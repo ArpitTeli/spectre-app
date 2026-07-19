@@ -232,17 +232,15 @@ ipcMain.handle('install-mod', async (_, modType) => {
     // Download CBA_A3 from GitHub
     try {
       const https = require('https');
-      const { pipeline } = require('stream/promises');
-      const { Readable } = require('stream');
 
       // Get latest release
-      const releaseUrl = 'https://api.github.com/repos/CBATeam/CBA_A3/releases/latest';
+      console.log('SPECTRE: Fetching CBA_A3 latest release...');
       const releaseData = await new Promise((resolve, reject) => {
-        https.get(releaseUrl, { headers: { 'User-Agent': 'SPECTRE-C2' } }, (res) => {
+        https.get('https://api.github.com/repos/CBATeam/CBA_A3/releases/latest', { headers: { 'User-Agent': 'SPECTRE-C2' } }, (res) => {
           let data = '';
           res.on('data', chunk => data += chunk);
           res.on('end', () => {
-            try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
+            try { resolve(JSON.parse(data)); } catch (e) { reject(new Error('Failed to parse GitHub response')); }
           });
         }).on('error', reject);
       });
@@ -250,26 +248,49 @@ ipcMain.handle('install-mod', async (_, modType) => {
       // Find the .zip asset
       const asset = releaseData.assets?.find(a => a.name.endsWith('.zip'));
       if (!asset) return { success: false, error: 'Could not find CBA_A3 download in latest release.' };
+      console.log('SPECTRE: Found CBA_A3 asset:', asset.name, 'size:', asset.size);
 
-      // Download
+      // Download with redirect handling
+      const downloadUrl = asset.browser_download_url;
+      console.log('SPECTRE: Downloading from:', downloadUrl);
+
       const zipPath = path.join(ARMA_INSTALL, 'cba_a3_temp.zip');
       await new Promise((resolve, reject) => {
-        https.get(asset.browser_download_url, { headers: { 'User-Agent': 'SPECTRE-C2' } }, (res) => {
-          if (res.statusCode === 302 || res.statusCode === 301) {
-            https.get(res.headers.location, { headers: { 'User-Agent': 'SPECTRE-C2' } }, (res2) => {
+        const download = (url) => {
+          https.get(url, { headers: { 'User-Agent': 'SPECTRE-C2' } }, (res) => {
+            if (res.statusCode === 302 || res.statusCode === 301) {
+              console.log('SPECTRE: Following redirect to:', res.headers.location);
+              download(res.headers.location);
+            } else if (res.statusCode === 200) {
               const file = fs.createWriteStream(zipPath);
-              res2.pipe(file);
-              file.on('finish', () => { file.close(); resolve(); });
-            }).on('error', reject);
-          } else {
-            const file = fs.createWriteStream(zipPath);
-            res.pipe(file);
-            file.on('finish', () => { file.close(); resolve(); });
-          }
-        }).on('error', reject);
+              let downloaded = 0;
+              res.on('data', (chunk) => {
+                downloaded += chunk.length;
+              });
+              res.pipe(file);
+              file.on('finish', () => {
+                file.close();
+                console.log('SPECTRE: Downloaded', downloaded, 'bytes');
+                resolve();
+              });
+            } else {
+              reject(new Error(`Download failed with status ${res.statusCode}`));
+            }
+          }).on('error', reject);
+        };
+        download(downloadUrl);
       });
 
+      // Check file exists and has size
+      const zipStat = fs.statSync(zipPath);
+      console.log('SPECTRE: ZIP file size:', zipStat.size, 'bytes');
+      if (zipStat.size < 1000) {
+        fs.unlinkSync(zipPath);
+        return { success: false, error: 'Downloaded file is too small - download may have failed.' };
+      }
+
       // Extract using PowerShell
+      console.log('SPECTRE: Extracting CBA_A3...');
       const { execSync } = require('child_process');
       fs.mkdirSync(cbaDir, { recursive: true });
       execSync(`powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${cbaDir}' -Force"`, { stdio: 'ignore' });
@@ -278,6 +299,7 @@ ipcMain.handle('install-mod', async (_, modType) => {
       // Fix nested folder: CBA_A3 zip extracts to @CBA_A3/@CBA_A3/, move contents up
       const nestedDir = path.join(cbaDir, '@CBA_A3');
       if (fs.existsSync(nestedDir)) {
+        console.log('SPECTRE: Fixing nested folder structure...');
         const items = fs.readdirSync(nestedDir);
         for (const item of items) {
           const src = path.join(nestedDir, item);
@@ -287,9 +309,15 @@ ipcMain.handle('install-mod', async (_, modType) => {
         fs.rmdirSync(nestedDir);
       }
 
+      // Verify installation
+      if (!fs.existsSync(path.join(cbaDir, 'mod.cpp'))) {
+        return { success: false, error: 'Extraction completed but mod.cpp not found. The zip format may have changed.' };
+      }
+
       console.log('SPECTRE: CBA_A3 installed to', cbaDir);
       return { success: true, path: cbaDir };
     } catch (e) {
+      console.error('SPECTRE: CBA_A3 install error:', e.message);
       return { success: false, error: `Failed to download CBA_A3: ${e.message}` };
     }
   }
