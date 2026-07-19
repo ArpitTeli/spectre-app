@@ -46,12 +46,14 @@
     ]
   },
   "build": {
+    "extends": null,
     "appId": "com.spectre.c2",
     "productName": "SPECTRE C2",
     "files": [
       "build/**/*",
       "electron/**/*",
-      "node_modules/**/*"
+      "node_modules/**/*",
+      "mod/**/*"
     ],
     "directories": {
       "buildResources": "public"
@@ -68,8 +70,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "spectre-c2",
-      "repo": "spectre",
+      "owner": "ArpitTeli",
+      "repo": "spectre-app",
       "releaseType": "release"
     }
   }

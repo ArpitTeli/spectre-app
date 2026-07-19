@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, crashReporter } = require('electron');
+const { app, BrowserWindow, ipcMain, crashReporter, dialog } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
@@ -150,6 +150,70 @@ function queueCommand(cmd) {
   flushCommandsToMission();
 }
 
+// ─── Auto-install mod to Arma 3 ──────────────────────────────────────────────
+function tryInstallMod() {
+  if (!ARMA_INSTALL) return;
+
+  const armaModDir = path.join(ARMA_INSTALL, '@SPECTRE');
+  const bundledMod = path.join(__dirname, '..', 'mod');
+
+  // Already installed?
+  if (fs.existsSync(path.join(armaModDir, 'mod.cpp'))) {
+    console.log('SPECTRE: mod already installed at', armaModDir);
+    return;
+  }
+
+  // Bundled mod exists?
+  if (!fs.existsSync(bundledMod)) {
+    console.log('SPECTRE: no bundled mod found, skipping auto-install');
+    return;
+  }
+
+  const result = dialog.showMessageBoxSync(mainWindow, {
+    type: 'question',
+    buttons: ['Install Mod', 'Skip'],
+    defaultId: 0,
+    title: 'SPECTRE C2 — Mod Installation',
+    message: 'Install the SPECTRE mod to Arma 3?',
+    detail: `Arma 3 detected at:\n${ARMA_INSTALL}\n\nThe mod will be installed to:\n${armaModDir}`,
+  });
+
+  if (result !== 0) return;
+
+  try {
+    copyDirRecursive(bundledMod, armaModDir);
+    console.log('SPECTRE: mod installed to', armaModDir);
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'SPECTRE C2',
+      message: 'Mod installed successfully!',
+      detail: 'You can now launch Arma 3 with the @SPECTRE mod enabled.',
+    });
+  } catch (e) {
+    console.error('SPECTRE: mod install failed:', e.message);
+    dialog.showMessageBox(mainWindow, {
+      type: 'error',
+      title: 'SPECTRE C2',
+      message: 'Mod installation failed',
+      detail: e.message,
+    });
+  }
+}
+
+function copyDirRecursive(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirRecursive(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
 // ─── Window ──────────────────────────────────────────────────────────────────
 let mainWindow;
 let logFilePos = 0;
@@ -217,6 +281,7 @@ app.whenReady().then(() => {
   createWindow();
   startBridgeWatcher();
   setupAutoUpdate();
+  tryInstallMod();
 });
 
 app.on('window-all-closed', () => {
