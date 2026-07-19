@@ -59,7 +59,8 @@
       "buildResources": "public"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "artifactName": "${productName}-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
