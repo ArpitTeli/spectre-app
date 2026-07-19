@@ -156,6 +156,15 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
   const [detecting, setDetecting]   = useState(false);
   const [detectedFolders, setDetectedFolders] = useState([]);
   const [showFolderList, setShowFolderList]   = useState(false);
+  const [armaPath, setArmaPath]     = useState('');
+  const [armaPathStatus, setArmaPathStatus] = useState('');
+  const [browsing, setBrowsing]     = useState(false);
+
+  useEffect(() => {
+    window.spectreAPI?.getArmaInfo?.().then(info => {
+      if (info?.installPath) setArmaPath(info.installPath);
+    });
+  }, []);
 
   const PRESETS = {
     openrouter: { base_url: 'https://openrouter.ai/api/v1', model: 'qwen/qwen3-next-80b-a3b-instruct:free',    ai_provider: 'openrouter' },
@@ -248,6 +257,56 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
             />
           </div>
         ))}
+
+        {/* ── Arma 3 Installation Path ── */}
+        <div className="settings-field">
+          <label className="settings-label">
+            Arma 3 Installation Path
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-muted)', marginLeft: '8px', fontWeight: 400 }}>
+              (for auto mod install)
+            </span>
+          </label>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <input
+              className="settings-input"
+              style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '11px' }}
+              placeholder="C:\Program Files (x86)\Steam\steamapps\common\Arma 3"
+              value={armaPath}
+              onChange={e => setArmaPath(e.target.value)}
+            />
+            <button
+              className="btn"
+              style={{ fontSize: '11px', whiteSpace: 'nowrap' }}
+              onClick={async () => {
+                setBrowsing(true);
+                try {
+                  const result = await window.spectreAPI?.setArmaPath?.(armaPath || undefined);
+                  if (result?.success) {
+                    setArmaPath(result.path);
+                    setArmaPathStatus('saved');
+                    setTimeout(() => setArmaPathStatus(''), 2000);
+                  } else if (result?.error) {
+                    setArmaPathStatus(result.error);
+                  }
+                } catch (_) {}
+                setBrowsing(false);
+              }}
+              disabled={browsing}
+            >
+              {browsing ? '...' : 'Browse'}
+            </button>
+          </div>
+          {armaPathStatus === 'saved' && (
+            <div style={{ marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-green)' }}>
+              ✓ Path saved — SPECTRE will install the mod to this location
+            </div>
+          )}
+          {armaPathStatus && armaPathStatus !== 'saved' && (
+            <div style={{ marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-yellow)' }}>
+              ⚠ {armaPathStatus}
+            </div>
+          )}
+        </div>
 
         {/* ── Mission Folder ── */}
         <div className="settings-field">

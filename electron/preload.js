@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('spectreAPI', {
   // ── Diagnostics ───────────────────────────────────────────────────────────
   getPaths:    () => ipcRenderer.invoke('get-paths'),
   getArmaInfo: () => ipcRenderer.invoke('get-arma-info'),
+  setArmaPath:  (p) => ipcRenderer.invoke('set-arma-path', p),
 
   // ── Auto-update ───────────────────────────────────────────────────────────
   onUpdateAvailable:  (cb) => ipcRenderer.on('update-available',  (_, info) => cb(info)),

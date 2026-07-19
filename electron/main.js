@@ -35,7 +35,7 @@ const INTEL_DIR    = path.join(USER_DATA, 'intel');
 const CONFIG_PATH  = path.join(USER_DATA, 'config.json');
 
 // ─── Auto-detect Arma 3 ─────────────────────────────────────────────────────
-const ARMA_INSTALL = detectArma3();
+let ARMA_INSTALL = detectArma3();
 const ARMA_DOCS    = detectArmaDocuments();
 const ARMA_SPECTRE = path.join(ARMA_DOCS, 'SPECTRE');
 
@@ -528,6 +528,32 @@ ipcMain.handle('get-arma-info', async () => {
     documentsPath: ARMA_DOCS,
     detected: !!ARMA_INSTALL,
   };
+});
+
+let customArmaPath = null;
+
+ipcMain.handle('set-arma-path', async (_, manualPath) => {
+  if (!manualPath) {
+    // Browse for folder
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'],
+      title: 'Select Arma 3 Installation Directory',
+    });
+    if (result.canceled || !result.filePaths[0]) return { success: false };
+    manualPath = result.filePaths[0];
+  }
+
+  // Verify it looks like Arma 3
+  const hasExe = fs.existsSync(path.join(manualPath, 'arma3_x64.exe')) ||
+                 fs.existsSync(path.join(manualPath, 'arma3.exe'));
+  if (!hasExe) {
+    return { success: false, error: 'No arma3_x64.exe found in that directory.' };
+  }
+
+  customArmaPath = manualPath;
+  ARMA_INSTALL = manualPath;
+  console.log('SPECTRE: manual Arma 3 path set:', manualPath);
+  return { success: true, path: manualPath };
 });
 
 // Window control IPC
