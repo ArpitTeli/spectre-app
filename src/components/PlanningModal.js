@@ -151,7 +151,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel })
       <div className="planning-container">
         <div className="planning-container__header">
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-            <div className="planning-container__title">⚡ Mission Planning</div>
+            <div className="planning-container__title">Mission Planning</div>
             <div className="planning-container__subtitle">
               {state.armaConnected
                 ? `${Object.keys(state.units).length} units available · ${Object.keys(state.contacts).length} contacts tracked`
@@ -229,7 +229,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel })
                     : `${userMessageCount} exchanges — click when you're ready to commit.`}
                 </div>
                 <button className="btn btn-success" onClick={handleGenerateOPORD} disabled={thinking}>
-                  📋 GENERATE OPORD
+                  GENERATE OPORD
                 </button>
               </div>
             )}
@@ -307,7 +307,7 @@ function OPORDView({ opord, thinking, onApprove, onRevise }) {
       <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border-primary)', display: 'flex', gap: '8px' }}>
         <button className="btn" onClick={onRevise} disabled={thinking}>◀ REVISE</button>
         <button className="btn btn-success" style={{ flex: 1 }} onClick={onApprove} disabled={thinking}>
-          {thinking ? '⟳ GENERATING COAs...' : '✓ APPROVE & GENERATE COAs'}
+          {thinking ? 'GENERATING COAs...' : 'APPROVE & GENERATE COAs'}
         </button>
       </div>
     </div>

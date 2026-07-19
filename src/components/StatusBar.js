@@ -206,7 +206,7 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
   return (
     <div className="settings-modal">
       <div className="settings-container" style={{ maxWidth: '560px' }}>
-        <div className="settings-title">⚙ Configuration</div>
+        <div className="settings-title">Configuration</div>
 
         {/* AI Provider */}
         <div className="settings-field">
@@ -297,13 +297,13 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
             </button>
           </div>
           {armaPathStatus === 'saved' && (
-            <div style={{ marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-green)' }}>
-              ✓ Path saved — SPECTRE will install the mod to this location
+            <div style={{ marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--accent)' }}>
+              Path saved — SPECTRE will install the mod to this location
             </div>
           )}
           {armaPathStatus && armaPathStatus !== 'saved' && (
-            <div style={{ marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-yellow)' }}>
-              ⚠ {armaPathStatus}
+            <div style={{ marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--yellow)' }}>
+              {armaPathStatus}
             </div>
           )}
         </div>
@@ -330,7 +330,7 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
               onClick={handleAutoDetect}
               disabled={detecting}
             >
-              {detecting ? '⟳' : '🔍 Auto-detect'}
+              {detecting ? '...' : 'Auto-detect'}
             </button>
           </div>
 
@@ -369,16 +369,15 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
           {/* Validation indicator */}
           {form.mission_folder_path && (
             <div style={{ marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '10px' }}>
-              {/* We can't check filesystem from renderer, so just show the path */}
-              <span style={{ color: 'var(--color-green)' }}>✓ </span>
+              <span style={{ color: 'var(--accent)' }}>OK </span>
               <span style={{ color: 'var(--text-muted)' }}>
                 Commands will write to: {form.mission_folder_path}\spectre_to_arma.sqf
               </span>
             </div>
           )}
           {!form.mission_folder_path && (
-            <div style={{ marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-yellow)' }}>
-              ⚠ Not set — SPECTRE cannot send commands to Arma until this is configured
+            <div style={{ marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--yellow)' }}>
+              Not set — SPECTRE cannot send commands to Arma until this is configured
             </div>
           )}
         </div>
@@ -407,7 +406,7 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
         <div className="settings-footer">
           <button className="btn" onClick={onClose}>CANCEL</button>
           <button className={`btn ${saved ? 'btn-success' : 'btn-primary'}`} onClick={handleSave}>
-            {saved ? '✓ SAVED' : 'SAVE CONFIG'}
+            {saved ? 'SAVED' : 'SAVE CONFIG'}
           </button>
         </div>
       </div>

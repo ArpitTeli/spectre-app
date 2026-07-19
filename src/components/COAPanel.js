@@ -214,9 +214,9 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
             </button>
           )}
           {isLastPhase && (
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--color-green)' }}>
-              ✓ Final phase active
-            </span>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)' }}>
+            Final phase active
+            </div>
           )}
         </div>
       </div>
@@ -249,7 +249,7 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
                 <div>
                   <div className="coa-card__name">COA {coa.id}: {coa.name}</div>
                   {coa.recommended && (
-                    <div style={{ fontSize: '10px', color: 'var(--color-green)', marginTop: '3px' }}>★ RECOMMENDED</div>
+                    <div style={{ fontSize: '10px', color: 'var(--accent)', marginTop: '3px', fontWeight: 600 }}>RECOMMENDED</div>
                   )}
                 </div>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: RISK_COLORS[coa.risk_level] || 'var(--text-muted)' }}>
@@ -345,7 +345,7 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
                 </button>
                 <button className="btn btn-success" style={{ flex: 1, fontSize: '11px' }}
                   onClick={() => handleExecute(coa, 0)}>
-                  ⚡ EXECUTE
+                  EXECUTE
                 </button>
               </div>
             </div>

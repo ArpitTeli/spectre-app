@@ -26,10 +26,10 @@ export default function AbortModal({ abortState, forceMetrics, rewardData, onCho
       }}>
         {/* Header */}
         <div style={{
-          background: 'rgba(255,68,68,0.15)', borderBottom: '1px solid var(--color-red)',
+          background: 'rgba(239,68,68,0.15)', borderBottom: '1px solid var(--color-red)',
           padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px'
         }}>
-          <span style={{ fontSize: '22px' }}>⚠</span>
+          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--color-red)', boxShadow: '0 0 10px rgba(239,68,68,0.6)' }} />
           <div>
             <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '18px', fontWeight: 700, color: 'var(--color-red)', letterSpacing: '2px' }}>
               EMERGENCY — MISSION ABORT RECOMMENDED

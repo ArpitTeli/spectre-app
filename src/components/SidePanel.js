@@ -62,32 +62,32 @@ function ForceMetrics({ forceMetrics, missionPhase, rewardData, patch, addCommsE
           <button className="btn btn-primary" style={{ flex: 1, fontSize: '11px' }} onClick={() => {
             addCommsEntry('SPECTRE', 'ALL', 'Mission planning initiated.', 'BLUE');
           }}>
-            ▶ BEGIN PLANNING
+            BEGIN PLANNING
           </button>
         )}
         {missionPhase === 'BRIEFING' && (
           <>
             <button className="btn" style={{ flex: 1, fontSize: '11px' }} onClick={() => patch({ missionPhase: 'PLANNING' })}>
-              📋 BEGIN PLANNING
+              BEGIN PLANNING
             </button>
             <button className="btn btn-success" style={{ fontSize: '11px', padding: '6px 10px' }} onClick={() => {
               patch({ missionPhase: 'ACTIVE', missionStartTime: Date.now() });
               addCommsEntry('SPECTRE', 'ALL', 'Mission is GO. Execute plan.', 'GREEN');
             }}>
-              ⚡ EXECUTE
+              EXECUTE
             </button>
           </>
         )}
         {missionPhase === 'ACTIVE' && (
           <>
             <button className="btn" style={{ flex: 1, fontSize: '11px' }} onClick={() => patch({ showCOAPanel: true })}>
-              📋 COA
+              COA
             </button>
             <button className="btn btn-success" style={{ fontSize: '11px', padding: '6px 10px' }} onClick={() => endMission(true)}>
-              ✓ OBJ
+              OBJ
             </button>
             <button className="btn btn-danger" style={{ fontSize: '11px', padding: '6px 10px' }} onClick={() => endMission(false)}>
-              ■ END
+              END
             </button>
           </>
         )}
@@ -239,7 +239,7 @@ function IntelTab({ intelDB, addIntel }) {
           onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) submit(); }}
         />
         <button className={`btn ${saved ? 'btn-success' : 'btn-primary'}`} style={{ marginTop: '6px', width: '100%', fontSize: '11px' }} onClick={submit}>
-          {saved ? '✓ INTEL LOGGED' : '+ LOG INTELLIGENCE'}
+          {saved ? 'INTEL LOGGED' : 'LOG INTELLIGENCE'}
         </button>
       </div>
 

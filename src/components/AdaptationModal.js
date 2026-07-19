@@ -19,9 +19,7 @@ export default function AdaptationModal({ adaptation, onAccept, onDismiss, onSho
         padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '16px' }}>
-            {adaptation.severity === 'CRITICAL' ? '🔴' : adaptation.severity === 'MAJOR' ? '🟠' : '🟡'}
-          </span>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color }} />
           <div>
             <span style={{ fontFamily: 'var(--font-condensed)', fontSize: '14px', fontWeight: 700, color, letterSpacing: '1px' }}>
               SPECTRE ADAPTATION — {adaptation.severity}
@@ -73,11 +71,11 @@ export default function AdaptationModal({ adaptation, onAccept, onDismiss, onSho
         {/* Actions */}
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="btn btn-success" style={{ flex: 1, fontSize: '11px' }} onClick={onAccept}>
-            ✓ ACCEPT & EXECUTE
+            ACCEPT & EXECUTE
           </button>
           {adaptation.new_coas && (
             <button className="btn btn-primary" style={{ flex: 1, fontSize: '11px' }} onClick={onShowNewCOAs}>
-              📋 VIEW NEW COAs
+              VIEW NEW COAs
             </button>
           )}
           <button className="btn" style={{ fontSize: '11px' }} onClick={onDismiss}>
