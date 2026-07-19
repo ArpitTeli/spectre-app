@@ -35,9 +35,24 @@ const INTEL_DIR    = path.join(USER_DATA, 'intel');
 const CONFIG_PATH  = path.join(USER_DATA, 'config.json');
 
 // ─── Auto-detect Arma 3 ─────────────────────────────────────────────────────
-let ARMA_INSTALL = detectArma3();
+let _configData;
+try { _configData = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch (_) { _configData = {}; }
+
+const ARMA_INSTALL = (_configData.arma_path && fs.existsSync(_configData.arma_path))
+  ? _configData.arma_path
+  : detectArma3();
 const ARMA_DOCS    = detectArmaDocuments();
 const ARMA_SPECTRE = path.join(ARMA_DOCS, 'SPECTRE');
+
+// Persist detected path back to config if we found one and config didn't have it
+if (ARMA_INSTALL && !_configData.arma_path) {
+  try {
+    let cfg = {};
+    try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch (_) {}
+    cfg.arma_path = ARMA_INSTALL;
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2));
+  } catch (_) {}
+}
 
 console.log('SPECTRE: Arma 3 install:', ARMA_INSTALL || '(not found)');
 console.log('SPECTRE: Arma 3 documents:', ARMA_DOCS);
@@ -50,6 +65,7 @@ const DEFAULT_CONFIG = {
   fallback_model:'qwen/qwen3-next-80b-a3b-instruct:free',
   base_url:      'https://openrouter.ai/api/v1',
   mission_folder_path: '',
+  arma_path:     '',
   auto_abort_threshold: {
     firepower_loss_pct: 50,
     crew_kia: 2
@@ -613,7 +629,11 @@ ipcMain.handle('get-config', async () => {
 });
 
 ipcMain.handle('save-config', async (_, config) => {
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  let existing = {};
+  try { existing = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch (_) {}
+  const merged = { ...existing, ...config };
+  if (ARMA_INSTALL) merged.arma_path = ARMA_INSTALL;
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2));
   return { success: true };
 });
 

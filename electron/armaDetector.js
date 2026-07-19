@@ -91,7 +91,13 @@ function detectArma3() {
     path.join('C:', 'Program Files', 'Steam', 'steamapps', 'common', 'Arma 3'),
     path.join('D:', 'SteamLibrary', 'steamapps', 'common', 'Arma 3'),
     path.join('D:', 'Steam', 'steamapps', 'common', 'Arma 3'),
+    path.join('D:', 'Games', 'Arma 3'),
     path.join('E:', 'SteamLibrary', 'steamapps', 'common', 'Arma 3'),
+    path.join('E:', 'Games', 'Arma 3'),
+    path.join('E:', 'Arma 3'),
+    path.join('F:', 'SteamLibrary', 'steamapps', 'common', 'Arma 3'),
+    path.join('F:', 'Games', 'Arma 3'),
+    path.join('F:', 'Arma 3'),
   ];
 
   for (const p of commonPaths) {
