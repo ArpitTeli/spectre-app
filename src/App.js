@@ -26,6 +26,16 @@ export default function App() {
     if (state.config) aiService.setConfig(state.config);
   }, [state.config]);
 
+  // Auto-update notifications
+  useEffect(() => {
+    window.spectreAPI?.onUpdateAvailable?.((info) => {
+      addCommsEntry('SPECTRE', 'ALL', `Update available: v${info.version}. Downloading...`, 'BLUE');
+    });
+    window.spectreAPI?.onUpdateDownloaded?.((info) => {
+      addCommsEntry('SPECTRE', 'ALL', `Update v${info.version} ready. Restart to apply.`, 'GREEN');
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Abort countdown ticker
   useEffect(() => {
     if (state.missionPhase !== 'ABORTING' || !state.abortState) return;
