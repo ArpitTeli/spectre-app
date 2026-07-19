@@ -275,6 +275,18 @@ ipcMain.handle('install-mod', async (_, modType) => {
       execSync(`powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${cbaDir}' -Force"`, { stdio: 'ignore' });
       fs.unlinkSync(zipPath);
 
+      // Fix nested folder: CBA_A3 zip extracts to @CBA_A3/@CBA_A3/, move contents up
+      const nestedDir = path.join(cbaDir, '@CBA_A3');
+      if (fs.existsSync(nestedDir)) {
+        const items = fs.readdirSync(nestedDir);
+        for (const item of items) {
+          const src = path.join(nestedDir, item);
+          const dest = path.join(cbaDir, item);
+          fs.renameSync(src, dest);
+        }
+        fs.rmdirSync(nestedDir);
+      }
+
       console.log('SPECTRE: CBA_A3 installed to', cbaDir);
       return { success: true, path: cbaDir };
     } catch (e) {
