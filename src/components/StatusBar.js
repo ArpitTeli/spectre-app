@@ -159,11 +159,14 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
   const [armaPath, setArmaPath]     = useState('');
   const [armaPathStatus, setArmaPathStatus] = useState('');
   const [browsing, setBrowsing]     = useState(false);
+  const [modStatus, setModStatus]   = useState({});
+  const [installing, setInstalling] = useState('');
 
   useEffect(() => {
     window.spectreAPI?.getArmaInfo?.().then(info => {
       if (info?.installPath) setArmaPath(info.installPath);
     });
+    window.spectreAPI?.checkModStatus?.().then(setModStatus);
   }, []);
 
   const PRESETS = {
@@ -201,6 +204,23 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
   const selectFolder = (folderPath) => {
     setForm(prev => ({ ...prev, mission_folder_path: folderPath }));
     setShowFolderList(false);
+  };
+
+  const handleInstallMod = async (modType) => {
+    setInstalling(modType);
+    try {
+      const result = await window.spectreAPI?.installMod?.(modType);
+      if (result?.success) {
+        setModStatus(prev => ({ ...prev, [modType]: true }));
+        setArmaPathStatus(result.message || `${modType.toUpperCase()} installed successfully`);
+        setTimeout(() => setArmaPathStatus(''), 3000);
+      } else {
+        setArmaPathStatus(result?.error || 'Installation failed');
+      }
+    } catch (e) {
+      setArmaPathStatus('Installation failed: ' + e.message);
+    }
+    setInstalling('');
   };
 
   return (
@@ -307,6 +327,34 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
             </div>
           )}
         </div>
+
+        {/* ── Mod Installation ── */}
+        {armaPath && (
+          <div className="settings-field">
+            <label className="settings-label">Mods</label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                className={`btn ${modStatus.spectre ? 'btn-success' : 'btn-primary'}`}
+                style={{ flex: 1, fontSize: '11px' }}
+                onClick={() => handleInstallMod('spectre')}
+                disabled={installing === 'spectre' || modStatus.spectre}
+              >
+                {installing === 'spectre' ? 'Installing...' : modStatus.spectre ? '@SPECTRE Installed' : 'Install @SPECTRE'}
+              </button>
+              <button
+                className={`btn ${modStatus.cba ? 'btn-success' : ''}`}
+                style={{ flex: 1, fontSize: '11px' }}
+                onClick={() => handleInstallMod('cba')}
+                disabled={installing === 'cba' || modStatus.cba}
+              >
+                {installing === 'cba' ? 'Downloading...' : modStatus.cba ? '@CBA_A3 Installed' : 'Install @CBA_A3'}
+              </button>
+            </div>
+            <div style={{ marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)' }}>
+              Both mods are required. CBA_A3 will be downloaded from GitHub.
+            </div>
+          </div>
+        )}
 
         {/* ── Mission Folder ── */}
         <div className="settings-field">

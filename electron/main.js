@@ -200,6 +200,100 @@ function tryInstallMod() {
   }
 }
 
+// ─── Manual mod install (from Settings) ──────────────────────────────────────
+ipcMain.handle('install-mod', async (_, modType) => {
+  if (!ARMA_INSTALL) {
+    return { success: false, error: 'Arma 3 path not set. Go to Settings and set the Arma 3 Installation Path first.' };
+  }
+
+  if (modType === 'spectre') {
+    const armaModDir = path.join(ARMA_INSTALL, '@SPECTRE');
+    const bundledMod = path.join(__dirname, '..', 'mod');
+
+    if (!fs.existsSync(bundledMod)) {
+      return { success: false, error: 'Bundled mod not found in app directory.' };
+    }
+
+    try {
+      copyDirRecursive(bundledMod, armaModDir);
+      console.log('SPECTRE: mod installed to', armaModDir);
+      return { success: true, path: armaModDir };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  if (modType === 'cba') {
+    const cbaDir = path.join(ARMA_INSTALL, '@CBA_A3');
+    if (fs.existsSync(path.join(cbaDir, 'mod.cpp'))) {
+      return { success: true, path: cbaDir, message: 'CBA_A3 already installed.' };
+    }
+
+    // Download CBA_A3 from GitHub
+    try {
+      const https = require('https');
+      const { pipeline } = require('stream/promises');
+      const { Readable } = require('stream');
+
+      // Get latest release
+      const releaseUrl = 'https://api.github.com/repos/CBATeam/CBA_A3/releases/latest';
+      const releaseData = await new Promise((resolve, reject) => {
+        https.get(releaseUrl, { headers: { 'User-Agent': 'SPECTRE-C2' } }, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
+          });
+        }).on('error', reject);
+      });
+
+      // Find the .zip asset
+      const asset = releaseData.assets?.find(a => a.name.endsWith('.zip'));
+      if (!asset) return { success: false, error: 'Could not find CBA_A3 download in latest release.' };
+
+      // Download
+      const zipPath = path.join(ARMA_INSTALL, 'cba_a3_temp.zip');
+      await new Promise((resolve, reject) => {
+        https.get(asset.browser_download_url, { headers: { 'User-Agent': 'SPECTRE-C2' } }, (res) => {
+          if (res.statusCode === 302 || res.statusCode === 301) {
+            https.get(res.headers.location, { headers: { 'User-Agent': 'SPECTRE-C2' } }, (res2) => {
+              const file = fs.createWriteStream(zipPath);
+              res2.pipe(file);
+              file.on('finish', () => { file.close(); resolve(); });
+            }).on('error', reject);
+          } else {
+            const file = fs.createWriteStream(zipPath);
+            res.pipe(file);
+            file.on('finish', () => { file.close(); resolve(); });
+          }
+        }).on('error', reject);
+      });
+
+      // Extract using PowerShell
+      const { execSync } = require('child_process');
+      fs.mkdirSync(cbaDir, { recursive: true });
+      execSync(`powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${cbaDir}' -Force"`, { stdio: 'ignore' });
+      fs.unlinkSync(zipPath);
+
+      console.log('SPECTRE: CBA_A3 installed to', cbaDir);
+      return { success: true, path: cbaDir };
+    } catch (e) {
+      return { success: false, error: `Failed to download CBA_A3: ${e.message}` };
+    }
+  }
+
+  return { success: false, error: 'Unknown mod type.' };
+});
+
+ipcMain.handle('check-mod-status', async () => {
+  const mods = {};
+  if (ARMA_INSTALL) {
+    mods.spectre = fs.existsSync(path.join(ARMA_INSTALL, '@SPECTRE', 'mod.cpp'));
+    mods.cba = fs.existsSync(path.join(ARMA_INSTALL, '@CBA_A3', 'mod.cpp'));
+  }
+  return mods;
+});
+
 function copyDirRecursive(src, dest) {
   fs.mkdirSync(dest, { recursive: true });
   const entries = fs.readdirSync(src, { withFileTypes: true });

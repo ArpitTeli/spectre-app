@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld('spectreAPI', {
   getPaths:    () => ipcRenderer.invoke('get-paths'),
   getArmaInfo: () => ipcRenderer.invoke('get-arma-info'),
   setArmaPath:  (p) => ipcRenderer.invoke('set-arma-path', p),
+  installMod:   (type) => ipcRenderer.invoke('install-mod', type),
+  checkModStatus: () => ipcRenderer.invoke('check-mod-status'),
 
   // ── Auto-update ───────────────────────────────────────────────────────────
   onUpdateAvailable:  (cb) => ipcRenderer.on('update-available',  (_, info) => cb(info)),
