@@ -7,7 +7,7 @@ function formatElapsed(sec) {
 }
 
 // ─── Status Bar ───────────────────────────────────────────────────────────────
-export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionElapsedSec, rewardData, onCommsToggle, bridgePaths }) {
+export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionElapsedSec, rewardData, onCommsToggle, bridgePaths, mode, roomCode, relayClients }) {
   const [clock, setClock] = useState(new Date().toLocaleTimeString('en-GB', { hour12: false }));
   useEffect(() => {
     const t = setInterval(() => setClock(new Date().toLocaleTimeString('en-GB', { hour12: false })), 1000);
@@ -25,9 +25,12 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
       </div>
       <div className="statusbar__divider" />
       <div className="statusbar__item">
-        <span className="statusbar__item-label">ARMA:</span>
+        <span className="statusbar__item-label">{mode === 'client' ? 'HOST:' : 'ARMA:'}</span>
         <span className={`statusbar__item-value ${armaConnected ? 'good' : 'danger'}`}>
-          {armaConnected ? 'CONNECTED' : 'OFFLINE'}
+          {mode === 'client'
+            ? (armaConnected ? 'CONNECTED' : 'DISCONNECTED')
+            : (armaConnected ? 'CONNECTED' : 'OFFLINE')
+          }
         </span>
       </div>
       <div className="statusbar__divider" />
@@ -88,7 +91,7 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
         ◈ COMMS
       </button>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '2px', marginLeft: '10px' }}>
-        SPECTRE C2 v1.4.3
+        SPECTRE C2 v1.5.0
       </div>
     </div>
   );

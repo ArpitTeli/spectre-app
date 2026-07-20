@@ -10,17 +10,22 @@ import COAPanel from './components/COAPanel';
 import AbortModal from './components/AbortModal';
 import AdaptationModal from './components/AdaptationModal';
 import AARPanel from './components/AARPanel';
+import ModeSelect from './components/ModeSelect';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles/global.css';
 
 export default function App() {
   const {
     state, patch, addCommsEntry, sendArmaCommand,
-    addIntel, endMission, generateMissionVault
+    addIntel, endMission, generateMissionVault, setCommandMode
   } = useSpectreStore();
 
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  const [appMode, setAppMode] = useState(null); // 'host' | 'client' | null
+  const [roomCode, setRoomCode] = useState('');
+  const [relayStatus, setRelayStatus] = useState({ connected: false, clients: 0 });
 
   // Sync AI config
   useEffect(() => {
@@ -32,7 +37,6 @@ export default function App() {
   const [updateDownloaded, setUpdateDownloaded] = useState(false);
 
   useEffect(() => {
-    // Signal to main process that renderer is ready to receive IPC
     window.spectreAPI?.rendererReady?.();
 
     window.spectreAPI?.onUpdateAvailable?.((info) => {
@@ -43,6 +47,16 @@ export default function App() {
       setUpdateDownloaded(true);
       setUpdateInfo(info);
       addCommsEntry('SPECTRE', 'ALL', `Update v${info.version} ready. Restart to apply.`, 'GREEN');
+    });
+
+    // Listen for relay status updates
+    window.spectreAPI?.onRelayStatus?.((data) => {
+      setRelayStatus(data);
+      if (data.connected && data.mode === 'client') {
+        addCommsEntry('SPECTRE', 'ALL', `Connected to host. Room: ${data.room}`, 'GREEN');
+      } else if (!data.connected && data.error) {
+        addCommsEntry('SPECTRE', `Relay: ${data.error}`, 'RED');
+      }
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -60,7 +74,7 @@ export default function App() {
       }));
     }, 1000);
     return () => clearTimeout(t);
-  }, [state.missionPhase, state.abortState?.countdown, patch]); // eslint-disable-line react-hooks/exhaustive-deps -- state.abortState?.countdown already captures the relevant change
+  }, [state.missionPhase, state.abortState?.countdown, patch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAbortChoice = useCallback(async (choiceId) => {
     patch({ missionPhase: 'ACTIVE', abortState: null });
@@ -79,9 +93,6 @@ export default function App() {
     }
   }, [patch, addCommsEntry, sendArmaCommand]);
 
-  // Use a ref so the abort countdown effect always calls the latest handler
-  // without adding handleAbortChoice to the effect deps (which would reset
-  // the timer on every Arma state update).
   const handleAbortChoiceRef = useRef(handleAbortChoice);
   handleAbortChoiceRef.current = handleAbortChoice;
 
@@ -96,19 +107,54 @@ export default function App() {
     patch({ pendingAdaptation: null });
   }, [sendArmaCommand, addCommsEntry, patch]);
 
+  // Mode selection handler
+  const handleModeSelect = useCallback(({ mode, roomCode: code }) => {
+    setAppMode(mode);
+    setRoomCode(code);
+
+    if (mode === 'host') {
+      // Host mode: start bridge + connect to relay as host
+      setCommandMode('local');
+      patch({ missionPhase: 'BRIEFING' });
+      const config = stateRef.current.config;
+      if (config?.relay_url) {
+        window.spectreAPI?.relayConnect?.({ mode: 'host', roomCode: code || 'DEFAULT', url: config.relay_url });
+      } else {
+        window.spectreAPI?.relayConnect?.({ mode: 'host', roomCode: code || 'DEFAULT' });
+      }
+    } else {
+      // Client mode: connect to relay as client, skip Arma bridge
+      setCommandMode('relay');
+      patch({ missionPhase: 'BRIEFING', armaConnected: false });
+      const config = stateRef.current.config;
+      if (config?.relay_url) {
+        window.spectreAPI?.relayConnect?.({ mode: 'client', roomCode: code, url: config.relay_url });
+      } else {
+        window.spectreAPI?.relayConnect?.({ mode: 'client', roomCode: code });
+      }
+    }
+  }, [patch, setCommandMode]);
+
+  // Show mode select if no mode chosen
+  if (!appMode) {
+    return <ModeSelect onSelect={handleModeSelect} />;
+  }
+
   return (
     <ErrorBoundary>
     <div className="app">
       <TitleBar
         missionPhase={state.missionPhase}
         missionElapsedSec={state.missionElapsedSec}
-        armaConnected={state.armaConnected}
+        armaConnected={appMode === 'client' ? relayStatus.connected : state.armaConnected}
+        mode={appMode}
+        roomCode={roomCode}
+        relayClients={relayStatus.clients}
         onMinimize={() => window.spectreAPI?.minimize()}
         onMaximize={() => window.spectreAPI?.maximize()}
         onClose={() => window.spectreAPI?.close()}
       />
 
-      {/* Update notification banner */}
       {updateDownloaded && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -158,13 +204,16 @@ export default function App() {
       </div>
 
       <StatusBar
-        armaConnected={state.armaConnected}
+        armaConnected={appMode === 'client' ? relayStatus.connected : state.armaConnected}
         forceMetrics={state.forceMetrics}
         missionPhase={state.missionPhase}
         missionElapsedSec={state.missionElapsedSec}
         rewardData={state.rewardData}
         lastUpdate={state.lastArmaUpdate}
         bridgePaths={state.bridgePaths}
+        mode={appMode}
+        roomCode={roomCode}
+        relayClients={relayStatus.clients}
         onCommsToggle={() => patch(p => ({ ...p, showComms: !p.showComms }))}
       />
 
@@ -231,7 +280,6 @@ export default function App() {
             await window.spectreAPI?.saveConfig(config);
             patch({ config, showSettings: false });
             aiService.setConfig(config);
-            // Notify main process about Vercel relay URL
             if (config.vercel_url) {
               window.spectreAPI?.setVercelUrl?.(config.vercel_url);
             }

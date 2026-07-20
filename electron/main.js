@@ -69,7 +69,11 @@ dbg('SPECTRE: Arma 3 documents: ' + ARMA_DOCS);
 dbg('SPECTRE: Config path: ' + CONFIG_PATH);
 
 // ─── Default config ──────────────────────────────────────────────────────────
+const RELAY_URL = 'wss://spectre-relay-production.up.railway.app'; // cloud relay
 const DEFAULT_CONFIG = {
+  mode:          'host', // 'host' or 'client'
+  room_code:     '',
+  relay_url:     RELAY_URL,
   ai_provider:   'openrouter',
   api_keys:      [],
   model:         'qwen/qwen3-next-80b-a3b-instruct:free',
@@ -199,6 +203,112 @@ async function postToVercel(data) {
     }
   }
   vercelPosting = false;
+}
+
+// ─── Cloud Relay Connection (Host/Client modes) ─────────────────────────────
+let relayWs = null;
+let relayConnected = false;
+let relayRoomCode = '';
+let relayMode = 'host'; // 'host' or 'client'
+let relayReconnectTimer = null;
+
+function connectToRelay(mode, roomCode, url) {
+  relayMode = mode;
+  relayRoomCode = roomCode;
+  if (relayWs) { relayWs.close(); relayWs = null; }
+  if (relayReconnectTimer) { clearTimeout(relayReconnectTimer); relayReconnectTimer = null; }
+
+  const relayUrl = url || RELAY_URL;
+  dbg(`SPECTRE: Connecting to relay as ${mode}, room ${roomCode}, url ${relayUrl}`);
+
+  try {
+    relayWs = new WebSocket(relayUrl);
+  } catch (e) {
+    dbg(`SPECTRE: Relay connect error: ${e.message}`);
+    scheduleReconnect(mode, roomCode, url);
+    return;
+  }
+
+  relayWs.on('open', () => {
+    relayConnected = true;
+    dbg('SPECTRE: Relay connected, joining room...');
+    relayWs.send(JSON.stringify({ type: 'join', room: roomCode, role: mode }));
+    sendToRenderer('relay-status', { connected: true, mode, room: roomCode });
+  });
+
+  relayWs.on('message', (raw) => {
+    let msg;
+    try { msg = JSON.parse(raw.toString()); } catch { return; }
+
+    if (msg.type === 'joined') {
+      dbg(`SPECTRE: Joined room ${msg.room} as ${msg.role}`);
+      sendToRenderer('relay-status', { connected: true, mode, room: roomCode, clients: msg.clients });
+    }
+
+    if (msg.type === 'client_count') {
+      sendToRenderer('relay-status', { connected: true, mode, room: roomCode, clients: msg.count });
+    }
+
+    // Client receives state from relay
+    if (msg.type === 'state' && relayMode === 'client') {
+      sendToRenderer('arma-state-update', msg.data);
+    }
+
+    // Host receives commands from relay
+    if (msg.type === 'command' && relayMode === 'host') {
+      if (msg.data) {
+        queueCommand(msg.data);
+        dbg(`SPECTRE: Relay command received: ${msg.data.type}`);
+      }
+    }
+
+    if (msg.type === 'host_disconnected') {
+      sendToRenderer('relay-status', { connected: false, mode, room: roomCode, error: 'Host disconnected' });
+    }
+
+    if (msg.type === 'error') {
+      dbg(`SPECTRE: Relay error: ${msg.message}`);
+      sendToRenderer('relay-status', { connected: false, mode, room: roomCode, error: msg.message });
+    }
+  });
+
+  relayWs.on('close', () => {
+    relayConnected = false;
+    dbg('SPECTRE: Relay disconnected');
+    sendToRenderer('relay-status', { connected: false, mode, room: roomCode });
+    scheduleReconnect(mode, roomCode, url);
+  });
+
+  relayWs.on('error', (e) => {
+    dbg(`SPECTRE: Relay WebSocket error: ${e.message}`);
+  });
+}
+
+function scheduleReconnect(mode, roomCode, url) {
+  if (relayReconnectTimer) return;
+  relayReconnectTimer = setTimeout(() => {
+    relayReconnectTimer = null;
+    if (!relayConnected) {
+      dbg('SPECTRE: Attempting relay reconnect...');
+      connectToRelay(mode, roomCode, url);
+    }
+  }, 3000);
+}
+
+function sendStateToRelay(data) {
+  if (!relayWs || relayWs.readyState !== WebSocket.OPEN || relayMode !== 'host') return;
+  try {
+    relayWs.send(JSON.stringify({ type: 'state', data }));
+  } catch (e) {
+    dbg(`SPECTRE: Relay send error: ${e.message}`);
+  }
+}
+
+function disconnectRelay() {
+  if (relayWs) { relayWs.close(); relayWs = null; }
+  if (relayReconnectTimer) { clearTimeout(relayReconnectTimer); relayReconnectTimer = null; }
+  relayConnected = false;
+  sendToRenderer('relay-status', { connected: false, mode: null, room: null });
 }
 
 function getWebViewerHTML() {
@@ -920,6 +1030,7 @@ function parseArmaLog(chunk) {
         sendToRenderer('arma-state-update', data);
         broadcastToWebClients(data);
         postToVercel(data);
+        sendStateToRelay(data);
         gotData = true;
       } catch (e) {
         dbg('SPECTRE: legacy parse error: ' + e.message);
@@ -944,6 +1055,7 @@ function parseArmaLog(chunk) {
     sendToRenderer('arma-state-update', data);
     broadcastToWebClients(data);
     postToVercel(data);
+    sendStateToRelay(data);
 
     // Reset accumulator (keep mapName and missionFolder for next chunk)
     pendingState.units = {};
@@ -1175,6 +1287,14 @@ ipcMain.on('maximize-window', () => mainWindow?.isMaximized() ? mainWindow.unmax
 ipcMain.on('close-window',    () => mainWindow?.close());
 ipcMain.on('open-external',   (_, url) => shell.openExternal(url));
 ipcMain.on('set-vercel-url',  (_, url) => setVercelUrl(url));
+ipcMain.on('relay-connect',   (_, { mode, roomCode, url }) => connectToRelay(mode, roomCode, url));
+ipcMain.on('relay-disconnect', () => disconnectRelay());
+ipcMain.on('relay-command',   (_, cmd) => {
+  // Client sends command through relay to host
+  if (relayWs && relayWs.readyState === WebSocket.OPEN && relayMode === 'client') {
+    relayWs.send(JSON.stringify({ type: 'command', data: cmd }));
+  }
+});
 ipcMain.on('restart-app',     () => {
   const { autoUpdater } = require('electron-updater');
   autoUpdater.quitAndInstall();

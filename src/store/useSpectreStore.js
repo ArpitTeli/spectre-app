@@ -158,7 +158,17 @@ export function useSpectreStore() {
   // ── Arma commands ─────────────────────────────────────────────────────────
   const sendArmaCommand = useCallback(async (command) => {
     if (!window.spectreAPI) return;
+    // In client mode, send through relay instead of local bridge
+    if (stateRef.current._commandMode === 'relay') {
+      window.spectreAPI.relayCommand?.(command);
+      return;
+    }
     return window.spectreAPI.sendCommand(command);
+  }, []);
+
+  // ── Set command mode (host=local, client=relay) ───────────────────────────
+  const setCommandMode = useCallback((mode) => {
+    setState(prev => ({ ...prev, _commandMode: mode }));
   }, []);
 
   // ── Intel ─────────────────────────────────────────────────────────────────
@@ -244,7 +254,7 @@ export function useSpectreStore() {
     }
   }, [patch]);
 
-  return { state, patch, addCommsEntry, sendArmaCommand, addIntel, endMission, recalcForceMetrics, generateMissionVault };
+  return { state, patch, addCommsEntry, sendArmaCommand, addIntel, endMission, recalcForceMetrics, generateMissionVault, setCommandMode };
 }
 
 // ─── Process Arma state update ────────────────────────────────────────────────

@@ -16,7 +16,7 @@ const PHASE_LABELS = {
   AAR: 'AFTER ACTION REVIEW'
 };
 
-export default function TitleBar({ missionPhase, missionElapsedSec, armaConnected, onMinimize, onMaximize, onClose }) {
+export default function TitleBar({ missionPhase, missionElapsedSec, armaConnected, mode, roomCode, relayClients, onMinimize, onMaximize, onClose }) {
   return (
     <div className="titlebar">
       <span className="titlebar__logo">SPECTRE</span>
@@ -41,9 +41,35 @@ export default function TitleBar({ missionPhase, missionElapsedSec, armaConnecte
           color: armaConnected ? 'var(--accent)' : 'var(--red)',
           fontFamily: 'var(--font-mono)', fontSize: '10px'
         }}>
-          {armaConnected ? 'ARMA LINK ACTIVE' : 'ARMA NOT CONNECTED'}
+          {mode === 'client'
+            ? (armaConnected ? 'CONNECTED TO HOST' : 'HOST DISCONNECTED')
+            : (armaConnected ? 'ARMA LINK ACTIVE' : 'ARMA NOT CONNECTED')
+          }
         </span>
       </div>
+
+      {roomCode && (
+        <>
+          <div className="titlebar__divider" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)' }}>
+              {mode === 'client' ? 'ROOM:' : 'HOSTING:'}
+            </span>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 600,
+              color: 'var(--accent)', background: 'var(--accent-dim)',
+              padding: '1px 6px', borderRadius: '3px', letterSpacing: '1px'
+            }}>
+              {roomCode}
+            </span>
+            {mode === 'host' && relayClients > 0 && (
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)' }}>
+                {relayClients} connected
+              </span>
+            )}
+          </div>
+        </>
+      )}
 
       <div className="titlebar__spacer" />
       <div className="titlebar__controls">

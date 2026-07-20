@@ -58,4 +58,8 @@ contextBridge.exposeInMainWorld('spectreAPI', {
   rendererReady: () => ipcRenderer.send('renderer-ready'),
   openExternal: (url) => ipcRenderer.send('open-external', url),
   setVercelUrl: (url) => ipcRenderer.send('set-vercel-url', url),
+  relayConnect: (opts) => ipcRenderer.send('relay-connect', opts),
+  relayDisconnect: () => ipcRenderer.send('relay-disconnect'),
+  relayCommand: (cmd) => ipcRenderer.send('relay-command', cmd),
+  onRelayStatus: (cb) => ipcRenderer.on('relay-status', (_, data) => cb(data)),
 });
