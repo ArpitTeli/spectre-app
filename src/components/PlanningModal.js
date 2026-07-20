@@ -21,7 +21,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
       aiService.setConfig(state.config);
     }
     aiService.resetConversation();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Number of user messages sent so far (used to decide when to show OPORD button)
   const userMessageCount = messages.filter(m => m.role === 'user').length;
