@@ -412,10 +412,27 @@ function setupAutoUpdate() {
     const { autoUpdater } = require('electron-updater');
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.logger = {
+      info: (msg) => console.log('SPECTRE-UPDATER:', msg),
+      warn: (msg) => console.warn('SPECTRE-UPDATER:', msg),
+      error: (msg) => console.error('SPECTRE-UPDATER:', msg),
+    };
+
+    autoUpdater.on('checking-for-update', () => {
+      console.log('SPECTRE: Checking for updates...');
+    });
 
     autoUpdater.on('update-available', (info) => {
       console.log('SPECTRE: Update available:', info.version);
       sendToRenderer('update-available', info);
+    });
+
+    autoUpdater.on('update-not-available', (info) => {
+      console.log('SPECTRE: No update available. Current version:', info.version);
+    });
+
+    autoUpdater.on('download-progress', (progress) => {
+      console.log(`SPECTRE: Download progress: ${Math.round(progress.percent)}%`);
     });
 
     autoUpdater.on('update-downloaded', (info) => {
@@ -425,14 +442,20 @@ function setupAutoUpdate() {
 
     autoUpdater.on('error', (err) => {
       console.error('SPECTRE: Auto-update error:', err.message);
+      console.error('SPECTRE: Auto-update error stack:', err.stack);
     });
 
     // Check for updates on startup (delay 10s to not block startup)
     setTimeout(() => {
-      autoUpdater.checkForUpdates().catch(() => {});
+      console.log('SPECTRE: Initiating update check...');
+      autoUpdater.checkForUpdates().then((result) => {
+        console.log('SPECTRE: Update check result:', JSON.stringify(result?.updateInfo?.version || 'none'));
+      }).catch((err) => {
+        console.error('SPECTRE: Update check failed:', err.message);
+      });
     }, 10000);
-  } catch (_) {
-    // electron-updater not installed, skip
+  } catch (err) {
+    console.error('SPECTRE: Failed to setup auto-updater:', err.message);
   }
 }
 
