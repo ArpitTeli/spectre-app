@@ -1,0 +1,2 @@
+6||6||6||28||warning||Undefined Function: spectre_fnc_bridgeinit||undefined function||/addons/spectre_bridge/XEH_postInit.sqf
+165||165||23||29||error||SQF Syntax could not be parsed||unparseable syntax||/addons/spectre_bridge/functions/fn_bridgeInit.sqf

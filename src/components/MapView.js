@@ -103,17 +103,18 @@ export default function MapView({
   const contactLayer = useRef(null);
   const coaLayer    = useRef(null);
   const [dismissOverlay, setDismissOverlay] = useState(false);
+  const prevMapNameRef = useRef(null);
 
   // ── Init map once ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (mapInst.current) return;
 
     const map = L.map(mapRef.current, {
-      center: [39.15, 21.18],
+      center: [39.0, 21.0],
       zoom: 13,
       zoomControl: false,
       attributionControl: false,
-      preferCanvas: true // Better performance for many markers
+      preferCanvas: true
     });
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -129,12 +130,23 @@ export default function MapView({
 
     mapInst.current = map;
 
-    // Cleanup
     return () => {
       map.remove();
       mapInst.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Re-center map when mapName changes ──────────────────────────────────────
+  useEffect(() => {
+    if (!mapInst.current || !mapName) return;
+    if (mapName === prevMapNameRef.current) return;
+    prevMapNameRef.current = mapName;
+
+    const coords = getMapCoords(mapName);
+    const centerLat = coords[0] + 0.15;
+    const centerLng = coords[1] + 0.15;
+    mapInst.current.setView([centerLat, centerLng], 13);
+  }, [mapName]);
 
   // ── Update unit markers ────────────────────────────────────────────────────
   useEffect(() => {
@@ -161,6 +173,20 @@ export default function MapView({
 
       unitLayer.current.addLayer(marker);
     });
+
+    // Auto-fit bounds to all units every update
+    if (mapInst.current) {
+      const unitList = Object.values(units).filter(u => u.position);
+      const latlngs = unitList.map(u => getUnitLatLng(u.position, mapName)).filter(Boolean);
+      if (latlngs.length > 0) {
+        const bounds = L.latLngBounds(latlngs);
+        if (latlngs.length === 1) {
+          mapInst.current.setView(latlngs[0], 15);
+        } else {
+          mapInst.current.fitBounds(bounds, { padding: [80, 80], maxZoom: 15 });
+        }
+      }
+    }
   }, [units, selectedUnit, onUnitSelect, mapName]);
 
   // ── Update contact markers ─────────────────────────────────────────────────
@@ -226,20 +252,6 @@ export default function MapView({
       });
     });
   }, [selectedCOA, showCOAOverlay, units, mapName]);
-
-  // ── Auto-pan to units when first connected ─────────────────────────────────
-  const hasPannedRef = useRef(false);
-  useEffect(() => {
-    if (hasPannedRef.current || !mapInst.current) return;
-    const unitList = Object.values(units).filter(u => u.position);
-    if (unitList.length === 0) return;
-
-    const latlngs = unitList.map(u => getUnitLatLng(u.position, mapName)).filter(Boolean);
-    if (latlngs.length > 0) {
-      mapInst.current.fitBounds(L.latLngBounds(latlngs), { padding: [60, 60], maxZoom: 15 });
-      hasPannedRef.current = true;
-    }
-  }, [units, mapName]);
 
   return (
     <div className="map-container">

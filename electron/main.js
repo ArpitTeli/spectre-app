@@ -54,8 +54,17 @@ if (ARMA_INSTALL && !_configData.arma_path) {
   } catch (_) {}
 }
 
-console.log('SPECTRE: Arma 3 install:', ARMA_INSTALL || '(not found)');
-console.log('SPECTRE: Arma 3 documents:', ARMA_DOCS);
+const DEBUG_LOG = path.join(USER_DATA, 'debug.log');
+function dbg(msg) {
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  try { fs.appendFileSync(DEBUG_LOG, line); } catch (_) {}
+  console.log(line.trimEnd());
+}
+
+dbg('SPECTRE: App starting');
+dbg('SPECTRE: Arma 3 install: ' + (ARMA_INSTALL || '(not found)'));
+dbg('SPECTRE: Arma 3 documents: ' + ARMA_DOCS);
+dbg('SPECTRE: Config path: ' + CONFIG_PATH);
 
 // ─── Default config ──────────────────────────────────────────────────────────
 const DEFAULT_CONFIG = {
@@ -461,6 +470,7 @@ function watchArmaLog() {
   const logPath = findLatestRptLog(ARMA_DOCS);
 
   if (!logPath) {
+    dbg('SPECTRE: no RPT log found, retrying in 5s...');
     setTimeout(watchArmaLog, 5000);
     return;
   }
@@ -469,9 +479,10 @@ function watchArmaLog() {
   if (logPath !== currentLogPath) {
     currentLogPath = logPath;
     try { logFilePos = fs.statSync(logPath).size; } catch (_) { logFilePos = 0; }
-    console.log('SPECTRE: tailing Arma log:', logPath);
+    dbg('SPECTRE: tailing Arma log: ' + logPath + ' at offset ' + logFilePos);
   }
 
+  // Use chokidar for file watching
   chokidar.watch(logPath, { persistent: true, usePolling: true, interval: 500 })
     .on('change', () => {
       try {
@@ -491,7 +502,8 @@ function watchArmaLog() {
         fs.closeSync(fd);
         logFilePos = stat.size;
 
-        parseArmaLog(buf.toString('utf8'));
+        const chunk = buf.toString('utf8');
+        parseArmaLog(chunk);
 
         // Check for newer RPT files periodically
         checkForNewerLog();
@@ -499,6 +511,49 @@ function watchArmaLog() {
         console.error('SPECTRE: log read error:', e.message);
       }
     });
+
+  // Fallback: polling timer in case chokidar misses changes
+  setInterval(() => {
+    try {
+      const latestRpt = findLatestRptLog(ARMA_DOCS);
+      if (latestRpt && latestRpt !== currentLogPath) {
+        console.log('SPECTRE: new RPT detected by polling:', latestRpt);
+        currentLogPath = latestRpt;
+        try { logFilePos = fs.statSync(latestRpt).size; } catch (_) { logFilePos = 0; }
+        // Watch the new file too
+        chokidar.watch(latestRpt, { persistent: true, usePolling: true, interval: 500 })
+          .on('change', () => {
+            try {
+              const stat = fs.statSync(latestRpt);
+              if (stat.size < logFilePos) { logFilePos = 0; }
+              if (stat.size === logFilePos) return;
+              const fd  = fs.openSync(latestRpt, 'r');
+              const len = stat.size - logFilePos;
+              const buf = Buffer.alloc(len);
+              fs.readSync(fd, buf, 0, len, logFilePos);
+              fs.closeSync(fd);
+              logFilePos = stat.size;
+              parseArmaLog(buf.toString('utf8'));
+              checkForNewerLog();
+            } catch (e) {}
+          });
+      }
+
+      // Also re-read current file in case chokidar missed
+      if (currentLogPath && fs.existsSync(currentLogPath)) {
+        const stat = fs.statSync(currentLogPath);
+        if (stat.size > logFilePos) {
+          const len = stat.size - logFilePos;
+          const fd = fs.openSync(currentLogPath, 'r');
+          const buf = Buffer.alloc(len);
+          fs.readSync(fd, buf, 0, len, logFilePos);
+          fs.closeSync(fd);
+          logFilePos = stat.size;
+          parseArmaLog(buf.toString('utf8'));
+        }
+      }
+    } catch (_) {}
+  }, 2000);
 }
 
 // Check if a newer RPT file has appeared (log rotation by Arma)
@@ -516,26 +571,137 @@ function checkForNewerLog() {
   }
 }
 
+// Accumulator for multi-line state
+let pendingState = { units: {}, contacts: {}, events: [], mapName: null, missionFolder: null, timestamp: 0 };
+
 function parseArmaLog(chunk) {
-  for (const line of chunk.split('\n')) {
+  const lines = chunk.split('\n');
+  let gotData = false;
+
+  for (const line of lines) {
+    // New per-line format: SPECTRE_META, SPECTRE_UNIT, SPECTRE_CONTACT, SPECTRE_EVENTS
+    const metaMatch = line.match(/SPECTRE_META:(\{.+\})/);
+    if (metaMatch) {
+      try {
+        const jsonStr = metaMatch[1].replace(/""/g, '"');
+        const meta = JSON.parse(jsonStr);
+        if (meta.map) pendingState.mapName = meta.map;
+        if (meta.mf) pendingState.missionFolder = meta.mf;
+        if (meta.ts) pendingState.timestamp = meta.ts;
+        gotData = true;
+      } catch (e) { dbg('SPECTRE: meta parse error: ' + e.message); }
+      continue;
+    }
+
+    const unitMatch = line.match(/SPECTRE_UNIT:(\{.+\})/);
+    if (unitMatch) {
+      try {
+        const jsonStr = unitMatch[1].replace(/""/g, '"');
+        const raw = JSON.parse(jsonStr);
+        const u = expandUnit(raw);
+        pendingState.units[u.id] = u;
+        gotData = true;
+      } catch (e) { dbg('SPECTRE: unit parse error: ' + e.message); }
+      continue;
+    }
+
+    const contactMatch = line.match(/SPECTRE_CONTACT:(\{.+\})/);
+    if (contactMatch) {
+      try {
+        const jsonStr = contactMatch[1].replace(/""/g, '"');
+        const raw = JSON.parse(jsonStr);
+        pendingState.contacts[raw.id] = {
+          id: raw.id,
+          type: raw.type || raw.vtype || 'UNKNOWN',
+          position: raw.position || raw.pos || { x: 0, y: 0, lat: 0, lng: 0 },
+          state: raw.state || 'CONFIRMED',
+          source: raw.source || 'VISUAL',
+          confidence: raw.confidence || 'HIGH'
+        };
+        gotData = true;
+      } catch (e) { dbg('SPECTRE: contact parse error: ' + e.message); }
+      continue;
+    }
+
+    const eventsMatch = line.match(/SPECTRE_EVENTS:(\[.+\])/);
+    if (eventsMatch) {
+      try {
+        const jsonStr = eventsMatch[1].replace(/""/g, '"');
+        const evts = JSON.parse(jsonStr);
+        pendingState.events = pendingState.events.concat(evts);
+        gotData = true;
+      } catch (e) { dbg('SPECTRE: events parse error: ' + e.message); }
+      continue;
+    }
+
+    // Legacy format fallback: SPECTRE_STATE (single-line JSON)
     const stateMatch = line.match(/SPECTRE_STATE:(\{.+\})/);
     if (stateMatch) {
       try {
-        const data = JSON.parse(stateMatch[1]);
-
-        // Auto-detect mission folder from bridge broadcast
-        if (data.missionFolder) {
-          autoSetMissionFolder(data.missionFolder);
-        }
-
+        const jsonStr = stateMatch[1].replace(/""/g, '"');
+        const raw = JSON.parse(jsonStr);
+        const data = expandLegacyState(raw);
+        if (data.missionFolder) autoSetMissionFolder(data.missionFolder);
         sendToRenderer('arma-state-update', data);
-      } catch (_) {}
-    }
-    const eventMatch = line.match(/SPECTRE_EVENT:(\{.+\})/);
-    if (eventMatch) {
-      try { sendToRenderer('arma-event', JSON.parse(eventMatch[1])); } catch (_) {}
+        gotData = true;
+      } catch (e) {
+        dbg('SPECTRE: legacy parse error: ' + e.message);
+      }
     }
   }
+
+  // After processing all lines in this chunk, flush the accumulated state
+  if (gotData && (Object.keys(pendingState.units).length > 0 || pendingState.mapName)) {
+    const data = {
+      missionFolder: pendingState.missionFolder || '',
+      mapName: pendingState.mapName || '',
+      timestamp: pendingState.timestamp,
+      units: Object.values(pendingState.units),
+      contacts: Object.values(pendingState.contacts),
+      events: pendingState.events
+    };
+    dbg(`SPECTRE: FLUSH — units: ${data.units.length}, map: ${data.mapName}`);
+    data.units.forEach(u => dbg(`  UNIT: id=${u.id}, pos=${JSON.stringify(u.position)}, hp=${u.health}`));
+
+    if (data.missionFolder) autoSetMissionFolder(data.missionFolder);
+    sendToRenderer('arma-state-update', data);
+
+    // Reset accumulator (keep mapName and missionFolder for next chunk)
+    pendingState.units = {};
+    pendingState.contacts = {};
+    pendingState.events = [];
+  }
+}
+
+function expandUnit(raw) {
+  return {
+    id: raw.id,
+    callsign: raw.callsign || raw.id,
+    type: raw.type || (['MBT','IFV','APC','RECON','HELI','TRUCK','PLANE'].includes(raw.vtype) ? 'VEHICLE' : 'INFANTRY'),
+    vehicle_type: raw.vehicle_type || raw.vtype || 'INFANTRY',
+    position: raw.position || raw.pos || { x: 0, y: 0, lat: 0, lng: 0 },
+    heading: raw.heading ?? raw.hdg ?? 0,
+    health: raw.health ?? raw.hp ?? 100,
+    fuel: raw.fuel ?? 100,
+    ammo: raw.ammo ?? 100,
+    status: raw.status || raw.st || 'UNKNOWN',
+    current_order: raw.current_order || raw.order || ''
+  };
+}
+
+function expandLegacyState(raw) {
+  return {
+    missionFolder: raw.missionFolder || '',
+    mapName: raw.mapName || '',
+    armaVersion: raw.armaVersion || '',
+    timestamp: raw.timestamp || 0,
+    units: (raw.units || []).map(expandUnit),
+    contacts: (raw.contacts || []).map(c => ({
+      id: c.id, type: c.type, position: c.position || c.pos || {},
+      state: c.state || 'CONFIRMED', source: c.source || 'VISUAL', confidence: c.confidence || 'HIGH'
+    })),
+    events: raw.events || []
+  };
 }
 
 // Auto-set mission folder from bridge's getMissionPath broadcast
@@ -545,8 +711,17 @@ function autoSetMissionFolder(missionPath) {
   lastAutoSet = missionPath;
 
   // Normalize path
-  const normalized = missionPath.replace(/\/$/, '').replace(/\//g, '\\');
-  if (!fs.existsSync(normalized)) return;
+  let normalized = missionPath.replace(/\/$/, '').replace(/\//g, '\\');
+
+  // If path is relative (no drive letter), resolve against Arma install dir
+  if (normalized && !normalized.match(/^[A-Z]:\\/i) && ARMA_INSTALL) {
+    normalized = path.join(ARMA_INSTALL, normalized);
+  }
+
+  if (!fs.existsSync(normalized)) {
+    console.warn('SPECTRE: mission folder not found:', normalized);
+    return;
+  }
 
   let config;
   try { config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); }
@@ -564,6 +739,8 @@ function autoSetMissionFolder(missionPath) {
 function sendToRenderer(channel, data) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(channel, data);
+  } else {
+    dbg(`SPECTRE: IPC skipped (no window), channel: ${channel}`);
   }
 }
 

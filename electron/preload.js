@@ -1,8 +1,17 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+const DEBUG = true;
+function dbg(msg) {
+  if (DEBUG) console.log('[SPECTRE-RENDERER] ' + msg);
+}
+
 contextBridge.exposeInMainWorld('spectreAPI', {
   // ── Arma bridge ───────────────────────────────────────────────────────────
-  onArmaUpdate: (cb) => ipcRenderer.on('arma-state-update', (_, data) => cb(data)),
+  onArmaUpdate: (cb) => ipcRenderer.on('arma-state-update', (_, data) => {
+    dbg('IPC arma-state-update received — units: ' + (data.units ? data.units.length : 'N/A') + ', mapName: ' + data.mapName);
+    if (data.units) data.units.forEach(u => dbg('  unit: ' + u.id + ' pos: ' + JSON.stringify(u.position)));
+    cb(data);
+  }),
   onArmaEvent:  (cb) => ipcRenderer.on('arma-event',        (_, data) => cb(data)),
 
   // ── Commands to Arma ─────────────────────────────────────────────────────

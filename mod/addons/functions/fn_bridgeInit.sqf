@@ -1,5 +1,5 @@
 /*
-  SPECTRE C2 Bridge - Arma 3 PBO Addon v2.2
+  SPECTRE C2 Bridge - Arma 3 PBO Addon v2.3
   ===========================================
   Auto-executed via CBA XEH PostInit.
   No manual init.sqf editing needed — just enable the mod.
@@ -11,9 +11,9 @@
                     This script reads it with loadFile + call compile every 0.75s.
 */
 
-// ─── Rate config ─────────────────────────────────────────────────────────────
-private _broadcastRate = 1.0;
-private _cmdReadRate   = 0.75;
+// ─── Rate config (globals — spawn block can't see private locals) ─────────────
+SPECTRE_broadcastRate = 1.0;
+SPECTRE_cmdReadRate   = 0.75;
 
 // ─── Map coordinate lookup ────────────────────────────────────────────────────
 // Format: [origin_lat, origin_lng, meters_per_lat, meters_per_lng]
@@ -35,7 +35,7 @@ SPECTRE_initialized    = false;
 
 // ─── Get map coordinate data ──────────────────────────────────────────────────
 private _mapName = toLowerANSI worldName;
-private _mapData = SPECTRE_mapCoords getOrDefault [_mapName, [0, 0, 111000, 85000]];
+SPECTRE_mapData = SPECTRE_mapCoords getOrDefault [_mapName, [0, 0, 111000, 85000]];
 
 // ─── Collect friendly units ───────────────────────────────────────────────────
 SPECTRE_blufor = allUnits select { side _x == west || side _x == blufor };
@@ -88,29 +88,39 @@ SPECTRE_fnc_serializeUnit = {
     private _px    = _pos select 0;
     private _py    = _pos select 1;
     private _hp    = round ((1 - getDammage _unit) * 100);
-    private _fuel  = if (_unit isKindOf "Man") then { 100 } else { round (fuel _unit * 100) };
-    private _type  = if (_unit isKindOf "Man") then { "INFANTRY" } else { "VEHICLE" };
     private _vtype = [_unit] call SPECTRE_fnc_vehicleType;
     private _order = (_unit getVariable ["SPECTRE_currentOrder", ""]) regexReplace ["""", ""];
     private _status = if (!alive _unit) then { "DEAD" } else { "READY" };
 
     // Map coordinate conversion using lookup table
-    private _originLat = _mapData select 0;
-    private _originLng = _mapData select 1;
-    private _mPerLat   = _mapData select 2;
-    private _mPerLng   = _mapData select 3;
+    private _originLat = SPECTRE_mapData select 0;
+    private _originLng = SPECTRE_mapData select 1;
+    private _mPerLat   = SPECTRE_mapData select 2;
+    private _mPerLng   = SPECTRE_mapData select 3;
     private _lat = _originLat + (_py / _mPerLat);
     private _lng = _originLng + (_px / _mPerLng);
 
+    // Compact JSON: skip type (redundant with vehicle_type), ammo (always 100)
+    // Only include current_order if non-empty, only include fuel if vehicle
+    private _fuelStr = "";
+    if !(_unit isKindOf "Man") then {
+        _fuelStr = format [",""fuel"":%1", round (fuel _unit * 100)];
+    };
+    private _orderStr = "";
+    if !(_order isEqualTo "") then {
+        _orderStr = format [",""order"":""%1""", _order];
+    };
+
     format [
-        "{""id"":""%1"",""callsign"":""%2"",""type"":""%3"",""vehicle_type"":""%4"",""position"":{""x"":%5,""y"":%6,""lat"":%7,""lng"":%8},""heading"":%9,""health"":%10,""fuel"":%11,""ammo"":100,""status"":""%12"",""current_order"":""%13""}",
-        _cs, _cs,
-        _type, _vtype,
+        "{""id"":""%1"",""vtype"":""%2"",""pos"":{""x"":%3,""y"":%4,""lat"":%5,""lng"":%6},""hdg"":%7,""hp"":%8%9%10,""st"":""%11""}",
+        _cs, _vtype,
         round _px, round _py,
         _lat, _lng,
         round getDir _unit,
-        _hp, _fuel,
-        _status, _order
+        _hp,
+        _fuelStr,
+        _orderStr,
+        _status
     ]
 };
 
@@ -123,10 +133,10 @@ SPECTRE_fnc_serializeContact = {
     private _py    = _pos select 1;
     private _type  = [_unit] call SPECTRE_fnc_vehicleType;
 
-    private _originLat = _mapData select 0;
-    private _originLng = _mapData select 1;
-    private _mPerLat   = _mapData select 2;
-    private _mPerLng   = _mapData select 3;
+    private _originLat = SPECTRE_mapData select 0;
+    private _originLng = SPECTRE_mapData select 1;
+    private _mPerLat   = SPECTRE_mapData select 2;
+    private _mPerLng   = SPECTRE_mapData select 3;
     private _lat = _originLat + (_py / _mPerLat);
     private _lng = _originLng + (_px / _mPerLng);
 
@@ -162,14 +172,14 @@ SPECTRE_fnc_execCmd = {
 
         case "HOLD": {
             if (!isNull _unit) then {
-                _unit doStop _unit;
+                doStop _unit;
                 _unit setVariable ["SPECTRE_currentOrder", "HOLD", false];
             };
         };
 
         case "HOLD_ALL": {
             {
-                _x doStop _x;
+                doStop _x;
                 _x setVariable ["SPECTRE_currentOrder", "HOLD", false];
             } forEach SPECTRE_blufor;
         };
@@ -325,53 +335,57 @@ SPECTRE_fnc_detectEvents = {
     _evts
 };
 
-// ─── Full state broadcast via diag_log ────────────────────────────────────────
+// ─── Full state broadcast via diag_log (one line per unit to avoid RPT truncation) ──
 SPECTRE_fnc_broadcastState = {
-    private _unitStrs = [];
-    { if (!isNull _x) then { _unitStrs pushBack ([_x] call SPECTRE_fnc_serializeUnit); }; } forEach SPECTRE_blufor;
+    private _ts = round (time * 1000);
 
-    private _contactStrs = [];
-    {
-        _contactStrs pushBack ([_x, format ["HOSTILE-%1", _forEachIndex]] call SPECTRE_fnc_serializeContact);
-    } forEach (allUnits select {
-        private _e = _x;
-        (side _e == east || side _e == independent) &&
-        alive _e &&
-        { _x knowsAbout _e > 0.3 } count SPECTRE_blufor > 0
-    });
-
-    private _eventStrs = call SPECTRE_fnc_detectEvents;
-
-    // Get mission path and map name for desktop app auto-detection
-    private _missionPath = getMissionPath "";
-    private _mapName     = worldName;
-
-    // Get Arma version for compatibility check
-    private _armaVersion = "unknown";
-    private _versionInfo = productVersion;
-    if (count _versionInfo > 1) then {
-        _armaVersion = _versionInfo select 1;
+    // Send metadata (short line, won't truncate)
+    private _mapName = worldName;
+    private _mp = getMissionPath "";
+    private _mf = "";
+    if (count _mp > 0) then {
+        private _clean = _mp regexReplace ["\\\\$", ""];
+        private _parts = _clean splitString "\\";
+        private _cnt = count _parts;
+        if (_cnt >= 2) then {
+            _mf = format ["%1\\%2", _parts select (_cnt - 2), _parts select (_cnt - 1)];
+        } else { _mf = _mp; };
     };
+    diag_log format ["SPECTRE_META:{""map"":""%1"",""mf"":""%2"",""ts"":%3}", _mapName, _mf regexReplace ["\\", "\\\\"], _ts];
 
-    private _json = format [
-        "{""missionFolder"":""%1"",""mapName"":""%2"",""armaVersion"":""%3"",""units"":[%4],""contacts"":[%5],""events"":[%6],""timestamp"":%7}",
-        _missionPath regexReplace ["\\", "\\\\"],
-        _mapName,
-        _armaVersion,
-        _unitStrs    joinString ",",
-        _contactStrs joinString ",",
-        _eventStrs   joinString ",",
-        round (time * 1000)
-    ];
+    // Send each unit on its own line (well under 1024 char RPT limit)
+    {
+        if (!isNull _x) then {
+            diag_log format ["SPECTRE_UNIT:%1", [_x] call SPECTRE_fnc_serializeUnit];
+        };
+    } forEach SPECTRE_blufor;
 
-    diag_log format ["SPECTRE_STATE:%1", _json];
+    // Send contacts (one per line)
+    private _ci = 0;
+    {
+        private _e = _x;
+        if ((side _e == east || side _e == independent) && alive _e &&
+            { _x knowsAbout _e > 0.3 } count SPECTRE_blufor > 0) then {
+            diag_log format ["SPECTRE_CONTACT:%1", [_e, format ["HOSTILE-%1", _ci]] call SPECTRE_fnc_serializeContact];
+            _ci = _ci + 1;
+        };
+    } forEach allUnits;
+
+    // Send events (usually few, one line)
+    private _evts = call SPECTRE_fnc_detectEvents;
+    if (count _evts > 0) then {
+        diag_log format ["SPECTRE_EVENTS:[%1]", _evts joinString ","];
+    };
 };
 
 // ─── Command reader ───────────────────────────────────────────────────────────
 SPECTRE_fnc_readCommands = {
-    private _sqf = loadFile "spectre_to_arma.sqf";
-    if (!(_sqf isEqualTo "")) then {
-        call compile _sqf;
+    private _path = getMissionPath "spectre_to_arma.sqf";
+    if (fileExists _path) then {
+        private _sqf = loadFile "spectre_to_arma.sqf";
+        if (!(_sqf isEqualTo "")) then {
+            call compile _sqf;
+        };
     };
 };
 
@@ -394,21 +408,24 @@ hint "SPECTRE C2 Bridge: ACTIVE";
 diag_log "SPECTRE: Bridge running. Broadcasting every 1s, reading commands every 0.75s.";
 SPECTRE_initialized = true;
 
-private _lastBroadcast = -999;
-private _lastCmdRead   = -999;
+// Spawn the main loop so it can use sleep (postInit uses 'call' which forbids sleep)
+[] spawn {
+    private _lastBroadcast = -999;
+    private _lastCmdRead   = -999;
 
-while { true } do {
-    private _t = time;
+    while { true } do {
+        private _t = time;
 
-    if (_t - _lastBroadcast >= _broadcastRate) then {
-        _lastBroadcast = _t;
-        call SPECTRE_fnc_broadcastState;
+        if (_t - _lastBroadcast >= SPECTRE_broadcastRate) then {
+            _lastBroadcast = _t;
+            call SPECTRE_fnc_broadcastState;
+        };
+
+        if (_t - _lastCmdRead >= SPECTRE_cmdReadRate) then {
+            _lastCmdRead = _t;
+            call SPECTRE_fnc_readCommands;
+        };
+
+        sleep 0.1;
     };
-
-    if (_t - _lastCmdRead >= _cmdReadRate) then {
-        _lastCmdRead = _t;
-        call SPECTRE_fnc_readCommands;
-    };
-
-    sleep 0.1;
 };

@@ -232,6 +232,9 @@ function processArmaUpdate(data, stateRef, patch) {
   const unitsMap = {};
   units.forEach(u => { unitsMap[u.id] = { ...current.units[u.id], ...u, last_updated: timestamp }; });
 
+  console.log(`[SPECTRE-STORE] processArmaUpdate: ${units.length} units received, mapName=${mapName}`);
+  Object.values(unitsMap).forEach(u => console.log(`  store unit: ${u.id} pos=${JSON.stringify(u.position)}`));
+
   const contactsMap = { ...current.contacts };
   contacts.forEach(c => { contactsMap[c.id] = { ...contactsMap[c.id], ...c, state: 'CONFIRMED', last_seen: now }; });
   Object.keys(contactsMap).forEach(id => {
