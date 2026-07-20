@@ -412,16 +412,18 @@ SPECTRE_fnc_readCommands = {
 
 // ─── Main loop ────────────────────────────────────────────────────────────────
 hint "SPECTRE C2 Bridge: ACTIVE";
-diag_log "SPECTRE: Bridge running. Broadcasting every 1s, reading commands every 0.75s.";
+diag_log "SPECTRE: Bridge running (wall-clock mode). Broadcasting every 0.5s, reading commands every 0.3s.";
 SPECTRE_initialized = true;
 
-// Spawn the main loop so it can use sleep (postInit uses 'call' which forbids sleep)
 [] spawn {
     private _lastBroadcast = -999;
     private _lastCmdRead   = -999;
 
     while { true } do {
-        private _t = time;
+        // diag_tickTime = real wall-clock time, NOT affected by Arma's
+        // simulation throttle when backgrounded. This keeps broadcasts
+        // running even when the user alt-tabs away from Arma.
+        private _t = diag_tickTime;
 
         if (_t - _lastBroadcast >= SPECTRE_broadcastRate) then {
             _lastBroadcast = _t;
@@ -433,6 +435,8 @@ SPECTRE_initialized = true;
             call SPECTRE_fnc_readCommands;
         };
 
-        sleep 0.1;
+        // uiSleep uses real time, NOT simulation time.
+        // Regular sleep slows to a crawl when Arma is backgrounded.
+        uiSleep 0.1;
     };
 };

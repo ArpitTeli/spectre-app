@@ -497,24 +497,49 @@ app.on('window-all-closed', () => {
 
 // ─── Bridge Watchers ─────────────────────────────────────────────────────────
 function startBridgeWatcher() {
-  // Legacy JSON bridge
-  const jsonFile = path.join(ARMA_SPECTRE, 'arma_to_spectre.json');
-  chokidar.watch(jsonFile, { persistent: true, usePolling: true, interval: 500 })
-    .on('change', () => {
-      try {
-        const data = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
-        sendToRenderer('arma-state-update', data);
-      } catch (_) {}
-    });
-
-  // Tail Arma RPT log
+  // Tail Arma RPT log using fs.watchFile (more reliable than chokidar for this)
   watchArmaLog();
+
+  // Periodic: check for newer RPT files (log rotation)
+  setInterval(() => {
+    const newer = findLatestRptLog(ARMA_DOCS);
+    if (newer && newer !== currentLogPath) {
+      console.log('SPECTRE: newer RPT detected, switching:', newer);
+      watchArmaLog(); // will pick up the new path
+    }
+  }, 10000);
 
   console.log('SPECTRE: bridge watching Arma log files');
 }
 
+function readNewLogData() {
+  if (!currentLogPath) return;
+  try {
+    if (!fs.existsSync(currentLogPath)) return;
+    const stat = fs.statSync(currentLogPath);
+
+    // Log rotated (file shrunk) — reset position
+    if (stat.size < logFilePos) {
+      logFilePos = 0;
+    }
+
+    if (stat.size <= logFilePos) return;
+
+    const fd  = fs.openSync(currentLogPath, 'r');
+    const len = stat.size - logFilePos;
+    const buf = Buffer.alloc(len);
+    fs.readSync(fd, buf, 0, len, logFilePos);
+    fs.closeSync(fd);
+    logFilePos = stat.size;
+
+    const chunk = buf.toString('utf8');
+    parseArmaLog(chunk);
+  } catch (e) {
+    console.error('SPECTRE: log read error:', e.message);
+  }
+}
+
 function watchArmaLog() {
-  // Find latest RPT log
   const logPath = findLatestRptLog(ARMA_DOCS);
 
   if (!logPath) {
@@ -523,85 +548,23 @@ function watchArmaLog() {
     return;
   }
 
-  // If we switched to a new log file, reset position
   if (logPath !== currentLogPath) {
+    // Stop watching old file
+    if (currentLogPath) {
+      try { fs.unwatchFile(currentLogPath); } catch (_) {}
+    }
     currentLogPath = logPath;
     try { logFilePos = fs.statSync(logPath).size; } catch (_) { logFilePos = 0; }
     dbg('SPECTRE: tailing Arma log: ' + logPath + ' at offset ' + logFilePos);
   }
 
-  // Use chokidar for file watching
-  chokidar.watch(logPath, { persistent: true, usePolling: true, interval: 500 })
-    .on('change', () => {
-      try {
-        const stat = fs.statSync(logPath);
-
-        // Log rotated (file shrunk) — reset position
-        if (stat.size < logFilePos) {
-          logFilePos = 0;
-        }
-
-        if (stat.size === logFilePos) return;
-
-        const fd  = fs.openSync(logPath, 'r');
-        const len = stat.size - logFilePos;
-        const buf = Buffer.alloc(len);
-        fs.readSync(fd, buf, 0, len, logFilePos);
-        fs.closeSync(fd);
-        logFilePos = stat.size;
-
-        const chunk = buf.toString('utf8');
-        parseArmaLog(chunk);
-
-        // Check for newer RPT files periodically
-        checkForNewerLog();
-      } catch (e) {
-        console.error('SPECTRE: log read error:', e.message);
-      }
-    });
-
-  // Fallback: polling timer in case chokidar misses changes
-  setInterval(() => {
-    try {
-      const latestRpt = findLatestRptLog(ARMA_DOCS);
-      if (latestRpt && latestRpt !== currentLogPath) {
-        console.log('SPECTRE: new RPT detected by polling:', latestRpt);
-        currentLogPath = latestRpt;
-        try { logFilePos = fs.statSync(latestRpt).size; } catch (_) { logFilePos = 0; }
-        // Watch the new file too
-        chokidar.watch(latestRpt, { persistent: true, usePolling: true, interval: 500 })
-          .on('change', () => {
-            try {
-              const stat = fs.statSync(latestRpt);
-              if (stat.size < logFilePos) { logFilePos = 0; }
-              if (stat.size === logFilePos) return;
-              const fd  = fs.openSync(latestRpt, 'r');
-              const len = stat.size - logFilePos;
-              const buf = Buffer.alloc(len);
-              fs.readSync(fd, buf, 0, len, logFilePos);
-              fs.closeSync(fd);
-              logFilePos = stat.size;
-              parseArmaLog(buf.toString('utf8'));
-              checkForNewerLog();
-            } catch (e) {}
-          });
-      }
-
-      // Also re-read current file in case chokidar missed
-      if (currentLogPath && fs.existsSync(currentLogPath)) {
-        const stat = fs.statSync(currentLogPath);
-        if (stat.size > logFilePos) {
-          const len = stat.size - logFilePos;
-          const fd = fs.openSync(currentLogPath, 'r');
-          const buf = Buffer.alloc(len);
-          fs.readSync(fd, buf, 0, len, logFilePos);
-          fs.closeSync(fd);
-          logFilePos = stat.size;
-          parseArmaLog(buf.toString('utf8'));
-        }
-      }
-    } catch (_) {}
-  }, 1000);
+  // Use fs.watchFile with 250ms interval — works reliably even when
+  // Arma writes to the file slowly (backgrounded game).
+  // chokidar's usePolling can miss events; fs.watchFile is more direct.
+  fs.watchFile(logPath, { interval: 250 }, (curr, prev) => {
+    if (curr.size === prev.size) return;
+    readNewLogData();
+  });
 }
 
 // Check if a newer RPT file has appeared (log rotation by Arma)
