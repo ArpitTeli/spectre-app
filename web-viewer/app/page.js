@@ -1,18 +1,31 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 
-const TILE_MAPS = {
-  stratis: { pattern: '/maps/stratis/{z}/{x}/{y}.png', maxZoom: 4, defaultZoom: 2, tileSize: 226, center: [4100, 4100] },
-  altis:   { pattern: '/maps/altis/{z}/{x}/{y}.png',   maxZoom: 6, defaultZoom: 3, tileSize: 212, center: [15000, 15000] },
-  tanoa:   { pattern: '/maps/tanoa/{z}/{x}/{y}.png',   maxZoom: 5, defaultZoom: 2, tileSize: 213, center: [7000, 7000] },
-  enoch:   { pattern: '/maps/enoch/{z}/{x}/{y}.png',   maxZoom: 4, defaultZoom: 2, tileSize: 356, center: [7100, 7100] },
-  livonia: { pattern: '/maps/enoch/{z}/{x}/{y}.png',   maxZoom: 4, defaultZoom: 2, tileSize: 356, center: [7100, 7100] },
-  malden:  { pattern: '/maps/malden/{z}/{x}/{y}.png',  maxZoom: 5, defaultZoom: 2, tileSize: 186, center: [7000, 7000] },
-};
-
 const TILE_BASE = 'https://jetelain.github.io/Arma3Map';
 const VEHICLE_SYMBOL = { MBT: '▲', IFV: '■', APC: '◆', RECON: '◇', HELI: '✦', TRUCK: '▪', INFANTRY: '●', DEFAULT: '○' };
 const CONTACT_SYMBOL = { INFANTRY: '●', VEHICLE: '■', TANK: '▲', UNKNOWN: '?' };
+
+// Map configs with CRS parameters (must match desktop app exactly)
+const MAP_CONFIGS = {
+  stratis: { pattern: '/maps/stratis/{z}/{x}/{y}.png', maxZoom: 4, defaultZoom: 2, tileSize: 226, center: [4100, 4100], f: 0.027475, tw: 226 },
+  altis:   { pattern: '/maps/altis/{z}/{x}/{y}.png',   maxZoom: 6, defaultZoom: 3, tileSize: 212, center: [15000, 15000], fx: 0.006839, fy: 0.006836, tw: 212 },
+  tanoa:   { pattern: '/maps/tanoa/{z}/{x}/{y}.png',   maxZoom: 5, defaultZoom: 2, tileSize: 213, center: [7000, 7000], f: 0.01385, tw: 213 },
+  enoch:   { pattern: '/maps/enoch/{z}/{x}/{y}.png',   maxZoom: 4, defaultZoom: 2, tileSize: 356, center: [7100, 7100], f: 0.02735, tw: 356 },
+  livonia: { pattern: '/maps/enoch/{z}/{x}/{y}.png',   maxZoom: 4, defaultZoom: 2, tileSize: 356, center: [7100, 7100], f: 0.02735, tw: 356 },
+  malden:  { pattern: '/maps/malden/{z}/{x}/{y}.png',  maxZoom: 5, defaultZoom: 2, tileSize: 186, center: [7000, 7000], f: 0.01448, tw: 186 },
+};
+
+function makeCRS(L, config) {
+  const fx = config.fx || config.f;
+  const fy = config.fy || config.f;
+  return L.extend({}, L.CRS.Simple, {
+    projection: L.Projection.LonLat,
+    transformation: new L.Transformation(fx, 0, -fy, config.tw),
+    scale: z => Math.pow(2, z),
+    zoom: s => Math.log(s) / Math.LN2,
+    infinite: true
+  });
+}
 
 function getLatLng(pos) {
   if (!pos) return null;
@@ -49,43 +62,15 @@ function makeContactHTML(contact) {
   </div>`;
 }
 
-function LeafletMap({ onReady }) {
-  const mapRef = useRef(null);
-
-  useEffect(() => {
-    if (!mapRef.current || !window.L) return;
-    const L = window.L;
-
-    const map = L.map(mapRef.current, {
-      crs: L.CRS.Simple,
-      center: [4100, 4100],
-      zoom: 2,
-      maxZoom: 8,
-      zoomControl: false,
-      attributionControl: false,
-      preferCanvas: true,
-      zoomSnap: 0.25,
-      zoomDelta: 0.5
-    });
-
-    map.getContainer().style.background = '#0a0f14';
-    L.control.zoom({ position: 'topright' }).addTo(map);
-
-    const unitLayer = L.layerGroup().addTo(map);
-    const contactLayer = L.layerGroup().addTo(map);
-    let tileLayer = null;
-
-    onReady({ map, L, unitLayer, contactLayer, tileLayerRef: { current: null } });
-  }, []);
-
-  return <div ref={mapRef} style={{ width: '100%', height: '100%', background: '#0a0f14' }} />;
-}
-
 export default function Home() {
-  const [leafletReady, setLeafletReady] = useState(false);
-  const mapData = useRef(null);
-  const mapNameRef = useRef(null);
+  const mapRef = useRef(null);
+  const mapInst = useRef(null);
+  const unitLayer = useRef(null);
+  const contactLayer = useRef(null);
+  const tileLayer = useRef(null);
+  const currentMapRef = useRef(null);
   const prevUnitCountRef = useRef(0);
+  const [leafletReady, setLeafletReady] = useState(false);
   const [connected, setConnected] = useState(false);
   const [unitCount, setUnitCount] = useState(0);
   const [contactCount, setContactCount] = useState(0);
@@ -93,17 +78,23 @@ export default function Home() {
   const [forceMetrics, setForceMetrics] = useState(null);
   const [missionPhase, setMissionPhase] = useState(null);
 
+  // Load Leaflet from CDN
   useEffect(() => {
     if (window.L) { setLeafletReady(true); return; }
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
     const script = document.createElement('script');
     script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
     script.onload = () => setLeafletReady(true);
     document.head.appendChild(script);
   }, []);
 
+  // Poll for state + manage map lifecycle
   useEffect(() => {
-    if (!leafletReady || !mapData.current) return;
-    const { map, L, unitLayer, contactLayer, tileLayerRef } = mapData.current;
+    if (!leafletReady || !mapRef.current) return;
+    const L = window.L;
 
     const poll = async () => {
       try {
@@ -121,67 +112,102 @@ export default function Home() {
         if (state.forceMetrics) setForceMetrics(state.forceMetrics);
         if (state.missionPhase) setMissionPhase(state.missionPhase);
 
+        // Recreate map when map type changes (matches desktop app behavior)
         const newMap = (state.mapName || '').toLowerCase();
-        if (newMap && newMap !== mapNameRef.current) {
-          mapNameRef.current = newMap;
+        if (newMap && newMap !== currentMapRef.current) {
+          currentMapRef.current = newMap;
           setMapName(newMap);
-          const config = TILE_MAPS[newMap];
+
+          // Destroy old map
+          if (mapInst.current) {
+            mapInst.current.remove();
+            mapInst.current = null;
+          }
+
+          const config = MAP_CONFIGS[newMap];
           if (config) {
-            if (tileLayerRef.current) map.removeLayer(tileLayerRef.current);
-            tileLayerRef.current = L.tileLayer(TILE_BASE + config.pattern, {
+            const crs = makeCRS(L, config);
+            const map = L.map(mapRef.current, {
+              crs: crs,
+              center: config.center,
+              zoom: config.defaultZoom,
+              maxZoom: config.maxZoom + 4,
+              zoomControl: false,
+              attributionControl: false,
+              preferCanvas: true,
+              zoomSnap: 0.25,
+              zoomDelta: 0.5
+            });
+
+            map.getContainer().style.background = '#0a0f14';
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            L.tileLayer(TILE_BASE + config.pattern, {
               tileSize: config.tileSize,
               maxZoom: config.maxZoom + 4,
               maxNativeZoom: config.maxZoom,
               minZoom: 0
             }).addTo(map);
-            map.setView(config.center, config.defaultZoom);
+
+            unitLayer.current = L.layerGroup().addTo(map);
+            contactLayer.current = L.layerGroup().addTo(map);
+            mapInst.current = map;
+            prevUnitCountRef.current = 0;
           }
         }
 
-        unitLayer.clearLayers();
-        const latlngs = [];
-        for (const u of units) {
-          const ll = getLatLng(u.position || u.pos);
-          if (!ll) continue;
-          latlngs.push(ll);
-          const icon = L.divIcon({ className: '', iconSize: [64, 54], iconAnchor: [32, 27], html: makeUnitHTML(u) });
-          const marker = L.marker(ll, { icon });
-          const hp = u.health ?? u.hp ?? 100;
-          marker.bindTooltip(
-            `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;background:#1b1b1b;border:1px solid #3a3a3a;padding:6px;border-radius:3px">
-              <b style="color:#2a7de1">${u.callsign || u.id}</b><br>
-              ${u.vehicle_type || u.vtype || ''} | HP:${hp}% Fuel:${u.fuel ?? 100}%<br>
-              Status: ${u.status || u.st || 'OK'}<br>
-              ${u.current_order || u.order ? `<span style="color:#a0a0a0">${u.current_order || u.order}</span>` : ''}
-            </div>`,
-            { permanent: false, direction: 'top' }
-          );
-          unitLayer.addLayer(marker);
-        }
-        // Only fit bounds when units first appear or count changes (not every poll)
-        if (latlngs.length > 0 && latlngs.length !== prevUnitCountRef.current) {
-          prevUnitCountRef.current = latlngs.length;
-          if (latlngs.length === 1) map.setView(latlngs[0], Math.max(map.getZoom(), 3));
-          else map.fitBounds(L.latLngBounds(latlngs), { padding: [80, 80] });
+        if (!mapInst.current) return;
+
+        // Update unit markers
+        if (unitLayer.current) {
+          unitLayer.current.clearLayers();
+          const latlngs = [];
+          for (const u of units) {
+            const ll = getLatLng(u.position || u.pos);
+            if (!ll) continue;
+            latlngs.push(ll);
+            const icon = L.divIcon({ className: '', iconSize: [64, 54], iconAnchor: [32, 27], html: makeUnitHTML(u) });
+            const marker = L.marker(ll, { icon });
+            const hp = u.health ?? u.hp ?? 100;
+            marker.bindTooltip(
+              `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;background:#1b1b1b;border:1px solid #3a3a3a;padding:6px;border-radius:3px">
+                <b style="color:#2a7de1">${u.callsign || u.id}</b><br>
+                ${u.vehicle_type || u.vtype || ''} | HP:${hp}% Fuel:${u.fuel ?? 100}%<br>
+                Status: ${u.status || u.st || 'OK'}<br>
+                ${u.current_order || u.order ? `<span style="color:#a0a0a0">${u.current_order || u.order}</span>` : ''}
+              </div>`,
+              { permanent: false, direction: 'top' }
+            );
+            unitLayer.current.addLayer(marker);
+          }
+          // Only fit bounds when units first appear or count changes
+          if (latlngs.length > 0 && latlngs.length !== prevUnitCountRef.current) {
+            prevUnitCountRef.current = latlngs.length;
+            if (latlngs.length === 1) mapInst.current.setView(latlngs[0], Math.max(mapInst.current.getZoom(), 3));
+            else mapInst.current.fitBounds(L.latLngBounds(latlngs), { padding: [80, 80] });
+          }
         }
 
-        contactLayer.clearLayers();
-        for (const c of contacts) {
-          const ll = getLatLng(c.position || c.pos);
-          if (!ll) continue;
-          const icon = L.divIcon({ className: '', iconSize: [52, 42], iconAnchor: [26, 21], html: makeContactHTML(c) });
-          const marker = L.marker(ll, { icon });
-          const ageMin = c.last_seen ? Math.floor((Date.now() - c.last_seen) / 60000) : 0;
-          marker.bindTooltip(
-            `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;background:#1b1b1b;border:1px solid #3a3a3a;padding:6px;border-radius:3px">
-              <b style="color:#db3838">${c.id}</b><br>
-              Type: ${c.type || 'UNKNOWN'} | State: <b style="color:${c.state === 'CONFIRMED' ? '#db3838' : c.state === 'LAST_KNOWN' ? '#e87c3e' : '#f5a623'}">${c.state}</b><br>
-              Source: ${c.source || 'UNKNOWN'}<br>
-              ${ageMin > 0 ? `Last seen: ${ageMin}m ago` : 'Just spotted'}
-            </div>`,
-            { permanent: false, direction: 'top' }
-          );
-          contactLayer.addLayer(marker);
+        // Update contact markers
+        if (contactLayer.current) {
+          contactLayer.current.clearLayers();
+          for (const c of contacts) {
+            const ll = getLatLng(c.position || c.pos);
+            if (!ll) continue;
+            const icon = L.divIcon({ className: '', iconSize: [52, 42], iconAnchor: [26, 21], html: makeContactHTML(c) });
+            const marker = L.marker(ll, { icon });
+            const ageMin = c.last_seen ? Math.floor((Date.now() - c.last_seen) / 60000) : 0;
+            marker.bindTooltip(
+              `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;background:#1b1b1b;border:1px solid #3a3a3a;padding:6px;border-radius:3px">
+                <b style="color:#db3838">${c.id}</b><br>
+                Type: ${c.type || 'UNKNOWN'} | State: <b style="color:${c.state === 'CONFIRMED' ? '#db3838' : c.state === 'LAST_KNOWN' ? '#e87c3e' : '#f5a623'}">${c.state}</b><br>
+                Source: ${c.source || 'UNKNOWN'}<br>
+                ${ageMin > 0 ? `Last seen: ${ageMin}m ago` : 'Just spotted'}
+              </div>`,
+              { permanent: false, direction: 'top' }
+            );
+            contactLayer.current.addLayer(marker);
+          }
         }
       } catch (e) {
         setConnected(false);
@@ -218,7 +244,7 @@ export default function Home() {
 
       {/* Map */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        {leafletReady && <LeafletMap onReady={(data) => { mapData.current = data; }} />}
+        <div ref={mapRef} style={{ width: '100%', height: '100%', background: '#0a0f14' }} />
 
         {mapName && (
           <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(27,27,27,0.95)', border: '1px solid #2a2a2a', borderRadius: 3, padding: '6px 10px', zIndex: 1000, fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', color: '#f5f6f7', letterSpacing: '1px', fontWeight: 600 }}>
@@ -239,7 +265,7 @@ export default function Home() {
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: '#888', background: 'rgba(27,27,27,0.95)', padding: '20px 30px', borderRadius: '3px', border: '1px solid #3a3a3a' }}>
               <div style={{ fontSize: '24px', marginBottom: '8px', color: '#888' }}>◎</div>
               <div style={{ fontWeight: 600, letterSpacing: '1px' }}>AWAITING ARMA CONNECTION</div>
-              <div style={{ marginTop: '6px', fontSize: '10px', color: '#888' }}>Load SPECTRE bridge in your Arma 3 mission</div>
+              <div style={{ marginTop: '6px', fontSize: '10px', color: '#888' }}>Start SPECTRE C2 + Arma 3 to see live positions</div>
             </div>
           </div>
         )}
@@ -273,7 +299,7 @@ export default function Home() {
         <span style={{ color: '#888', letterSpacing: '1px' }}>{unitCount} units</span>
         {contactCount > 0 && <span style={{ color: '#888', letterSpacing: '1px' }}>{contactCount} contacts</span>}
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#888', letterSpacing: '2px' }}>
-          SPECTRE C2 v1.4.1
+          SPECTRE C2 v1.4.2
         </div>
       </div>
     </div>
