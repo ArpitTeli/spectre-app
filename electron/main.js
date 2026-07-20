@@ -407,6 +407,9 @@ function createWindow() {
 }
 
 // ─── Auto-update ─────────────────────────────────────────────────────────────
+let updateInfo = null;
+let updateDownloaded = false;
+
 function setupAutoUpdate() {
   try {
     const { autoUpdater } = require('electron-updater');
@@ -424,6 +427,8 @@ function setupAutoUpdate() {
 
     autoUpdater.on('update-available', (info) => {
       console.log('SPECTRE: Update available:', info.version);
+      updateInfo = info;
+      // Try to notify renderer, but it might not be ready yet
       sendToRenderer('update-available', info);
     });
 
@@ -437,27 +442,46 @@ function setupAutoUpdate() {
 
     autoUpdater.on('update-downloaded', (info) => {
       console.log('SPECTRE: Update downloaded:', info.version);
+      updateDownloaded = true;
+      updateInfo = info;
+      // Try to notify renderer
       sendToRenderer('update-downloaded', info);
     });
 
     autoUpdater.on('error', (err) => {
       console.error('SPECTRE: Auto-update error:', err.message);
-      console.error('SPECTRE: Auto-update error stack:', err.stack);
     });
 
-    // Check for updates on startup (delay 10s to not block startup)
-    setTimeout(() => {
-      console.log('SPECTRE: Initiating update check...');
-      autoUpdater.checkForUpdates().then((result) => {
-        console.log('SPECTRE: Update check result:', JSON.stringify(result?.updateInfo?.version || 'none'));
-      }).catch((err) => {
-        console.error('SPECTRE: Update check failed:', err.message);
-      });
-    }, 10000);
+    // Don't check immediately — wait for renderer to be ready
+    // The renderer will send 'check-for-updates' when it's mounted
   } catch (err) {
     console.error('SPECTRE: Failed to setup auto-updater:', err.message);
   }
 }
+
+// When renderer is ready, check for updates and send any pending state
+ipcMain.on('renderer-ready', () => {
+  console.log('SPECTRE: Renderer ready, checking for updates...');
+
+  // If we already have update state, send it now
+  if (updateDownloaded && updateInfo) {
+    sendToRenderer('update-downloaded', updateInfo);
+  } else if (updateInfo) {
+    sendToRenderer('update-available', updateInfo);
+  }
+
+  // Start the update check
+  try {
+    const { autoUpdater } = require('electron-updater');
+    autoUpdater.checkForUpdates().then((result) => {
+      console.log('SPECTRE: Update check result:', result?.updateInfo?.version || 'none');
+    }).catch((err) => {
+      console.error('SPECTRE: Update check failed:', err.message);
+    });
+  } catch (err) {
+    console.error('SPECTRE: Update check error:', err.message);
+  }
+});
 
 // ─── App ready ───────────────────────────────────────────────────────────────
 app.whenReady().then(() => {

@@ -32,12 +32,16 @@ export default function App() {
   const [updateDownloaded, setUpdateDownloaded] = useState(false);
 
   useEffect(() => {
+    // Signal to main process that renderer is ready to receive IPC
+    window.spectreAPI?.rendererReady?.();
+
     window.spectreAPI?.onUpdateAvailable?.((info) => {
       setUpdateInfo(info);
       addCommsEntry('SPECTRE', 'ALL', `Update available: v${info.version}. Downloading...`, 'BLUE');
     });
     window.spectreAPI?.onUpdateDownloaded?.((info) => {
       setUpdateDownloaded(true);
+      setUpdateInfo(info);
       addCommsEntry('SPECTRE', 'ALL', `Update v${info.version} ready. Restart to apply.`, 'GREEN');
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

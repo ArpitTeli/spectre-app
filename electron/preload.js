@@ -55,4 +55,5 @@ contextBridge.exposeInMainWorld('spectreAPI', {
   maximize: () => ipcRenderer.send('maximize-window'),
   close:    () => ipcRenderer.send('close-window'),
   restartApp: () => ipcRenderer.send('restart-app'),
+  rendererReady: () => ipcRenderer.send('renderer-ready'),
 });
