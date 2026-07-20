@@ -18,7 +18,7 @@
   /* Text */
   --text-primary: #f5f6f7;
   --text-secondary: #a0a0a0;
-  --text-muted: #6b7280;
+  --text-muted: #888888;
   --text-inverse: #1b1b1b;
 
   /* Accent — blue primary */
@@ -232,6 +232,7 @@ body {
 .titlebar__btn:hover {
   background: var(--surface-3);
   color: var(--text-primary);
+  cursor: pointer;
 }
 
 .titlebar__btn.close:hover {
@@ -278,12 +279,12 @@ body {
 
 .side-panel__tab {
   flex: 1;
-  padding: var(--space-2) var(--space-1);
+  padding: var(--space-3) var(--space-2);
   background: transparent;
   border: none;
   color: var(--text-muted);
   font-family: var(--font-body);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.5px;
   cursor: pointer;
@@ -291,6 +292,10 @@ body {
   text-transform: uppercase;
   border-bottom: 2px solid transparent;
   position: relative;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .side-panel__tab:hover {
@@ -330,6 +335,7 @@ body {
 .unit-card:hover {
   border-color: var(--border-default);
   background: var(--surface-3);
+  cursor: pointer;
 }
 
 .unit-card.selected {
@@ -758,6 +764,7 @@ body {
   background: var(--surface-3);
   border-color: var(--border-strong);
   color: var(--text-primary);
+  cursor: pointer;
 }
 
 .btn:active {
@@ -765,9 +772,10 @@ body {
 }
 
 .btn:disabled {
-  opacity: 0.4;
+  opacity: 0.38;
   cursor: not-allowed;
   pointer-events: none;
+  color: var(--text-muted);
 }
 
 .btn-primary {
