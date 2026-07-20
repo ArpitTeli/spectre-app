@@ -305,18 +305,20 @@ async function handleArmaEvents(events, stateRef, patch) {
         window.spectreAPI?.saveIntel(db);
         return { ...prev, intelDB: db };
       });
-      continue;
+      // Don't continue — fall through to vault update, but skip adaptation
     }
 
     // Update vault on significant events
-    if (state.vaultPath) {
+    const freshState = stateRef.current;
+    if (freshState.vaultPath) {
       try {
         const { vaultOnEvent } = await import('../lib/vault');
-        await vaultOnEvent(state.vaultPath, event, state);
+        await vaultOnEvent(freshState.vaultPath, event, freshState);
       } catch (e) { console.error('Vault event update failed:', e); }
     }
 
-    // Trigger AI adaptation for significant events
+    // Trigger AI adaptation for significant events (skip for kills and contact sightings)
+    if (event.type === 'ENEMY_KILLED' || event.type === 'CONTACT_SPOTTED') continue;
     if (!state.selectedCOA) continue;
     try {
       const context = { units: state.units, contacts: state.contacts, forceMetrics: state.forceMetrics, intelDB: state.intelDB };

@@ -908,6 +908,7 @@ ipcMain.handle('vault-create', async (_, missionId) => {
 });
 
 ipcMain.handle('vault-write-node', async (_, vaultPath, filename, content) => {
+  if (!vaultPath || !filename || !content) return false;
   try {
     const nodesPath = path.join(vaultPath, 'nodes');
     if (!fs.existsSync(nodesPath)) fs.mkdirSync(nodesPath, { recursive: true });
@@ -920,6 +921,7 @@ ipcMain.handle('vault-write-node', async (_, vaultPath, filename, content) => {
 });
 
 ipcMain.handle('vault-read-nodes', async (_, vaultPath) => {
+  if (!vaultPath) return [];
   try {
     const nodesPath = path.join(vaultPath, 'nodes');
     if (!fs.existsSync(nodesPath)) return [];
@@ -935,6 +937,7 @@ ipcMain.handle('vault-read-nodes', async (_, vaultPath) => {
 });
 
 ipcMain.handle('vault-update-node', async (_, vaultPath, nodeId, updates) => {
+  if (!vaultPath || !nodeId || !updates) return false;
   try {
     const nodesPath = path.join(vaultPath, 'nodes');
     const filename = `${nodeId}.md`;
@@ -942,7 +945,7 @@ ipcMain.handle('vault-update-node', async (_, vaultPath, nodeId, updates) => {
     if (!fs.existsSync(filePath)) return false;
 
     const content = fs.readFileSync(filePath, 'utf8');
-    const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+    const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
     if (!match) return false;
 
     const yamlLines = match[1].split('\n');
@@ -954,7 +957,8 @@ ipcMain.handle('vault-update-node', async (_, vaultPath, nodeId, updates) => {
       if (key in updates) {
         const val = updates[key];
         if (Array.isArray(val)) return `${key}: ${JSON.stringify(val)}`;
-        if (typeof val === 'string' && (val.includes(':') || val.includes('#'))) return `${key}: "${val}"`;
+        if (typeof val === 'string' && (val.includes(':') || val.includes('#') || val.includes('"')))
+          return `${key}: "${val.replace(/"/g, '\\"')}"`;
         return `${key}: ${val}`;
       }
       return line;
@@ -970,6 +974,7 @@ ipcMain.handle('vault-update-node', async (_, vaultPath, nodeId, updates) => {
 });
 
 ipcMain.handle('vault-add-wikilink', async (_, vaultPath, nodeId, targetTitle) => {
+  if (!vaultPath || !nodeId || !targetTitle) return false;
   try {
     const nodesPath = path.join(vaultPath, 'nodes');
     const filename = `${nodeId}.md`;

@@ -5,7 +5,7 @@
 // ── YAML Frontmatter Parser ─────────────────────────────────────────────────
 export function parseFrontmatter(content) {
   if (!content || typeof content !== 'string') return { frontmatter: {}, body: content || '' };
-  const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) return { frontmatter: {}, body: content };
 
   const yaml = match[1];
@@ -51,8 +51,8 @@ export function writeFrontmatter(frontmatter, body) {
     if (val === undefined || val === null) continue;
     if (Array.isArray(val)) {
       lines.push(`${key}: ${JSON.stringify(val)}`);
-    } else if (typeof val === 'string' && (val.includes(':') || val.includes('#') || val.includes('"'))) {
-      lines.push(`${key}: "${val.replace(/"/g, '\\"')}"`);
+    } else if (typeof val === 'string' && (val.includes(':') || val.includes('#') || val.includes('"') || val.includes('\n'))) {
+      lines.push(`${key}: "${val.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`);
     } else {
       lines.push(`${key}: ${val}`);
     }
@@ -204,7 +204,7 @@ export function createIntelNode(intel) {
     frontmatter: {
       id: `intel-${slugify(intel.name || intel.id || String(Date.now()))}`,
       type: 'intel',
-      source: intel.confidence || intel.source || 'PLAYER_REPORTED',
+      source: intel.source || 'PLAYER_REPORTED',
       classification: intel.classification || 'UNCLASSIFIED',
       threat_level: intel.threat_level || 'MEDIUM',
       confidence: intel.confidence || 'ASSESSED',

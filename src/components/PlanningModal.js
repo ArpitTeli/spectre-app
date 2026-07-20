@@ -121,7 +121,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
 
       // Generate vault ontology from OPORD + COA
       if (generateMissionVault && coaResult?.coas?.[0]) {
-        generateMissionVault(opord, coaResult.coas[0]);
+        await generateMissionVault(opord, coaResult.coas[0]);
       }
 
       addCommsEntry('SPECTRE', 'ALL',
