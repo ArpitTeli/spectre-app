@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import VaultGraph from './VaultGraph';
 
 export default function SidePanel({ state, patch, addCommsEntry, sendArmaCommand, addIntel, endMission }) {
   const [activeTab, setActiveTab] = useState('UNITS');
@@ -16,7 +17,7 @@ export default function SidePanel({ state, patch, addCommsEntry, sendArmaCommand
       />
 
       <div className="side-panel__tabs">
-        {['UNITS','CONTACTS','INTEL','ORDERS'].map(t => (
+        {['UNITS','CONTACTS','INTEL','ORDERS','GRAPH'].map(t => (
           <button key={t} className={`side-panel__tab ${activeTab === t ? 'active' : ''}`} onClick={() => setActiveTab(t)}>{t}</button>
         ))}
       </div>
@@ -26,6 +27,7 @@ export default function SidePanel({ state, patch, addCommsEntry, sendArmaCommand
         {activeTab === 'CONTACTS' && <ContactsTab contacts={state.contacts} patch={patch} />}
         {activeTab === 'INTEL'    && <IntelTab    intelDB={state.intelDB} addIntel={addIntel} />}
         {activeTab === 'ORDERS'   && <OrdersTab   state={state} sendArmaCommand={sendArmaCommand} addCommsEntry={addCommsEntry} />}
+        {activeTab === 'GRAPH'    && <VaultGraph  vaultPath={state.vaultPath} units={state.units} contacts={state.contacts} />}
       </div>
     </div>
   );
