@@ -34,6 +34,7 @@ const INITIAL_STATE = {
   intelDB: { locations: [], patterns: [], terrain: [] },
   config: null,
   mapName: null,
+  vaultPath: null,
   forceMetrics: {
     vehicles_total: 0, vehicles_active: 0,
     crew_total: 0, crew_active: 0,
@@ -219,7 +220,23 @@ export function useSpectreStore() {
     } catch (e) { console.error('AAR failed:', e); }
   }, [patch, addIntel]);
 
-  return { state, patch, addCommsEntry, sendArmaCommand, addIntel, endMission, recalcForceMetrics };
+  // ── Vault generation (called from PlanningModal after OPORD+COA) ──────────
+  const generateMissionVault = useCallback(async (opord, coa) => {
+    try {
+      const { generateVault } = await import('../lib/vault');
+      const vaultPath = await generateVault(opord, coa, stateRef.current);
+      if (vaultPath) {
+        patch({ vaultPath });
+        console.log('SPECTRE: vault created at', vaultPath);
+      }
+      return vaultPath;
+    } catch (e) {
+      console.error('SPECTRE: vault generation failed:', e);
+      return null;
+    }
+  }, [patch]);
+
+  return { state, patch, addCommsEntry, sendArmaCommand, addIntel, endMission, recalcForceMetrics, generateMissionVault };
 }
 
 // ─── Process Arma state update ────────────────────────────────────────────────
@@ -282,7 +299,6 @@ async function handleArmaEvents(events, stateRef, patch) {
       patch(prev => ({ ...prev, rewardData: { ...prev.rewardData, friendly_kia: prev.rewardData.friendly_kia + 1, score: prev.rewardData.score + REWARD.FRIENDLY_KIA } }));
     } else if (event.type === 'ENEMY_KILLED') {
       patch(prev => ({ ...prev, rewardData: { ...prev.rewardData, enemy_kills: prev.rewardData.enemy_kills + 1, score: prev.rewardData.score + REWARD.ENEMY_KILL } }));
-      continue; // no adaptation needed for kills
     } else if (event.type === 'CONTACT_SPOTTED') {
       patch(prev => {
         const db = { ...prev.intelDB, patterns: [...prev.intelDB.patterns, { type: 'contact_spotted', ...event, timestamp: new Date().toISOString() }] };
@@ -292,11 +308,19 @@ async function handleArmaEvents(events, stateRef, patch) {
       continue;
     }
 
+    // Update vault on significant events
+    if (state.vaultPath) {
+      try {
+        const { vaultOnEvent } = await import('../lib/vault');
+        await vaultOnEvent(state.vaultPath, event, state);
+      } catch (e) { console.error('Vault event update failed:', e); }
+    }
+
     // Trigger AI adaptation for significant events
     if (!state.selectedCOA) continue;
     try {
       const context = { units: state.units, contacts: state.contacts, forceMetrics: state.forceMetrics, intelDB: state.intelDB };
-      const adaptation = await aiService.adaptPlan(event, state.selectedCOA, context);
+      const adaptation = await aiService.adaptPlan(event, state.selectedCOA, context, state.vaultPath);
       if (!adaptation) continue;
 
       if (adaptation.auto_handle) {
@@ -335,7 +359,7 @@ async function triggerAbortCheck(state, patch) {
   try {
     const { aiService } = await import('../ai/aiService');
     const context = { units: state.units, contacts: state.contacts, forceMetrics: state.forceMetrics, intelDB: state.intelDB };
-    const result = await aiService.adaptPlan({ type: 'ABORT_THRESHOLD', reason }, state.selectedCOA, context);
+    const result = await aiService.adaptPlan({ type: 'ABORT_THRESHOLD', reason }, state.selectedCOA, context, state.vaultPath);
     patch({
       missionPhase: 'ABORTING',
       abortState: { tier: 2, reason, countdown: 30, options: baseOptions, assessment: result?.assessment || reason, auto_select: 'WITHDRAW' }

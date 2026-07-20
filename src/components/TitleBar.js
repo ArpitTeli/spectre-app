@@ -12,7 +12,7 @@ const PHASE_LABELS = {
   PLANNING: 'PRE-MISSION PLANNING',
   BRIEFING: 'MISSION BRIEFING',
   ACTIVE: 'MISSION ACTIVE',
-  ABORTING: '⚠ EMERGENCY',
+  ABORTING: 'EMERGENCY',
   AAR: 'AFTER ACTION REVIEW'
 };
 
@@ -28,7 +28,7 @@ export default function TitleBar({ missionPhase, missionElapsedSec, armaConnecte
       {missionPhase === 'ACTIVE' && (
         <>
           <div className="titlebar__divider" />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--color-green)', letterSpacing: '1px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--accent)', letterSpacing: '1px' }}>
             T+{formatTime(missionElapsedSec || 0)}
           </span>
         </>
@@ -38,7 +38,7 @@ export default function TitleBar({ missionPhase, missionElapsedSec, armaConnecte
       <div className="titlebar__connection">
         <div className={`titlebar__connection-dot ${armaConnected ? 'connected' : ''}`} />
         <span style={{
-          color: armaConnected ? 'var(--color-green)' : '#ff4444',
+          color: armaConnected ? 'var(--accent)' : 'var(--red)',
           fontFamily: 'var(--font-mono)', fontSize: '10px'
         }}>
           {armaConnected ? 'ARMA LINK ACTIVE' : 'ARMA NOT CONNECTED'}

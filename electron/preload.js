@@ -29,6 +29,13 @@ contextBridge.exposeInMainWorld('spectreAPI', {
   loadIntel:   ()      => ipcRenderer.invoke('load-intel'),
   saveIntel:   (intel) => ipcRenderer.invoke('save-intel', intel),
 
+  // ── Vault (Ontology Layer) ────────────────────────────────────────────────
+  vaultCreate:     (missionId)                    => ipcRenderer.invoke('vault-create', missionId),
+  vaultWriteNode:  (vaultPath, filename, content) => ipcRenderer.invoke('vault-write-node', vaultPath, filename, content),
+  vaultReadNodes:  (vaultPath)                    => ipcRenderer.invoke('vault-read-nodes', vaultPath),
+  vaultUpdateNode: (vaultPath, nodeId, updates)   => ipcRenderer.invoke('vault-update-node', vaultPath, nodeId, updates),
+  vaultAddWikilink:(vaultPath, nodeId, target)    => ipcRenderer.invoke('vault-add-wikilink', vaultPath, nodeId, target),
+
   // ── Mission folder auto-detect ────────────────────────────────────────────
   getMissionFolders: () => ipcRenderer.invoke('get-mission-folders'),
 

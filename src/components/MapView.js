@@ -135,18 +135,17 @@ const CONTACT_SYMBOL = { INFANTRY: '●', VEHICLE: '■', TANK: '▲', UNKNOWN: 
 function makeUnitIcon(unit, selected) {
   const symbol = VEHICLE_SYMBOL[unit.vehicle_type] || VEHICLE_SYMBOL.DEFAULT;
   const hp = unit.health ?? 100;
-  const hpColor = hp > 60 ? '#22c55e' : hp > 30 ? '#eab308' : '#ef4444';
-  const borderColor = selected ? '#22c55e' : '#3b82f6';
-  const glow = selected ? '6px rgba(34,197,94,0.6)' : '3px rgba(59,130,246,0.4)';
+  const hpColor = hp > 60 ? '#2a7de1' : hp > 30 ? '#f5a623' : '#db3838';
+  const borderColor = selected ? '#2a7de1' : '#525252';
 
   return L.divIcon({
     className: '',
     iconSize: [64, 54],
     iconAnchor: [32, 27],
-    html: `<div style="display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 0 ${glow})">
-      <div style="background:rgba(15,23,42,0.92);border:1px solid ${borderColor};border-radius:3px;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:#f1f5f9;letter-spacing:0.5px;white-space:nowrap;margin-bottom:2px">${unit.callsign || unit.id}</div>
+    html: `<div style="display:flex;flex-direction:column;align-items:center">
+      <div style="background:rgba(27,27,27,0.95);border:1px solid ${borderColor};border-radius:3px;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:#f5f6f7;letter-spacing:0.5px;white-space:nowrap;margin-bottom:2px">${unit.callsign || unit.id}</div>
       <div style="font-size:16px;line-height:1;color:${borderColor}">${symbol}</div>
-      <div style="width:28px;height:3px;background:rgba(30,41,59,0.8);border-radius:2px;overflow:hidden;margin-top:2px">
+      <div style="width:28px;height:3px;background:rgba(42,42,42,0.8);border-radius:2px;overflow:hidden;margin-top:2px">
         <div style="width:${hp}%;height:100%;background:${hpColor};border-radius:2px"></div>
       </div>
     </div>`
@@ -156,9 +155,9 @@ function makeUnitIcon(unit, selected) {
 function makeContactIcon(contact, selected) {
   const symbol = CONTACT_SYMBOL[contact.type] || CONTACT_SYMBOL.UNKNOWN;
   const colors = {
-    CONFIRMED:  { border: '#ef4444', glow: 'rgba(239,68,68,0.5)',  text: '#fca5a5', opacity: 1.0 },
-    LAST_KNOWN: { border: '#f97316', glow: 'rgba(249,115,22,0.4)', text: '#fdba74', opacity: 0.7 },
-    SUSPECTED:  { border: '#eab308', glow: 'rgba(234,179,8,0.4)',  text: '#fde047', opacity: 0.6 }
+    CONFIRMED:  { border: '#db3838', text: '#f5a6a6', opacity: 1.0 },
+    LAST_KNOWN: { border: '#e87c3e', text: '#f5c4a0', opacity: 0.7 },
+    SUSPECTED:  { border: '#f5a623', text: '#f5d48a', opacity: 0.6 }
   };
   const c = colors[contact.state] || colors.SUSPECTED;
   const label = contact.state === 'SUSPECTED' ? '?' : (contact.id || '?').split('-').pop();
@@ -167,8 +166,8 @@ function makeContactIcon(contact, selected) {
     className: '',
     iconSize: [52, 42],
     iconAnchor: [26, 21],
-    html: `<div style="opacity:${c.opacity};display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 0 3px ${c.glow})">
-      <div style="background:rgba(15,23,42,0.92);border:1px solid ${c.border};border-radius:3px;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:${c.text};letter-spacing:0.5px;margin-bottom:2px">${label}</div>
+    html: `<div style="opacity:${c.opacity};display:flex;flex-direction:column;align-items:center">
+      <div style="background:rgba(27,27,27,0.95);border:1px solid ${c.border};border-radius:3px;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:${c.text};letter-spacing:0.5px;margin-bottom:2px">${label}</div>
       <div style="font-size:14px;line-height:1;color:${c.border}">${symbol}</div>
     </div>`
   });
@@ -263,11 +262,11 @@ export default function MapView({
       marker.on('click', () => onUnitSelect(unit.id));
 
       marker.bindTooltip(
-        `<div style="font-family:monospace;font-size:11px;background:#0d1520;border:1px solid #1a2d45;padding:6px;border-radius:3px">
-          <b style="color:#00b4ff">${unit.callsign}</b><br>
+        `<div style="font-family:monospace;font-size:11px;background:#1b1b1b;border:1px solid #3a3a3a;padding:6px;border-radius:3px">
+          <b style="color:#2a7de1">${unit.callsign}</b><br>
           ${unit.vehicle_type} | HP:${unit.health ?? 100}% Fuel:${unit.fuel ?? 100}%<br>
           Status: ${unit.status || 'UNKNOWN'}<br>
-          ${unit.current_order ? `<span style="color:#7a9ab8">▶ ${unit.current_order}</span>` : ''}
+          ${unit.current_order ? `<span style="color:#a0a0a0">${unit.current_order}</span>` : ''}
         </div>`,
         { className: 'spectre-tooltip', permanent: false, direction: 'top' }
       );
@@ -305,9 +304,9 @@ export default function MapView({
 
       const ageMin = contact.last_seen ? Math.floor((Date.now() - contact.last_seen) / 60000) : 0;
       marker.bindTooltip(
-        `<div style="font-family:monospace;font-size:11px;background:#0d1520;border:1px solid #1a2d45;padding:6px;border-radius:3px">
-          <b style="color:#ff6666">${contact.id}</b><br>
-          Type: ${contact.type} | State: <b style="color:${contact.state === 'CONFIRMED' ? '#ff4444' : contact.state === 'LAST_KNOWN' ? '#ff6b35' : '#ffaa00'}">${contact.state}</b><br>
+        `<div style="font-family:monospace;font-size:11px;background:#1b1b1b;border:1px solid #3a3a3a;padding:6px;border-radius:3px">
+          <b style="color:#db3838">${contact.id}</b><br>
+          Type: ${contact.type} | State: <b style="color:${contact.state === 'CONFIRMED' ? '#db3838' : contact.state === 'LAST_KNOWN' ? '#e87c3e' : '#f5a623'}">${contact.state}</b><br>
           Source: ${contact.source || 'UNKNOWN'}<br>
           ${ageMin > 0 ? `Last seen: ${ageMin}m ago` : 'Just spotted'}
         </div>`,
@@ -366,8 +365,8 @@ export default function MapView({
         }}>
           <div style={{
             fontFamily: 'var(--font-mono)', fontSize: '12px',
-            color: 'var(--text-muted)', background: 'rgba(7,11,16,0.9)',
-            padding: '20px 30px', borderRadius: '4px',
+            color: 'var(--text-muted)', background: 'rgba(27,27,27,0.95)',
+            padding: '20px 30px', borderRadius: '3px',
             border: '1px solid var(--border-primary)',
             position: 'relative'
           }}>
@@ -391,10 +390,9 @@ export default function MapView({
 
       <div style={{
         position: 'absolute', bottom: '10px', left: '10px',
-        background: 'rgba(15,23,42,0.92)', border: '1px solid var(--border-subtle)',
-        borderRadius: '4px', padding: '8px 12px', zIndex: 1000,
-        fontFamily: 'var(--font-mono)', fontSize: '10px', pointerEvents: 'none',
-        backdropFilter: 'blur(8px)'
+        background: 'rgba(27,27,27,0.95)', border: '1px solid var(--border-subtle)',
+        borderRadius: '3px', padding: '8px 12px', zIndex: 1000,
+        fontFamily: 'var(--font-mono)', fontSize: '10px', pointerEvents: 'none'
       }}>
         <div style={{ color: 'var(--text-muted)', marginBottom: '5px', letterSpacing: '1px', fontWeight: 600 }}>LEGEND</div>
         <div style={{ color: 'var(--color-friendly)',  marginBottom: '2px' }}>○ FRIENDLY</div>
@@ -406,8 +404,8 @@ export default function MapView({
       {mapName && (
         <div style={{
           position: 'absolute', top: '10px', left: '10px',
-          background: 'rgba(15,23,42,0.92)', border: '1px solid var(--border-subtle)',
-          borderRadius: '4px', padding: '6px 10px', zIndex: 1000,
+          background: 'rgba(27,27,27,0.95)', border: '1px solid var(--border-subtle)',
+          borderRadius: '3px', padding: '6px 10px', zIndex: 1000,
           fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-primary)',
           letterSpacing: '1px', fontWeight: 600
         }}>

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import aiService from '../ai/aiService';
 
-export default function PlanningModal({ state, patch, addCommsEntry, addIntel }) {
+export default function PlanningModal({ state, patch, addCommsEntry, addIntel, generateMissionVault }) {
   const [messages, setMessages] = useState([{
     role: 'assistant',
     content: 'SPECTRE online. Ready for mission briefing.\n\nWhat is your objective, Commander?'
@@ -41,7 +41,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel })
         forceMetrics: state.forceMetrics,
         intelDB: state.intelDB
       };
-      const response = await aiService.chat(userMsg, context);
+      const response = await aiService.chat(userMsg, context, state.vaultPath);
       setMessages(prev => [...prev, { role: 'assistant', content: response }]);
     } catch (err) {
       const msg = err.message || 'Unknown error';
@@ -74,7 +74,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel })
       const objective  = userMsgs[0] || 'Unspecified';
       const constraints = userMsgs.slice(1).join('; ') || 'None specified';
 
-      const generated = await aiService.generateOPORD(objective, constraints, context, conversation);
+      const generated = await aiService.generateOPORD(objective, constraints, context, conversation, state.vaultPath);
 
       if (!generated) throw new Error('AI returned no OPORD — check API key and model.');
 
@@ -109,7 +109,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel })
         intelDB: state.intelDB
       };
 
-      const coaResult = await aiService.generateCOAs('Initial planning', opord, context);
+      const coaResult = await aiService.generateCOAs('Initial planning', opord, context, state.vaultPath);
 
       patch({
         opord,
@@ -118,6 +118,11 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel })
         missionPhase: 'BRIEFING',
         showCOAPanel: true
       });
+
+      // Generate vault ontology from OPORD + COA
+      if (generateMissionVault && coaResult?.coas?.[0]) {
+        generateMissionVault(opord, coaResult.coas[0]);
+      }
 
       addCommsEntry('SPECTRE', 'ALL',
         `OPORD approved. ${opord.mission_name || 'Mission'}. Stand by for execution orders.`, 'BLUE');
@@ -195,7 +200,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel })
             {error && (
               <div style={{
                 margin: '0 16px 8px', padding: '8px 12px',
-                background: 'rgba(255,68,68,0.1)', border: '1px solid var(--color-red)',
+                background: 'var(--red-dim)', border: '1px solid var(--color-red)',
                 borderRadius: '3px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--color-red)'
               }}>
                 ⚠ {error}
@@ -250,7 +255,7 @@ function OPORDView({ opord, thinking, onApprove, onRevise }) {
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
         <div style={{
           background: 'var(--bg-secondary)', border: '1px solid var(--border-accent)',
-          borderRadius: '4px', padding: '16px', fontFamily: 'var(--font-mono)', fontSize: '12px'
+          borderRadius: '3px', padding: '16px', fontFamily: 'var(--font-mono)', fontSize: '12px'
         }}>
           <div style={{
             fontSize: '14px', fontFamily: 'var(--font-condensed)', fontWeight: 700,

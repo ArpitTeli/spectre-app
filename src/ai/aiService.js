@@ -169,11 +169,11 @@ class AIService {
   }
 
   // ── Planning conversation ──────────────────────────────────────────────────
-  async chat(userMessage, context) {
+  async chat(userMessage, context, vaultPath) {
     this.compressHistory();
     this.conversationHistory.push({ role: 'user', content: userMessage });
 
-    const ctx = this.buildContext(context);
+    const ctx = vaultPath ? await this.buildVaultContext(vaultPath, context) : this.buildContext(context);
     const messages = [
       { role: 'user', content: `BATTLEFIELD CONTEXT:\n${ctx}\n\n---` },
       ...this.conversationHistory
@@ -192,8 +192,8 @@ class AIService {
   }
 
   // ── OPORD generation ───────────────────────────────────────────────────────
-  async generateOPORD(objective, constraints, context, conversation) {
-    const ctx = this.buildContext(context);
+  async generateOPORD(objective, constraints, context, conversation, vaultPath) {
+    const ctx = vaultPath ? await this.buildVaultContext(vaultPath, context) : this.buildContext(context);
     const convSummary = (conversation || []).map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
 
     const prompt = `Generate a complete Operations Order based on this planning session.
@@ -232,8 +232,8 @@ Return JSON wrapped in <OPORD_JSON> tags:
   }
 
   // ── COA generation ─────────────────────────────────────────────────────────
-  async generateCOAs(situation, opord, context) {
-    const ctx = this.buildContext(context);
+  async generateCOAs(situation, opord, context, vaultPath) {
+    const ctx = vaultPath ? await this.buildVaultContext(vaultPath, context) : this.buildContext(context);
 
     const prompt = `Generate exactly 3 tactically distinct Courses of Action.
 
@@ -298,7 +298,7 @@ Return JSON wrapped in <COA_JSON> tags:
   }
 
   // ── Modify COA ─────────────────────────────────────────────────────────────
-  async modifyCOA(coa, modification, context) {
+  async modifyCOA(coa, modification, context, vaultPath) {
     const prompt = `Modify this Course of Action based on the commander's request.
 
 ORIGINAL COA:
@@ -307,7 +307,7 @@ ${JSON.stringify(coa, null, 2)}
 COMMANDER'S REQUEST: "${modification}"
 
 CONTEXT:
-${this.buildContext(context)}
+${vaultPath ? await this.buildVaultContext(vaultPath, context) : this.buildContext(context)}
 
 Apply the modification, recalculate all probabilities, and return the updated COA.
 Add a "changes" array describing what changed.
@@ -324,7 +324,7 @@ Return JSON wrapped in <COA_JSON> tags with this structure:
   }
 
   // ── Mid-mission adaptation ─────────────────────────────────────────────────
-  async adaptPlan(event, currentCOA, context) {
+  async adaptPlan(event, currentCOA, context, vaultPath) {
     const prompt = `A battlefield event has occurred. Assess and recommend adaptation.
 
 EVENT: ${JSON.stringify(event)}
@@ -333,7 +333,7 @@ CURRENT PLAN (abbreviated):
 ${JSON.stringify({ name: currentCOA?.name, phases: currentCOA?.phases?.map(p => ({ name: p.name, units: p.unit_orders?.map(o => o.callsign) })) }, null, 2)}
 
 CURRENT STATE:
-${this.buildContext(context)}
+${vaultPath ? await this.buildVaultContext(vaultPath, context) : this.buildContext(context)}
 
 Determine severity and recommend action. Return JSON (no tags needed, raw JSON only):
 {
@@ -446,6 +446,111 @@ ${intelStr}
 
 OBSERVED PATTERNS:
 ${patternStr}`;
+  }
+
+  // ── Vault-aware context builder (Palantir Ontology style) ─────────────────
+  async buildVaultContext(vaultPath, context) {
+    if (!vaultPath) return this.buildContext(context);
+
+    try {
+      const { readVaultNodes, buildGraphFromWikilinks } = await import('../lib/vault');
+      const nodes = await readVaultNodes(vaultPath);
+      if (!nodes.length) return this.buildContext(context);
+
+      const edges = buildGraphFromWikilinks(nodes);
+      const { units: liveUnits, contacts: liveContacts } = context || {};
+
+      const lines = [];
+
+      // Units — typed objects with relationships
+      const unitNodes = nodes.filter(n => n.frontmatter?.type === 'unit');
+      if (unitNodes.length) {
+        lines.push('FRIENDLY FORCES:');
+        for (const node of unitNodes) {
+          const fm = node.frontmatter;
+          const live = liveUnits?.[fm.id];
+          const pos = live?.position || { x: fm.position_x, y: fm.position_y };
+          const hp = live?.health ?? fm.health;
+          const fuel = live?.fuel ?? fm.fuel;
+          const status = live?.status || fm.status;
+          const order = live?.current_order || fm.current_order || 'NONE';
+          const rels = node.wikilinks.join(', ');
+          lines.push(`  [${fm.vehicle_type}] ${fm.callsign}`);
+          lines.push(`    HP:${hp}% Fuel:${fuel}% Status:${status}`);
+          lines.push(`    Position: (${Math.round(pos.x)}, ${Math.round(pos.y)})`);
+          lines.push(`    Order: ${order}`);
+          if (rels) lines.push(`    Relationships: ${rels}`);
+        }
+      }
+
+      // Contacts — enemy disposition
+      const contactNodes = nodes.filter(n => n.frontmatter?.type === 'contact');
+      if (contactNodes.length) {
+        lines.push('\nENEMY CONTACTS:');
+        for (const node of contactNodes) {
+          const fm = node.frontmatter;
+          const live = liveContacts?.[fm.id];
+          const pos = live?.position || { x: fm.position_x, y: fm.position_y };
+          const state = live?.state || fm.state;
+          const rels = node.wikilinks.join(', ');
+          lines.push(`  ${fm.id} [${state}]: ${fm.contact_type}`);
+          lines.push(`    Position: (${Math.round(pos.x)}, ${Math.round(pos.y)}) Source: ${fm.source}`);
+          if (rels) lines.push(`    Relationships: ${rels}`);
+        }
+      }
+
+      // Objectives
+      const objNodes = nodes.filter(n => n.frontmatter?.type === 'objective');
+      if (objNodes.length) {
+        lines.push('\nOBJECTIVES:');
+        for (const node of objNodes) {
+          const fm = node.frontmatter;
+          lines.push(`  ${fm.name}: ${fm.status} (Priority: ${fm.priority})`);
+          if (fm.description) lines.push(`    ${fm.description}`);
+        }
+      }
+
+      // Phases
+      const phaseNodes = nodes.filter(n => n.frontmatter?.type === 'phase');
+      if (phaseNodes.length) {
+        lines.push('\nEXECUTION PHASES:');
+        for (const node of phaseNodes) {
+          const fm = node.frontmatter;
+          const assigned = node.wikilinks.filter(w => w.toLowerCase().startsWith('unit-') || w.toLowerCase().startsWith('alpha') || w.toLowerCase().startsWith('bravo'));
+          lines.push(`  Phase ${fm.number}: ${fm.name} [${fm.status}]`);
+          if (fm.description) lines.push(`    ${fm.description}`);
+          if (assigned.length) lines.push(`    Assigned: ${assigned.join(', ')}`);
+        }
+      }
+
+      // Intel
+      const intelNodes = nodes.filter(n => n.frontmatter?.type === 'intel');
+      if (intelNodes.length) {
+        lines.push('\nINTELLIGENCE:');
+        for (const node of intelNodes) {
+          const fm = node.frontmatter;
+          lines.push(`  [${fm.threat_level}] ${fm.id}`);
+          if (node.body) lines.push(`    ${node.body.substring(0, 200)}`);
+        }
+      }
+
+      // Graph connections
+      if (edges.length) {
+        lines.push('\nRELATIONSHIP GRAPH:');
+        for (const edge of edges.slice(0, 20)) {
+          const src = nodes.find(n => n.frontmatter?.id === edge.source);
+          const tgt = nodes.find(n => n.frontmatter?.id === edge.target);
+          const srcName = src?.frontmatter?.callsign || src?.frontmatter?.name || edge.source;
+          const tgtName = tgt?.frontmatter?.callsign || tgt?.frontmatter?.name || edge.target;
+          lines.push(`  ${srcName} → ${tgtName}`);
+        }
+      }
+
+      return lines.join('\n') || this.buildContext(context);
+    } catch (e) {
+      console.error('SPECTRE: buildVaultContext failed, falling back:', e);
+      return this.buildContext(context);
+    }
   }
 
   // ── Robust JSON extractor ──────────────────────────────────────────────────

@@ -2,14 +2,14 @@ import React, { useState, useRef } from 'react';
 import aiService from '../ai/aiService';
 
 const RISK_COLORS = {
-  LOW:      'var(--color-green)',
+  LOW:      'var(--accent)',
   MEDIUM:   'var(--color-yellow)',
   HIGH:     'var(--color-last-known)',
   CRITICAL: 'var(--color-red)'
 };
 
 function getProbColor(pct) {
-  if (pct >= 70) return 'var(--color-green)';
+  if (pct >= 70) return 'var(--accent)';
   if (pct >= 50) return 'var(--color-yellow)';
   return 'var(--color-red)';
 }
@@ -35,7 +35,7 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
     setLoading(true);
     try {
       const ctx = { units: state.units, contacts: state.contacts, forceMetrics: state.forceMetrics, intelDB: state.intelDB };
-      const modified = await aiService.modifyCOA(coa, modifyInput, ctx);
+      const modified = await aiService.modifyCOA(coa, modifyInput, ctx, state.vaultPath);
       const updated  = coas.map(c => c.id === coa.id ? { ...modified, id: coa.id } : c);
       patch({ currentCOAs: updated });
       setModifyingId(null);
@@ -119,8 +119,8 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
 
           {phase && (
             <div style={{ padding: '16px' }}>
-              <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-accent)', borderRadius: '4px', padding: '14px', marginBottom: '12px' }}>
-                <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '16px', fontWeight: 700, color: 'var(--accent-bright)', marginBottom: '8px' }}>
+                  <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-accent)', borderRadius: '3px', padding: '14px', marginBottom: '12px' }}>
+                <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '16px', fontWeight: 700, color: 'var(--accent)', marginBottom: '8px' }}>
                   PHASE {phase.number || stepIndex + 1}: {phase.name}
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)', marginLeft: '10px' }}>
                     ~{Math.round((phase.duration_sec || 120) / 60)} min
@@ -134,10 +134,10 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
                 {(phase.unit_orders || []).map((order, i) => (
                   <div key={i} style={{
                     background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)',
-                    borderLeft: '3px solid var(--color-friendly)', borderRadius: '3px',
+                    borderLeft: '3px solid var(--accent)', borderRadius: '3px',
                     padding: '8px 12px', marginBottom: '6px'
                   }}>
-                    <div style={{ fontFamily: 'var(--font-condensed)', fontWeight: 700, color: 'var(--color-friendly)', marginBottom: '4px' }}>
+                    <div style={{ fontFamily: 'var(--font-condensed)', fontWeight: 700, color: 'var(--accent)', marginBottom: '4px' }}>
                       {order.callsign || order.unit_id}
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-primary)' }}>{order.action}</div>
@@ -190,15 +190,15 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
         background: 'rgba(13,127,204,0.08)', border: '1px solid var(--border-accent)',
         borderRadius: '4px'
       }}>
-        <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '2px', marginBottom: '8px' }}>
+          <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '2px', marginBottom: '8px' }}>
           ACTIVE COA: {selectedCOA.name}
         </div>
         <div style={{ display: 'flex', gap: '4px', marginBottom: '10px' }}>
           {phases.map((ph, i) => (
             <div key={i} style={{
               flex: 1, height: '6px', borderRadius: '3px',
-              background: i < activePhaseIdx ? 'var(--color-green)'
-                : i === activePhaseIdx ? 'var(--accent-bright)'
+              background: i < activePhaseIdx ? 'var(--accent)'
+                : i === activePhaseIdx ? 'var(--accent)'
                 : 'var(--bg-tertiary)',
               transition: 'background 0.3s'
             }} />

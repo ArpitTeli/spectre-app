@@ -16,7 +16,7 @@ import './styles/global.css';
 export default function App() {
   const {
     state, patch, addCommsEntry, sendArmaCommand,
-    addIntel, endMission
+    addIntel, endMission, generateMissionVault
   } = useSpectreStore();
 
   const stateRef = useRef(state);
@@ -147,6 +147,7 @@ export default function App() {
           patch={patch}
           addCommsEntry={addCommsEntry}
           addIntel={addIntel}
+          generateMissionVault={generateMissionVault}
         />
       )}
 

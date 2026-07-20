@@ -5,20 +5,19 @@ export default function AARPanel({ aar, rewardData, onClose, onNewMission }) {
 
   if (!aar) return null;
 
-  const scoreColor = rewardData.score >= 70 ? 'var(--color-green)' : rewardData.score >= 40 ? 'var(--color-yellow)' : 'var(--color-red)';
+  const scoreColor = rewardData.score >= 70 ? 'var(--accent)' : rewardData.score >= 40 ? 'var(--color-yellow)' : 'var(--color-red)';
   const scoreLetter = rewardData.score >= 80 ? 'S' : rewardData.score >= 60 ? 'A' : rewardData.score >= 40 ? 'B' : rewardData.score >= 20 ? 'C' : 'F';
 
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 500,
-      background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(8px)',
+      background: 'rgba(0,0,0,0.8)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
     }}>
       <div style={{
         background: 'var(--bg-panel)', border: '1px solid var(--border-accent)',
-        borderRadius: '6px', width: '100%', maxWidth: '860px', maxHeight: '88vh',
-        display: 'flex', flexDirection: 'column',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.9)'
+        borderRadius: '4px', width: '100%', maxWidth: '860px', maxHeight: '88vh',
+        display: 'flex', flexDirection: 'column'
       }}>
         {/* Header */}
         <div style={{
@@ -63,7 +62,7 @@ export default function AARPanel({ aar, rewardData, onClose, onNewMission }) {
 
         {/* Footer */}
         <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border-primary)', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-          <div style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-green)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span>✓</span> Mission data saved to training dataset
           </div>
           <button className="btn" onClick={onClose}>CLOSE</button>
@@ -104,7 +103,7 @@ function SummaryTab({ aar, rewardData, scoreColor }) {
 
       {/* What went well / wrong */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <ListBox title="WHAT WENT WELL" items={aar.what_went_well || []} color="var(--color-green)" icon="✓" />
+        <ListBox title="WHAT WENT WELL" items={aar.what_went_well || []} color="var(--accent)" icon="✓" />
         <ListBox title="WHAT WENT WRONG" items={aar.what_went_wrong || []} color="var(--color-red)" icon="✗" />
       </div>
     </div>
@@ -174,7 +173,7 @@ function AnalysisTab({ aar }) {
       {(aar.intelligence_updates || []).length > 0 && (
         <Section title="INTELLIGENCE UPDATES">
           {aar.intelligence_updates.map((u, i) => (
-            <div key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--color-green)', padding: '3px 0' }}>
+            <div key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)', padding: '3px 0' }}>
               ✓ Intel updated: {u.type} — {JSON.stringify(u.data).slice(0, 80)}...
             </div>
           ))}
@@ -203,7 +202,7 @@ function TrainingDataTab({ rewardData }) {
 
       <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '4px', padding: '12px 14px', marginBottom: '12px' }}>
         <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '2px', marginBottom: '8px' }}>REWARD RECORD (PREVIEW)</div>
-        <pre style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--color-green)', margin: 0, lineHeight: 1.6 }}>
+        <pre style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)', margin: 0, lineHeight: 1.6 }}>
           {JSON.stringify(sample, null, 2)}
         </pre>
       </div>
@@ -218,7 +217,7 @@ function TrainingDataTab({ rewardData }) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function OutcomeBox({ label, value, good, bad, neutral }) {
-  const color = good ? 'var(--color-green)' : bad ? 'var(--color-red)' : 'var(--text-bright)';
+  const color = good ? 'var(--accent)' : bad ? 'var(--color-red)' : 'var(--text-bright)';
   return (
     <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '4px', padding: '10px', textAlign: 'center' }}>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '18px', fontWeight: 'bold', color }}>{value}</div>
@@ -228,7 +227,7 @@ function OutcomeBox({ label, value, good, bad, neutral }) {
 }
 
 function ScoreLine({ label, value, positive, negative }) {
-  const color = positive ? 'var(--color-green)' : negative ? 'var(--color-red)' : 'var(--text-secondary)';
+  const color = positive ? 'var(--accent)' : negative ? 'var(--color-red)' : 'var(--text-secondary)';
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--border-primary)' }}>
       <span style={{ fontFamily: 'var(--font-condensed)', fontSize: '12px', color: 'var(--text-secondary)' }}>{label}</span>

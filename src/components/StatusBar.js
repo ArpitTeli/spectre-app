@@ -71,14 +71,14 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
       )}
       <div style={{ flex: 1 }} />
       <button onClick={onCommsToggle} style={{
-        background: 'none', border: '1px solid var(--border-primary)', borderRadius: '2px',
+        background: 'none', border: '1px solid var(--border-primary)', borderRadius: '3px',
         color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--font-mono)',
         fontSize: '10px', padding: '2px 8px', letterSpacing: '1px'
       }}>
         ◈ COMMS
       </button>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '2px', marginLeft: '10px' }}>
-        SPECTRE C2 v1.1
+        SPECTRE C2 v1.3.0
       </div>
     </div>
   );

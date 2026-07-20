@@ -33,6 +33,7 @@ const BRIDGE_DIR   = path.join(USER_DATA, 'bridge');
 const MISSIONS_DIR = path.join(USER_DATA, 'missions');
 const INTEL_DIR    = path.join(USER_DATA, 'intel');
 const CONFIG_PATH  = path.join(USER_DATA, 'config.json');
+const VAULTS_DIR   = path.join(USER_DATA, 'vaults');
 
 // ─── Auto-detect Arma 3 ─────────────────────────────────────────────────────
 let _configData;
@@ -82,7 +83,7 @@ const DEFAULT_CONFIG = {
 };
 
 // ─── Ensure directories exist ────────────────────────────────────────────────
-[BRIDGE_DIR, MISSIONS_DIR, INTEL_DIR, ARMA_SPECTRE].forEach(d => {
+[BRIDGE_DIR, MISSIONS_DIR, INTEL_DIR, ARMA_SPECTRE, VAULTS_DIR].forEach(d => {
   try { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); } catch (_) {}
 });
 if (!fs.existsSync(CONFIG_PATH)) {
@@ -891,3 +892,99 @@ ipcMain.handle('set-arma-path', async (_, manualPath) => {
 ipcMain.on('minimize-window', () => mainWindow?.minimize());
 ipcMain.on('maximize-window', () => mainWindow?.isMaximized() ? mainWindow.unmaximize() : mainWindow?.maximize());
 ipcMain.on('close-window',    () => mainWindow?.close());
+
+// ─── Vault (Ontology Layer) ──────────────────────────────────────────────────
+ipcMain.handle('vault-create', async (_, missionId) => {
+  const safeId = (missionId || `mission-${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, '_');
+  const vaultPath = path.join(VAULTS_DIR, safeId);
+  const nodesPath = path.join(vaultPath, 'nodes');
+  try {
+    fs.mkdirSync(nodesPath, { recursive: true });
+    return vaultPath;
+  } catch (e) {
+    console.error('SPECTRE: vault create failed:', e.message);
+    return null;
+  }
+});
+
+ipcMain.handle('vault-write-node', async (_, vaultPath, filename, content) => {
+  try {
+    const nodesPath = path.join(vaultPath, 'nodes');
+    if (!fs.existsSync(nodesPath)) fs.mkdirSync(nodesPath, { recursive: true });
+    fs.writeFileSync(path.join(nodesPath, filename), content, 'utf8');
+    return true;
+  } catch (e) {
+    console.error('SPECTRE: vault write failed:', e.message);
+    return false;
+  }
+});
+
+ipcMain.handle('vault-read-nodes', async (_, vaultPath) => {
+  try {
+    const nodesPath = path.join(vaultPath, 'nodes');
+    if (!fs.existsSync(nodesPath)) return [];
+    const files = fs.readdirSync(nodesPath).filter(f => f.endsWith('.md'));
+    return files.map(f => {
+      const content = fs.readFileSync(path.join(nodesPath, f), 'utf8');
+      return { filename: f, content };
+    });
+  } catch (e) {
+    console.error('SPECTRE: vault read failed:', e.message);
+    return [];
+  }
+});
+
+ipcMain.handle('vault-update-node', async (_, vaultPath, nodeId, updates) => {
+  try {
+    const nodesPath = path.join(vaultPath, 'nodes');
+    const filename = `${nodeId}.md`;
+    const filePath = path.join(nodesPath, filename);
+    if (!fs.existsSync(filePath)) return false;
+
+    const content = fs.readFileSync(filePath, 'utf8');
+    const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+    if (!match) return false;
+
+    const yamlLines = match[1].split('\n');
+    const body = match[2];
+    const updatedLines = yamlLines.map(line => {
+      const colonIdx = line.indexOf(':');
+      if (colonIdx === -1) return line;
+      const key = line.slice(0, colonIdx).trim();
+      if (key in updates) {
+        const val = updates[key];
+        if (Array.isArray(val)) return `${key}: ${JSON.stringify(val)}`;
+        if (typeof val === 'string' && (val.includes(':') || val.includes('#'))) return `${key}: "${val}"`;
+        return `${key}: ${val}`;
+      }
+      return line;
+    });
+
+    const newContent = `---\n${updatedLines.join('\n')}\n---\n${body}`;
+    fs.writeFileSync(filePath, newContent, 'utf8');
+    return true;
+  } catch (e) {
+    console.error('SPECTRE: vault update failed:', e.message);
+    return false;
+  }
+});
+
+ipcMain.handle('vault-add-wikilink', async (_, vaultPath, nodeId, targetTitle) => {
+  try {
+    const nodesPath = path.join(vaultPath, 'nodes');
+    const filename = `${nodeId}.md`;
+    const filePath = path.join(nodesPath, filename);
+    if (!fs.existsSync(filePath)) return false;
+
+    const content = fs.readFileSync(filePath, 'utf8');
+    const wikilink = `[[${targetTitle}]]`;
+    if (content.includes(wikilink)) return true;
+
+    const newContent = content.trimEnd() + `\n${wikilink}\n`;
+    fs.writeFileSync(filePath, newContent, 'utf8');
+    return true;
+  } catch (e) {
+    console.error('SPECTRE: vault add wikilink failed:', e.message);
+    return false;
+  }
+});

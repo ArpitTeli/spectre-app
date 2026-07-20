@@ -1,7 +1,7 @@
 import React from 'react';
 
 const RISK_COLORS = {
-  LOW: 'var(--color-green)',
+  LOW: 'var(--accent)',
   MEDIUM: 'var(--color-yellow)',
   HIGH: 'var(--color-last-known)',
   CRITICAL: 'var(--color-red)'
@@ -16,20 +16,19 @@ export default function AbortModal({ abortState, forceMetrics, rewardData, onCho
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 500,
-      background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)',
+      background: 'rgba(0,0,0,0.8)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
     }}>
       <div style={{
-        background: 'var(--bg-panel)', border: '2px solid var(--color-red)',
-        borderRadius: '6px', width: '100%', maxWidth: '620px',
-        boxShadow: '0 0 40px rgba(255,68,68,0.3)'
+        background: 'var(--bg-panel)', border: '1px solid var(--color-red)',
+        borderRadius: '4px', width: '100%', maxWidth: '620px'
       }}>
         {/* Header */}
         <div style={{
           background: 'rgba(239,68,68,0.15)', borderBottom: '1px solid var(--color-red)',
           padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px'
         }}>
-          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--color-red)', boxShadow: '0 0 10px rgba(239,68,68,0.6)' }} />
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-red)' }} />
           <div>
             <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '18px', fontWeight: 700, color: 'var(--color-red)', letterSpacing: '2px' }}>
               EMERGENCY — MISSION ABORT RECOMMENDED
@@ -85,7 +84,7 @@ export default function AbortModal({ abortState, forceMetrics, rewardData, onCho
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     {opt.success_pct !== undefined && (
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: opt.success_pct > 60 ? 'var(--color-green)' : opt.success_pct > 30 ? 'var(--color-yellow)' : 'var(--color-red)', fontWeight: 'bold' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: opt.success_pct > 60 ? 'var(--accent)' : opt.success_pct > 30 ? 'var(--color-yellow)' : 'var(--color-red)', fontWeight: 'bold' }}>
                         {opt.success_pct}%
                       </span>
                     )}

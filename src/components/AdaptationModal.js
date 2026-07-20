@@ -11,7 +11,7 @@ export default function AdaptationModal({ adaptation, onAccept, onDismiss, onSho
       position: 'fixed', bottom: '40px', left: '50%', transform: 'translateX(-50%)',
       zIndex: 400, width: '540px',
       background: 'var(--bg-panel)', border: `1px solid ${color}`,
-      borderRadius: '6px', boxShadow: `0 0 30px ${color}33`
+      borderRadius: '4px'
     }}>
       {/* Header */}
       <div style={{
