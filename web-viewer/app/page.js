@@ -54,6 +54,7 @@ export default function Home() {
   const [connected, setConnected] = useState(false);
   const [unitCount, setUnitCount] = useState(0);
   const [mapName, setMapName] = useState(null);
+  const mapNameRef = useRef(null);
   const [ready, setReady] = useState(false);
 
   // Load Leaflet from CDN
@@ -108,7 +109,8 @@ export default function Home() {
         setUnitCount(units.length);
 
         const newMap = (state.mapName || '').toLowerCase();
-        if (newMap && newMap !== mapName && mapInst.current) {
+        if (newMap && newMap !== mapNameRef.current && mapInst.current) {
+          mapNameRef.current = newMap;
           setMapName(newMap);
           const config = TILE_MAPS[newMap];
           if (config) {
@@ -157,12 +159,10 @@ export default function Home() {
     poll();
     const interval = setInterval(poll, 1000);
     return () => clearInterval(interval);
-  }, [ready, mapName]);
+  }, [ready]);
 
   return (
-    <>
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-      <div style={{ background: '#1b1b1b', color: '#f5f6f7', fontFamily: 'Inter, system-ui, sans-serif', fontSize: '13px', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ background: '#1b1b1b', color: '#f5f6f7', fontFamily: 'Inter, system-ui, sans-serif', fontSize: '13px', height: '100vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ background: '#212121', borderBottom: '1px solid #2a2a2a', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '12px', height: '40px', flexShrink: 0 }}>
           <span style={{ fontWeight: 700, fontSize: '13px', letterSpacing: '2px', color: '#2a7de1' }}>SPECTRE</span>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: connected ? '#2a7de1' : '#db3838' }} />
@@ -186,8 +186,7 @@ export default function Home() {
               </div>
             </div>
           )}
-        </div>
       </div>
-    </>
+    </div>
   );
 }
