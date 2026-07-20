@@ -2,43 +2,128 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// ─── Map coordinate lookup ────────────────────────────────────────────────────
-// [origin_lat, origin_lng, meters_per_lat, meters_per_lng]
-const MAP_COORDS = {
-  altis:      [39.0, 21.0, 111000, 85000],
-  stratis:    [39.0, 21.0, 111000, 85000],
-  tanoa:      [-6.0, 149.0, 111000, 111000],
-  livonia:    [51.0, 17.0, 111000, 63000],
-  malden:     [42.0, 3.0, 111000, 78000],
-  enoch:      [51.0, 17.0, 111000, 63000],
-  tem_anizay: [37.0, 71.0, 111000, 88000],
-  cola:       [-23.0, -68.0, 111000, 95000],
+// ─── Arma 3 Map Configs (from jetelain/Arma3Map) ─────────────────────────────
+// In this CRS: lat = Arma Y (northing), lng = Arma X (easting) — both in meters
+const TILE_BASE = 'https://jetelain.github.io/Arma3Map';
+
+const ARMA_MAPS = {
+  stratis: {
+    crs: (() => {
+      const f = 0.027475, tw = 226;
+      return L.extend({}, L.CRS.Simple, {
+        projection: L.Projection.LonLat,
+        transformation: new L.Transformation(f, 0, -f, tw),
+        scale: z => Math.pow(2, z),
+        zoom: s => Math.log(s) / Math.LN2,
+        infinite: true
+      });
+    })(),
+    tilePattern: '/maps/stratis/{z}/{x}/{y}.png',
+    maxZoom: 4, defaultZoom: 2, tileSize: 226, worldSize: 8192,
+    center: [4100, 4100]
+  },
+  altis: {
+    crs: (() => {
+      const fx = 0.006839, fy = 0.006836, tw = 212;
+      return L.extend({}, L.CRS.Simple, {
+        projection: L.Projection.LonLat,
+        transformation: new L.Transformation(fx, 0, -fy, tw),
+        scale: z => Math.pow(2, z),
+        zoom: s => Math.log(s) / Math.LN2,
+        infinite: true
+      });
+    })(),
+    tilePattern: '/maps/altis/{z}/{x}/{y}.png',
+    maxZoom: 6, defaultZoom: 3, tileSize: 212, worldSize: 30720,
+    center: [15000, 15000]
+  },
+  tanoa: {
+    crs: (() => {
+      const f = 0.01385, tw = 213;
+      return L.extend({}, L.CRS.Simple, {
+        projection: L.Projection.LonLat,
+        transformation: new L.Transformation(f, 0, -f, tw),
+        scale: z => Math.pow(2, z),
+        zoom: s => Math.log(s) / Math.LN2,
+        infinite: true
+      });
+    })(),
+    tilePattern: '/maps/tanoa/{z}/{x}/{y}.png',
+    maxZoom: 5, defaultZoom: 2, tileSize: 213, worldSize: 15360,
+    center: [7000, 7000]
+  },
+  enoch: {
+    crs: (() => {
+      const f = 0.02735, tw = 356;
+      return L.extend({}, L.CRS.Simple, {
+        projection: L.Projection.LonLat,
+        transformation: new L.Transformation(f, 0, -f, tw),
+        scale: z => Math.pow(2, z),
+        zoom: s => Math.log(s) / Math.LN2,
+        infinite: true
+      });
+    })(),
+    tilePattern: '/maps/enoch/{z}/{x}/{y}.png',
+    maxZoom: 4, defaultZoom: 2, tileSize: 356, worldSize: 12800,
+    center: [7100, 7100]
+  },
+  livonia: {
+    crs: (() => {
+      const f = 0.02735, tw = 356;
+      return L.extend({}, L.CRS.Simple, {
+        projection: L.Projection.LonLat,
+        transformation: new L.Transformation(f, 0, -f, tw),
+        scale: z => Math.pow(2, z),
+        zoom: s => Math.log(s) / Math.LN2,
+        infinite: true
+      });
+    })(),
+    tilePattern: '/maps/enoch/{z}/{x}/{y}.png',
+    maxZoom: 4, defaultZoom: 2, tileSize: 356, worldSize: 12800,
+    center: [7100, 7100]
+  },
+  malden: {
+    crs: (() => {
+      const f = 0.01448, tw = 186;
+      return L.extend({}, L.CRS.Simple, {
+        projection: L.Projection.LonLat,
+        transformation: new L.Transformation(f, 0, -f, tw),
+        scale: z => Math.pow(2, z),
+        zoom: s => Math.log(s) / Math.LN2,
+        infinite: true
+      });
+    })(),
+    tilePattern: '/maps/malden/{z}/{x}/{y}.png',
+    maxZoom: 5, defaultZoom: 2, tileSize: 186, worldSize: 12800,
+    center: [7000, 7000]
+  }
 };
 
-const DEFAULT_MAP = [0, 0, 111000, 85000];
-
-function getMapCoords(mapName) {
-  if (!mapName) return DEFAULT_MAP;
-  return MAP_COORDS[mapName.toLowerCase()] || DEFAULT_MAP;
+// Fallback for unknown maps: simple CRS with 1:1 meter mapping
+function makeFallbackCRS() {
+  return L.extend({}, L.CRS.Simple, {
+    projection: L.Projection.LonLat,
+    transformation: new L.Transformation(1, 0, -1, 0),
+    scale: z => Math.pow(2, z),
+    zoom: s => Math.log(s) / Math.LN2,
+    infinite: true
+  });
 }
 
-function armaToLatLng(x, y, mapName) {
-  const [originLat, originLng, mPerLat, mPerLng] = getMapCoords(mapName);
-  return [
-    originLat + (y / mPerLat),
-    originLng + (x / mPerLng)
-  ];
+function getMapConfig(mapName) {
+  if (!mapName) return null;
+  return ARMA_MAPS[mapName.toLowerCase()] || null;
 }
 
-function getUnitLatLng(position, mapName) {
+// Convert Arma position to Leaflet LatLng for this CRS
+// In Arma3Map CRS: lat = Y (northing), lng = X (easting)
+function getUnitLatLng(position) {
   if (!position) return null;
-  // Already lat/lng
+  if (position.x !== undefined && position.y !== undefined) {
+    return [position.y, position.x];
+  }
   if (position.lat !== undefined && position.lng !== undefined) {
     return [position.lat, position.lng];
-  }
-  // Arma grid coordinates
-  if (position.x !== undefined && position.y !== undefined) {
-    return armaToLatLng(position.x, position.y, mapName);
   }
   return null;
 }
@@ -103,24 +188,51 @@ export default function MapView({
   const contactLayer = useRef(null);
   const coaLayer    = useRef(null);
   const [dismissOverlay, setDismissOverlay] = useState(false);
-  const prevMapNameRef = useRef(null);
+  const currentMapRef = useRef(null);
 
-  // ── Init map once ──────────────────────────────────────────────────────────
+  // ── Create/recreate map when mapName changes ────────────────────────────────
   useEffect(() => {
-    if (mapInst.current) return;
+    if (!mapRef.current) return;
+
+    const mapKey = (mapName || '').toLowerCase();
+
+    // Only recreate if map changed
+    if (mapKey === currentMapRef.current) return;
+    currentMapRef.current = mapKey;
+
+    // Destroy old map
+    if (mapInst.current) {
+      mapInst.current.remove();
+      mapInst.current = null;
+    }
+
+    const config = getMapConfig(mapName);
+    const crs = config ? config.crs : makeFallbackCRS();
+    const center = config ? config.center : [4000, 4000];
+    const zoom = config ? config.defaultZoom : 2;
 
     const map = L.map(mapRef.current, {
-      center: [39.0, 21.0],
-      zoom: 13,
+      crs: crs,
+      center: center,
+      zoom: zoom,
       zoomControl: false,
       attributionControl: false,
       preferCanvas: true
     });
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      opacity: 0.35,
-      attribution: ''
-    }).addTo(map);
+    if (config) {
+      L.tileLayer(TILE_BASE + config.tilePattern, {
+        attribution: config.attribution,
+        tileSize: config.tileSize,
+        maxZoom: config.maxZoom,
+        minZoom: 0
+      }).addTo(map);
+    } else {
+      // Fallback: dark grid for unknown maps
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        opacity: 0.15
+      }).addTo(map);
+    }
 
     L.control.zoom({ position: 'topright' }).addTo(map);
 
@@ -129,23 +241,6 @@ export default function MapView({
     coaLayer.current     = L.layerGroup().addTo(map);
 
     mapInst.current = map;
-
-    return () => {
-      map.remove();
-      mapInst.current = null;
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Re-center map when mapName changes ──────────────────────────────────────
-  useEffect(() => {
-    if (!mapInst.current || !mapName) return;
-    if (mapName === prevMapNameRef.current) return;
-    prevMapNameRef.current = mapName;
-
-    const coords = getMapCoords(mapName);
-    const centerLat = coords[0] + 0.15;
-    const centerLng = coords[1] + 0.15;
-    mapInst.current.setView([centerLat, centerLng], 13);
   }, [mapName]);
 
   // ── Update unit markers ────────────────────────────────────────────────────
@@ -154,7 +249,7 @@ export default function MapView({
     unitLayer.current.clearLayers();
 
     Object.values(units).forEach(unit => {
-      const latlng = getUnitLatLng(unit.position, mapName);
+      const latlng = getUnitLatLng(unit.position);
       if (!latlng) return;
 
       const marker = L.marker(latlng, { icon: makeUnitIcon(unit, unit.id === selectedUnit) });
@@ -174,16 +269,16 @@ export default function MapView({
       unitLayer.current.addLayer(marker);
     });
 
-    // Auto-fit bounds to all units every update
+    // Auto-fit bounds to all units
     if (mapInst.current) {
       const unitList = Object.values(units).filter(u => u.position);
-      const latlngs = unitList.map(u => getUnitLatLng(u.position, mapName)).filter(Boolean);
+      const latlngs = unitList.map(u => getUnitLatLng(u.position)).filter(Boolean);
       if (latlngs.length > 0) {
         const bounds = L.latLngBounds(latlngs);
         if (latlngs.length === 1) {
-          mapInst.current.setView(latlngs[0], 15);
+          mapInst.current.setView(latlngs[0], mapInst.current.getZoom());
         } else {
-          mapInst.current.fitBounds(bounds, { padding: [80, 80], maxZoom: 15 });
+          mapInst.current.fitBounds(bounds, { padding: [80, 80], maxZoom: mapInst.current.getMaxZoom() - 1 });
         }
       }
     }
@@ -195,7 +290,7 @@ export default function MapView({
     contactLayer.current.clearLayers();
 
     Object.values(contacts).forEach(contact => {
-      const latlng = getUnitLatLng(contact.position, mapName);
+      const latlng = getUnitLatLng(contact.position);
       if (!latlng) return;
 
       const marker = L.marker(latlng, { icon: makeContactIcon(contact, contact.id === selectedContact) });
@@ -232,9 +327,9 @@ export default function MapView({
         const unit = Object.values(units).find(u => u.id === order.unit_id || u.callsign === order.callsign);
         if (!order.waypoints?.length) return;
 
-        const startLatLng = unit ? getUnitLatLng(unit.position, mapName) : null;
+        const startLatLng = unit ? getUnitLatLng(unit.position) : null;
         const wpLatLngs = order.waypoints
-          .map(wp => getUnitLatLng({ x: wp.x, y: wp.y, lat: wp.lat, lng: wp.lng }, mapName))
+          .map(wp => getUnitLatLng({ x: wp.x, y: wp.y }))
           .filter(Boolean);
 
         if (wpLatLngs.length === 0) return;
@@ -301,6 +396,18 @@ export default function MapView({
         <div style={{ color: 'var(--color-last-known)',marginBottom: '2px', opacity: 0.7 }}>● LAST KNOWN</div>
         <div style={{ color: 'var(--color-suspected)', opacity: 0.6 }}>● SUSPECTED</div>
       </div>
+
+      {mapName && (
+        <div style={{
+          position: 'absolute', top: '10px', left: '10px',
+          background: 'rgba(15,23,42,0.92)', border: '1px solid var(--border-subtle)',
+          borderRadius: '4px', padding: '6px 10px', zIndex: 1000,
+          fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-primary)',
+          letterSpacing: '1px', fontWeight: 600
+        }}>
+          {mapName.toUpperCase()}
+        </div>
+      )}
     </div>
   );
 }
