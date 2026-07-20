@@ -50,29 +50,37 @@ export default function Home() {
   const unitLayer = useRef(null);
   const contactLayer = useRef(null);
   const tileLayer = useRef(null);
-  const L = useRef(null);
+  const leafletRef = useRef(null);
+  const mapNameRef = useRef(null);
   const [connected, setConnected] = useState(false);
   const [unitCount, setUnitCount] = useState(0);
   const [mapName, setMapName] = useState(null);
-  const mapNameRef = useRef(null);
   const [ready, setReady] = useState(false);
 
-  // Load Leaflet from CDN
   useEffect(() => {
-    if (window.L) { L.current = window.L; setReady(true); return; }
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.onload = () => { L.current = window.L; setReady(true); };
-    document.head.appendChild(script);
+    const loadLeaflet = async () => {
+      if (typeof window === 'undefined') return;
+      // Load CSS
+      if (!document.querySelector('link[href*="leaflet"]')) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(link);
+      }
+      // Load JS
+      const L = await import('https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.esm.js');
+      leafletRef.current = L.default || L;
+      setReady(true);
+    };
+    loadLeaflet();
   }, []);
 
-  // Init map
   useEffect(() => {
     if (!ready || !mapRef.current || mapInst.current) return;
-    const leaflet = L.current;
+    const L = leafletRef.current;
 
-    const map = leaflet.map(mapRef.current, {
-      crs: leaflet.CRS.Simple,
+    const map = L.map(mapRef.current, {
+      crs: L.CRS.Simple,
       center: [4100, 4100],
       zoom: 2,
       maxZoom: 8,
@@ -83,17 +91,17 @@ export default function Home() {
       zoomDelta: 0.5
     });
 
-    leaflet.control.zoom({ position: 'topright' }).addTo(map);
-    unitLayer.current = leaflet.layerGroup().addTo(map);
-    contactLayer.current = leaflet.layerGroup().addTo(map);
+    L.control.zoom({ position: 'topright' }).addTo(map);
+    unitLayer.current = L.layerGroup().addTo(map);
+    contactLayer.current = L.layerGroup().addTo(map);
     mapInst.current = map;
 
     return () => { map.remove(); mapInst.current = null; };
   }, [ready]);
 
-  // Poll for state
   useEffect(() => {
     if (!ready) return;
+    const L = leafletRef.current;
 
     const poll = async () => {
       try {
@@ -115,7 +123,7 @@ export default function Home() {
           const config = TILE_MAPS[newMap];
           if (config) {
             if (tileLayer.current) mapInst.current.removeLayer(tileLayer.current);
-            tileLayer.current = L.current.tileLayer(TILE_BASE + config.pattern, {
+            tileLayer.current = L.tileLayer(TILE_BASE + config.pattern, {
               tileSize: config.tileSize,
               maxZoom: config.maxZoom + 4,
               maxNativeZoom: config.maxZoom,
@@ -131,14 +139,14 @@ export default function Home() {
             const ll = getLatLng(u.position || u.pos);
             if (!ll) continue;
             latlngs.push(ll);
-            const icon = L.current.divIcon({ className: '', iconSize: [60, 50], iconAnchor: [30, 25], html: makeUnitHTML(u) });
-            const marker = L.current.marker(ll, { icon });
+            const icon = L.divIcon({ className: '', iconSize: [60, 50], iconAnchor: [30, 25], html: makeUnitHTML(u) });
+            const marker = L.marker(ll, { icon });
             marker.bindTooltip(`<div style="font-family:monospace;font-size:11px;background:#1b1b1b;border:1px solid #3a3a3a;padding:6px;border-radius:3px"><b style="color:#2a7de1">${u.callsign || u.id}</b><br>${u.vehicle_type || u.vtype || ''} | HP:${u.health ?? u.hp ?? 100}%</div>`, { permanent: false, direction: 'top' });
             unitLayer.current.addLayer(marker);
           }
           if (latlngs.length > 0 && mapInst.current) {
             if (latlngs.length === 1) mapInst.current.setView(latlngs[0], Math.max(mapInst.current.getZoom(), 3));
-            else mapInst.current.fitBounds(L.current.latLngBounds(latlngs), { padding: [60, 60] });
+            else mapInst.current.fitBounds(L.latLngBounds(latlngs), { padding: [60, 60] });
           }
         }
 
@@ -147,8 +155,8 @@ export default function Home() {
           for (const c of contacts) {
             const ll = getLatLng(c.position || c.pos);
             if (!ll) continue;
-            const icon = L.current.divIcon({ className: '', iconSize: [50, 40], iconAnchor: [25, 20], html: makeContactHTML(c) });
-            contactLayer.current.addLayer(L.current.marker(ll, { icon }));
+            const icon = L.divIcon({ className: '', iconSize: [50, 40], iconAnchor: [25, 20], html: makeContactHTML(c) });
+            contactLayer.current.addLayer(L.marker(ll, { icon }));
           }
         }
       } catch (e) {
@@ -163,29 +171,29 @@ export default function Home() {
 
   return (
     <div style={{ background: '#1b1b1b', color: '#f5f6f7', fontFamily: 'Inter, system-ui, sans-serif', fontSize: '13px', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ background: '#212121', borderBottom: '1px solid #2a2a2a', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '12px', height: '40px', flexShrink: 0 }}>
-          <span style={{ fontWeight: 700, fontSize: '13px', letterSpacing: '2px', color: '#2a7de1' }}>SPECTRE</span>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: connected ? '#2a7de1' : '#db3838' }} />
-          <span style={{ fontFamily: 'monospace', fontSize: '10px', color: '#888' }}>{connected ? 'LIVE' : 'WAITING FOR DATA'}</span>
-          {unitCount > 0 && <span style={{ fontFamily: 'monospace', fontSize: '10px', color: '#888' }}>{unitCount} units</span>}
-          {mapName && <span style={{ fontFamily: 'monospace', fontSize: '10px', color: '#525252', marginLeft: 'auto' }}>{mapName.toUpperCase()}</span>}
+      <div style={{ background: '#212121', borderBottom: '1px solid #2a2a2a', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '12px', height: '40px', flexShrink: 0 }}>
+        <span style={{ fontWeight: 700, fontSize: '13px', letterSpacing: '2px', color: '#2a7de1' }}>SPECTRE</span>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: connected ? '#2a7de1' : '#db3838' }} />
+        <span style={{ fontFamily: 'monospace', fontSize: '10px', color: '#888' }}>{connected ? 'LIVE' : 'WAITING FOR DATA'}</span>
+        {unitCount > 0 && <span style={{ fontFamily: 'monospace', fontSize: '10px', color: '#888' }}>{unitCount} units</span>}
+        {mapName && <span style={{ fontFamily: 'monospace', fontSize: '10px', color: '#525252', marginLeft: 'auto' }}>{mapName.toUpperCase()}</span>}
+      </div>
+      <div style={{ flex: 1, position: 'relative' }}>
+        <div ref={mapRef} style={{ width: '100%', height: '100%', background: '#141414' }} />
+        <div style={{ position: 'absolute', bottom: 10, left: 10, background: 'rgba(27,27,27,0.95)', border: '1px solid #2a2a2a', borderRadius: 3, padding: '8px 12px', fontFamily: 'monospace', fontSize: 10, zIndex: 1000, pointerEvents: 'none' }}>
+          <div style={{ color: '#888', marginBottom: 4, letterSpacing: 1 }}>LEGEND</div>
+          <div style={{ color: '#2a7de1', marginBottom: 2 }}>○ FRIENDLY</div>
+          <div style={{ color: '#db3838' }}>● HOSTILE</div>
         </div>
-        <div style={{ flex: 1, position: 'relative' }}>
-          <div ref={mapRef} style={{ width: '100%', height: '100%', background: '#141414' }} />
-          <div style={{ position: 'absolute', bottom: 10, left: 10, background: 'rgba(27,27,27,0.95)', border: '1px solid #2a2a2a', borderRadius: 3, padding: '8px 12px', fontFamily: 'monospace', fontSize: 10, zIndex: 1000, pointerEvents: 'none' }}>
-            <div style={{ color: '#888', marginBottom: 4, letterSpacing: 1 }}>LEGEND</div>
-            <div style={{ color: '#2a7de1', marginBottom: 2 }}>○ FRIENDLY</div>
-            <div style={{ color: '#db3838' }}>● HOSTILE</div>
-          </div>
-          {!connected && (
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 1000 }}>
-              <div style={{ background: 'rgba(27,27,27,0.95)', border: '1px solid #3a3a3a', borderRadius: 3, padding: '20px 30px' }}>
-                <div style={{ fontSize: 24, marginBottom: 8, color: '#525252' }}>◎</div>
-                <div style={{ fontWeight: 600, letterSpacing: 1 }}>WAITING FOR DATA</div>
-                <div style={{ marginTop: 6, fontSize: 10, color: '#888' }}>Start SPECTRE C2 + Arma 3 to see live positions</div>
-              </div>
+        {!connected && (
+          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 1000 }}>
+            <div style={{ background: 'rgba(27,27,27,0.95)', border: '1px solid #3a3a3a', borderRadius: 3, padding: '20px 30px' }}>
+              <div style={{ fontSize: 24, marginBottom: 8, color: '#525252' }}>◎</div>
+              <div style={{ fontWeight: 600, letterSpacing: 1 }}>WAITING FOR DATA</div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#888' }}>Start SPECTRE C2 + Arma 3 to see live positions</div>
             </div>
-          )}
+          </div>
+        )}
       </div>
     </div>
   );
