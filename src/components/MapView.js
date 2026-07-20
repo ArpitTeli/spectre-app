@@ -215,20 +215,25 @@ export default function MapView({
       crs: crs,
       center: center,
       zoom: zoom,
+      maxZoom: 20,
       zoomControl: false,
       attributionControl: false,
-      preferCanvas: true
+      preferCanvas: true,
+      zoomSnap: 0.25,
+      zoomDelta: 0.5
     });
+
+    // Dark background behind tiles
+    mapRef.current.style.background = '#0a0f14';
 
     if (config) {
       L.tileLayer(TILE_BASE + config.tilePattern, {
         attribution: config.attribution,
         tileSize: config.tileSize,
-        maxZoom: config.maxZoom,
+        maxNativeZoom: config.maxZoom,
         minZoom: 0
       }).addTo(map);
     } else {
-      // Fallback: dark grid for unknown maps
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         opacity: 0.15
       }).addTo(map);
