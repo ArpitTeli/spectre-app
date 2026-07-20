@@ -5,22 +5,44 @@ const TILE_BASE = 'https://jetelain.github.io/Arma3Map';
 const VEHICLE_SYMBOL = { MBT: '▲', IFV: '■', APC: '◆', RECON: '◇', HELI: '✦', TRUCK: '▪', INFANTRY: '●', DEFAULT: '○' };
 const CONTACT_SYMBOL = { INFANTRY: '●', VEHICLE: '■', TANK: '▲', UNKNOWN: '?' };
 
-// Map configs with CRS parameters (must match desktop app exactly)
+// Exact same configs as desktop app MapView.js
 const MAP_CONFIGS = {
-  stratis: { pattern: '/maps/stratis/{z}/{x}/{y}.png', maxZoom: 4, defaultZoom: 2, tileSize: 226, center: [4100, 4100], f: 0.027475, tw: 226 },
-  altis:   { pattern: '/maps/altis/{z}/{x}/{y}.png',   maxZoom: 6, defaultZoom: 3, tileSize: 212, center: [15000, 15000], fx: 0.006839, fy: 0.006836, tw: 212 },
-  tanoa:   { pattern: '/maps/tanoa/{z}/{x}/{y}.png',   maxZoom: 5, defaultZoom: 2, tileSize: 213, center: [7000, 7000], f: 0.01385, tw: 213 },
-  enoch:   { pattern: '/maps/enoch/{z}/{x}/{y}.png',   maxZoom: 4, defaultZoom: 2, tileSize: 356, center: [7100, 7100], f: 0.02735, tw: 356 },
-  livonia: { pattern: '/maps/enoch/{z}/{x}/{y}.png',   maxZoom: 4, defaultZoom: 2, tileSize: 356, center: [7100, 7100], f: 0.02735, tw: 356 },
-  malden:  { pattern: '/maps/malden/{z}/{x}/{y}.png',  maxZoom: 5, defaultZoom: 2, tileSize: 186, center: [7000, 7000], f: 0.01448, tw: 186 },
+  stratis: { tilePattern: '/maps/stratis/{z}/{x}/{y}.png', maxZoom: 4, defaultZoom: 2, tileSize: 226, center: [4100, 4100] },
+  altis:   { tilePattern: '/maps/altis/{z}/{x}/{y}.png',   maxZoom: 6, defaultZoom: 3, tileSize: 212, center: [15000, 15000] },
+  tanoa:   { tilePattern: '/maps/tanoa/{z}/{x}/{y}.png',   maxZoom: 5, defaultZoom: 2, tileSize: 213, center: [7000, 7000] },
+  enoch:   { tilePattern: '/maps/enoch/{z}/{x}/{y}.png',   maxZoom: 4, defaultZoom: 2, tileSize: 356, center: [7100, 7100] },
+  livonia: { tilePattern: '/maps/enoch/{z}/{x}/{y}.png',   maxZoom: 4, defaultZoom: 2, tileSize: 356, center: [7100, 7100] },
+  malden:  { tilePattern: '/maps/malden/{z}/{x}/{y}.png',  maxZoom: 5, defaultZoom: 2, tileSize: 186, center: [7000, 7000] },
 };
 
-function makeCRS(L, config) {
-  const fx = config.fx || config.f;
-  const fy = config.fy || config.f;
+// Fallback CRS (same as desktop app's makeFallbackCRS)
+function makeFallbackCRS(L) {
   return L.extend({}, L.CRS.Simple, {
     projection: L.Projection.LonLat,
-    transformation: new L.Transformation(fx, 0, -fy, config.tw),
+    transformation: new L.Transformation(1, 0, -1, 0),
+    scale: z => Math.pow(2, z),
+    zoom: s => Math.log(s) / Math.LN2,
+    infinite: true
+  });
+}
+
+// Per-map CRS (exact same as desktop app)
+function makeMapCRS(L, mapName) {
+  const configs = {
+    stratis: { f: 0.027475, tw: 226 },
+    altis:   { fx: 0.006839, fy: 0.006836, tw: 212 },
+    tanoa:   { f: 0.01385, tw: 213 },
+    enoch:   { f: 0.02735, tw: 356 },
+    livonia: { f: 0.02735, tw: 356 },
+    malden:  { f: 0.01448, tw: 186 },
+  };
+  const c = configs[(mapName || '').toLowerCase()];
+  if (!c) return makeFallbackCRS(L);
+  const fx = c.fx || c.f;
+  const fy = c.fy || c.f;
+  return L.extend({}, L.CRS.Simple, {
+    projection: L.Projection.LonLat,
+    transformation: new L.Transformation(fx, 0, -fy, c.tw),
     scale: z => Math.pow(2, z),
     zoom: s => Math.log(s) / Math.LN2,
     infinite: true
@@ -67,7 +89,6 @@ export default function Home() {
   const mapInst = useRef(null);
   const unitLayer = useRef(null);
   const contactLayer = useRef(null);
-  const tileLayer = useRef(null);
   const currentMapRef = useRef(null);
   const prevUnitCountRef = useRef(0);
   const [leafletReady, setLeafletReady] = useState(false);
@@ -78,7 +99,7 @@ export default function Home() {
   const [forceMetrics, setForceMetrics] = useState(null);
   const [missionPhase, setMissionPhase] = useState(null);
 
-  // Load Leaflet from CDN
+  // Load Leaflet
   useEffect(() => {
     if (window.L) { setLeafletReady(true); return; }
     const link = document.createElement('link');
@@ -91,7 +112,7 @@ export default function Home() {
     document.head.appendChild(script);
   }, []);
 
-  // Poll for state + manage map lifecycle
+  // Poll + map lifecycle (exact same pattern as desktop app)
   useEffect(() => {
     if (!leafletReady || !mapRef.current) return;
     const L = window.L;
@@ -112,13 +133,12 @@ export default function Home() {
         if (state.forceMetrics) setForceMetrics(state.forceMetrics);
         if (state.missionPhase) setMissionPhase(state.missionPhase);
 
-        // Recreate map when map type changes (matches desktop app behavior)
+        // Recreate map when map changes (exact same as desktop app)
         const newMap = (state.mapName || '').toLowerCase();
         if (newMap && newMap !== currentMapRef.current) {
           currentMapRef.current = newMap;
           setMapName(newMap);
 
-          // Destroy old map
           if (mapInst.current) {
             mapInst.current.remove();
             mapInst.current = null;
@@ -126,7 +146,8 @@ export default function Home() {
 
           const config = MAP_CONFIGS[newMap];
           if (config) {
-            const crs = makeCRS(L, config);
+            const crs = makeMapCRS(L, newMap);
+
             const map = L.map(mapRef.current, {
               crs: crs,
               center: config.center,
@@ -139,16 +160,16 @@ export default function Home() {
               zoomDelta: 0.5
             });
 
-            map.getContainer().style.background = '#0a0f14';
-            L.control.zoom({ position: 'topright' }).addTo(map);
+            mapRef.current.style.background = '#0a0f14';
 
-            L.tileLayer(TILE_BASE + config.pattern, {
+            L.tileLayer(TILE_BASE + config.tilePattern, {
               tileSize: config.tileSize,
               maxZoom: config.maxZoom + 4,
               maxNativeZoom: config.maxZoom,
               minZoom: 0
             }).addTo(map);
 
+            L.control.zoom({ position: 'topright' }).addTo(map);
             unitLayer.current = L.layerGroup().addTo(map);
             contactLayer.current = L.layerGroup().addTo(map);
             mapInst.current = map;
@@ -173,14 +194,12 @@ export default function Home() {
               `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;background:#1b1b1b;border:1px solid #3a3a3a;padding:6px;border-radius:3px">
                 <b style="color:#2a7de1">${u.callsign || u.id}</b><br>
                 ${u.vehicle_type || u.vtype || ''} | HP:${hp}% Fuel:${u.fuel ?? 100}%<br>
-                Status: ${u.status || u.st || 'OK'}<br>
-                ${u.current_order || u.order ? `<span style="color:#a0a0a0">${u.current_order || u.order}</span>` : ''}
+                Status: ${u.status || u.st || 'OK'}
               </div>`,
               { permanent: false, direction: 'top' }
             );
             unitLayer.current.addLayer(marker);
           }
-          // Only fit bounds when units first appear or count changes
           if (latlngs.length > 0 && latlngs.length !== prevUnitCountRef.current) {
             prevUnitCountRef.current = latlngs.length;
             if (latlngs.length === 1) mapInst.current.setView(latlngs[0], Math.max(mapInst.current.getZoom(), 3));
@@ -196,16 +215,6 @@ export default function Home() {
             if (!ll) continue;
             const icon = L.divIcon({ className: '', iconSize: [52, 42], iconAnchor: [26, 21], html: makeContactHTML(c) });
             const marker = L.marker(ll, { icon });
-            const ageMin = c.last_seen ? Math.floor((Date.now() - c.last_seen) / 60000) : 0;
-            marker.bindTooltip(
-              `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;background:#1b1b1b;border:1px solid #3a3a3a;padding:6px;border-radius:3px">
-                <b style="color:#db3838">${c.id}</b><br>
-                Type: ${c.type || 'UNKNOWN'} | State: <b style="color:${c.state === 'CONFIRMED' ? '#db3838' : c.state === 'LAST_KNOWN' ? '#e87c3e' : '#f5a623'}">${c.state}</b><br>
-                Source: ${c.source || 'UNKNOWN'}<br>
-                ${ageMin > 0 ? `Last seen: ${ageMin}m ago` : 'Just spotted'}
-              </div>`,
-              { permanent: false, direction: 'top' }
-            );
             contactLayer.current.addLayer(marker);
           }
         }
@@ -223,35 +232,21 @@ export default function Home() {
 
   return (
     <div style={{ background: '#1b1b1b', color: '#f5f6f7', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: '13px', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-
-      {/* Title Bar */}
       <div style={{ display: 'flex', alignItems: 'center', height: '36px', background: '#212121', borderBottom: '1px solid #2a2a2a', padding: '0 12px', gap: '12px', flexShrink: 0 }}>
         <span style={{ fontWeight: 700, fontSize: '13px', letterSpacing: '2px', color: '#2a7de1', textTransform: 'uppercase' }}>SPECTRE</span>
         <div style={{ width: 1, height: 16, background: '#3a3a3a' }} />
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 500, color: '#a0a0a0', letterSpacing: '1px', textTransform: 'uppercase' }}>
-          {missionPhase || 'STANDBY'}
-        </span>
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 500, color: '#a0a0a0', letterSpacing: '1px', textTransform: 'uppercase' }}>{missionPhase || 'STANDBY'}</span>
         <div style={{ width: 1, height: 16, background: '#3a3a3a' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: connected ? '#2a7de1' : '#db3838' }} />
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: connected ? '#2a7de1' : '#db3838' }}>
-            {connected ? 'ARMA LINK ACTIVE' : 'ARMA NOT CONNECTED'}
-          </span>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: connected ? '#2a7de1' : '#db3838' }}>{connected ? 'ARMA LINK ACTIVE' : 'ARMA NOT CONNECTED'}</span>
         </div>
         <div style={{ flex: 1 }} />
         <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#888', letterSpacing: '1px' }}>LIVE WEB VIEW</span>
       </div>
-
-      {/* Map */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         <div ref={mapRef} style={{ width: '100%', height: '100%', background: '#0a0f14' }} />
-
-        {mapName && (
-          <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(27,27,27,0.95)', border: '1px solid #2a2a2a', borderRadius: 3, padding: '6px 10px', zIndex: 1000, fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', color: '#f5f6f7', letterSpacing: '1px', fontWeight: 600 }}>
-            {mapName.toUpperCase()}
-          </div>
-        )}
-
+        {mapName && <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(27,27,27,0.95)', border: '1px solid #2a2a2a', borderRadius: 3, padding: '6px 10px', zIndex: 1000, fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', color: '#f5f6f7', letterSpacing: '1px', fontWeight: 600 }}>{mapName.toUpperCase()}</div>}
         <div style={{ position: 'absolute', bottom: 10, left: 10, background: 'rgba(27,27,27,0.95)', border: '1px solid #2a2a2a', borderRadius: '3px', padding: '8px 12px', zIndex: 1000, fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', pointerEvents: 'none' }}>
           <div style={{ color: '#888', marginBottom: 5, letterSpacing: '1px', fontWeight: 600 }}>LEGEND</div>
           <div style={{ color: '#2a7de1', marginBottom: 2 }}>○ FRIENDLY</div>
@@ -259,48 +254,17 @@ export default function Home() {
           <div style={{ color: '#e87c3e', marginBottom: 2, opacity: 0.7 }}>● LAST KNOWN</div>
           <div style={{ color: '#f5a623', opacity: 0.6 }}>● SUSPECTED</div>
         </div>
-
-        {!connected && (
-          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 1000 }}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: '#888', background: 'rgba(27,27,27,0.95)', padding: '20px 30px', borderRadius: '3px', border: '1px solid #3a3a3a' }}>
-              <div style={{ fontSize: '24px', marginBottom: '8px', color: '#888' }}>◎</div>
-              <div style={{ fontWeight: 600, letterSpacing: '1px' }}>AWAITING ARMA CONNECTION</div>
-              <div style={{ marginTop: '6px', fontSize: '10px', color: '#888' }}>Start SPECTRE C2 + Arma 3 to see live positions</div>
-            </div>
-          </div>
-        )}
+        {!connected && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 1000 }}><div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: '#888', background: 'rgba(27,27,27,0.95)', padding: '20px 30px', borderRadius: '3px', border: '1px solid #3a3a3a' }}><div style={{ fontSize: '24px', marginBottom: '8px', color: '#888' }}>◎</div><div style={{ fontWeight: 600, letterSpacing: '1px' }}>AWAITING ARMA CONNECTION</div><div style={{ marginTop: '6px', fontSize: '10px', color: '#888' }}>Start SPECTRE C2 + Arma 3 to see live positions</div></div></div>}
       </div>
-
-      {/* Status Bar */}
       <div style={{ height: '28px', background: '#212121', borderTop: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', padding: '0 12px', gap: '12px', flexShrink: 0, fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#888' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ color: '#888' }}>ARMA:</span>
-          <span style={{ color: connected ? '#2a7de1' : '#db3838', fontWeight: 500 }}>{connected ? 'CONNECTED' : 'OFFLINE'}</span>
-        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span>ARMA:</span><span style={{ color: connected ? '#2a7de1' : '#db3838', fontWeight: 500 }}>{connected ? 'CONNECTED' : 'OFFLINE'}</span></div>
         <div style={{ width: 1, height: 12, background: '#2a2a2a' }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ color: '#888' }}>PHASE:</span>
-          <span style={{ color: missionPhase === 'ABORTING' ? '#db3838' : '#a0a0a0', fontWeight: 500 }}>{missionPhase || 'STANDBY'}</span>
-        </div>
-        {forceMetrics && (
-          <>
-            <div style={{ width: 1, height: 12, background: '#2a2a2a' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#888' }}>FP:</span>
-              <span style={{ color: fpColor, fontWeight: 500 }}>{forceMetrics.firepower_index}%</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#888' }}>VEH:</span>
-              <span style={{ color: '#a0a0a0', fontWeight: 500 }}>{forceMetrics.vehicles_active}/{forceMetrics.vehicles_total}</span>
-            </div>
-          </>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span>PHASE:</span><span style={{ color: missionPhase === 'ABORTING' ? '#db3838' : '#a0a0a0', fontWeight: 500 }}>{missionPhase || 'STANDBY'}</span></div>
+        {forceMetrics && <><div style={{ width: 1, height: 12, background: '#2a2a2a' }} /><div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span>FP:</span><span style={{ color: fpColor, fontWeight: 500 }}>{forceMetrics.firepower_index}%</span></div><div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span>VEH:</span><span style={{ color: '#a0a0a0', fontWeight: 500 }}>{forceMetrics.vehicles_active}/{forceMetrics.vehicles_total}</span></div></>}
         <div style={{ flex: 1 }} />
-        <span style={{ color: '#888', letterSpacing: '1px' }}>{unitCount} units</span>
-        {contactCount > 0 && <span style={{ color: '#888', letterSpacing: '1px' }}>{contactCount} contacts</span>}
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#888', letterSpacing: '2px' }}>
-          SPECTRE C2 v1.4.2
-        </div>
+        <span>{unitCount} units</span>
+        {contactCount > 0 && <span>{contactCount} contacts</span>}
+        <span style={{ letterSpacing: '2px' }}>SPECTRE C2 v1.4.2</span>
       </div>
     </div>
   );
