@@ -167,6 +167,40 @@ function broadcastToWebClients(data) {
   }
 }
 
+// ─── Vercel Relay (POST state to hosted web viewer) ─────────────────────────
+let vercelUrl = null;
+let vercelPostQueue = [];
+let vercelPosting = false;
+
+function setVercelUrl(url) {
+  vercelUrl = url ? url.replace(/\/+$/, '') : null;
+  dbg(`SPECTRE: Vercel relay URL set to: ${vercelUrl || '(disabled)'}`);
+}
+
+async function postToVercel(data) {
+  if (!vercelUrl) return;
+  vercelPostQueue.push(data);
+  if (vercelPosting) return;
+  vercelPosting = true;
+
+  while (vercelPostQueue.length > 0) {
+    const payload = vercelPostQueue.shift();
+    try {
+      const res = await fetch(`${vercelUrl}/api/state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        dbg(`SPECTRE: Vercel POST failed: ${res.status}`);
+      }
+    } catch (e) {
+      dbg(`SPECTRE: Vercel POST error: ${e.message}`);
+    }
+  }
+  vercelPosting = false;
+}
+
 function getWebViewerHTML() {
   return `<!DOCTYPE html>
 <html>
@@ -728,6 +762,12 @@ app.whenReady().then(() => {
   setupAutoUpdate();
   startWebSocketServer();
   tryInstallMod();
+
+  // Load Vercel relay URL from config
+  try {
+    const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+    if (config.vercel_url) setVercelUrl(config.vercel_url);
+  } catch (_) {}
 });
 
 app.on('window-all-closed', () => {
@@ -894,6 +934,7 @@ function parseArmaLog(chunk) {
         if (data.missionFolder) autoSetMissionFolder(data.missionFolder);
         sendToRenderer('arma-state-update', data);
         broadcastToWebClients(data);
+        postToVercel(data);
         gotData = true;
       } catch (e) {
         dbg('SPECTRE: legacy parse error: ' + e.message);
@@ -917,6 +958,7 @@ function parseArmaLog(chunk) {
     if (data.missionFolder) autoSetMissionFolder(data.missionFolder);
     sendToRenderer('arma-state-update', data);
     broadcastToWebClients(data);
+    postToVercel(data);
 
     // Reset accumulator (keep mapName and missionFolder for next chunk)
     pendingState.units = {};
@@ -1146,6 +1188,7 @@ ipcMain.on('minimize-window', () => mainWindow?.minimize());
 ipcMain.on('maximize-window', () => mainWindow?.isMaximized() ? mainWindow.unmaximize() : mainWindow?.maximize());
 ipcMain.on('close-window',    () => mainWindow?.close());
 ipcMain.on('open-external',   (_, url) => shell.openExternal(url));
+ipcMain.on('set-vercel-url',  (_, url) => setVercelUrl(url));
 ipcMain.on('restart-app',     () => {
   const { autoUpdater } = require('electron-updater');
   autoUpdater.quitAndInstall();

@@ -231,6 +231,10 @@ export default function App() {
             await window.spectreAPI?.saveConfig(config);
             patch({ config, showSettings: false });
             aiService.setConfig(config);
+            // Notify main process about Vercel relay URL
+            if (config.vercel_url) {
+              window.spectreAPI?.setVercelUrl?.(config.vercel_url);
+            }
           }}
           onClose={() => patch({ showSettings: false })}
         />

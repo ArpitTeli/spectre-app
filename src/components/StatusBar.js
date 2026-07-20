@@ -88,7 +88,7 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
         ◈ COMMS
       </button>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '2px', marginLeft: '10px' }}>
-        SPECTRE C2 v1.4.0
+        SPECTRE C2 v1.4.1
       </div>
     </div>
   );
@@ -287,6 +287,26 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
             />
           </div>
         ))}
+
+        {/* ── Web Viewer (Vercel) URL ── */}
+        <div className="settings-field">
+          <label className="settings-label">
+            Web Viewer URL
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-muted)', marginLeft: '8px', fontWeight: 400 }}>
+              (optional — deploy to Vercel, share with anyone)
+            </span>
+          </label>
+          <input
+            className="settings-input"
+            type="text"
+            placeholder="https://spectre-viewer.vercel.app"
+            value={form.vercel_url || ''}
+            onChange={e => setForm(prev => ({ ...prev, vercel_url: e.target.value }))}
+          />
+          <div style={{ marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)' }}>
+            {form.vercel_url ? 'State will be relayed to this URL' : 'Leave empty for local-only (WebSocket on port 3721)'}
+          </div>
+        </div>
 
         {/* ── Arma 3 Installation Path ── */}
         <div className="settings-field">
