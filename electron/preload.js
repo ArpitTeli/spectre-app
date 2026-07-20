@@ -56,4 +56,5 @@ contextBridge.exposeInMainWorld('spectreAPI', {
   close:    () => ipcRenderer.send('close-window'),
   restartApp: () => ipcRenderer.send('restart-app'),
   rendererReady: () => ipcRenderer.send('renderer-ready'),
+  openExternal: (url) => ipcRenderer.send('open-external', url),
 });

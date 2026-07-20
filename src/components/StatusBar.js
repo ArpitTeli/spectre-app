@@ -7,7 +7,7 @@ function formatElapsed(sec) {
 }
 
 // ─── Status Bar ───────────────────────────────────────────────────────────────
-export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionElapsedSec, rewardData, onCommsToggle }) {
+export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionElapsedSec, rewardData, onCommsToggle, bridgePaths }) {
   const [clock, setClock] = useState(new Date().toLocaleTimeString('en-GB', { hour12: false }));
   useEffect(() => {
     const t = setInterval(() => setClock(new Date().toLocaleTimeString('en-GB', { hour12: false })), 1000);
@@ -15,6 +15,7 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
   }, []);
 
   const fpColor = forceMetrics.firepower_index < 50 ? 'danger' : forceMetrics.firepower_index < 70 ? 'warning' : 'good';
+  const webUrl = bridgePaths?.web_viewer_url;
 
   return (
     <div className="statusbar">
@@ -70,6 +71,15 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
         </>
       )}
       <div style={{ flex: 1 }} />
+      {webUrl && (
+        <button onClick={() => window.spectreAPI?.openExternal?.(webUrl)} style={{
+          background: 'none', border: '1px solid var(--border-primary)', borderRadius: '3px',
+          color: 'var(--accent)', cursor: 'pointer', fontFamily: 'var(--font-mono)',
+          fontSize: '10px', padding: '2px 8px', letterSpacing: '1px', marginRight: '6px'
+        }}>
+          ◎ WEB VIEW
+        </button>
+      )}
       <button onClick={onCommsToggle} style={{
         background: 'none', border: '1px solid var(--border-primary)', borderRadius: '3px',
         color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--font-mono)',
@@ -78,7 +88,7 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
         ◈ COMMS
       </button>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '2px', marginLeft: '10px' }}>
-        SPECTRE C2 v1.3.4
+        SPECTRE C2 v1.4.0
       </div>
     </div>
   );

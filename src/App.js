@@ -164,6 +164,7 @@ export default function App() {
         missionElapsedSec={state.missionElapsedSec}
         rewardData={state.rewardData}
         lastUpdate={state.lastArmaUpdate}
+        bridgePaths={state.bridgePaths}
         onCommsToggle={() => patch(p => ({ ...p, showComms: !p.showComms }))}
       />
 

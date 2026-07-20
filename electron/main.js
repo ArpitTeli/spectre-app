@@ -1,8 +1,9 @@
-const { app, BrowserWindow, ipcMain, crashReporter, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, crashReporter, dialog, shell } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
-const chokidar = require('chokidar');
+const http = require('http');
+const WebSocket = require('ws');
 const { detectArma3, detectArmaDocuments, findLatestRptLog } = require('./armaDetector');
 
 // ─── Single instance lock ────────────────────────────────────────────────────
@@ -88,6 +89,243 @@ const DEFAULT_CONFIG = {
 });
 if (!fs.existsSync(CONFIG_PATH)) {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(DEFAULT_CONFIG, null, 2));
+}
+
+// ─── WebSocket Server (live web viewer) ──────────────────────────────────────
+const WS_PORT = 3721;
+let wss = null;
+let wsClients = new Set();
+let lastBroadcastState = null;
+
+function getLocalIP() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return '127.0.0.1';
+}
+
+function startWebSocketServer() {
+  // HTTP server that serves the web viewer HTML
+  const server = http.createServer((req, res) => {
+    if (req.url === '/' || req.url === '/index.html') {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(getWebViewerHTML());
+    } else if (req.url === '/api/state') {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify(lastBroadcastState || {}));
+    } else {
+      res.writeHead(404);
+      res.end('Not found');
+    }
+  });
+
+  wss = new WebSocket.Server({ server });
+
+  wss.on('connection', (ws) => {
+    wsClients.add(ws);
+    dbg(`SPECTRE: WebSocket client connected (${wsClients.size} total)`);
+
+    // Send current state immediately on connect
+    if (lastBroadcastState) {
+      ws.send(JSON.stringify(lastBroadcastState));
+    }
+
+    ws.on('close', () => {
+      wsClients.delete(ws);
+      dbg(`SPECTRE: WebSocket client disconnected (${wsClients.size} total)`);
+    });
+
+    ws.on('error', () => {
+      wsClients.delete(ws);
+    });
+  });
+
+  server.listen(WS_PORT, '0.0.0.0', () => {
+    const ip = getLocalIP();
+    console.log(`SPECTRE: Web viewer running at http://${ip}:${WS_PORT}`);
+    dbg(`SPECTRE: Web viewer running at http://${ip}:${WS_PORT}`);
+  });
+
+  server.on('error', (err) => {
+    console.error('SPECTRE: WebSocket server error:', err.message);
+  });
+}
+
+function broadcastToWebClients(data) {
+  lastBroadcastState = data;
+  if (wsClients.size === 0) return;
+  const msg = JSON.stringify(data);
+  for (const ws of wsClients) {
+    if (ws.readyState === WebSocket.OPEN) {
+      try { ws.send(msg); } catch (_) {}
+    }
+  }
+}
+
+function getWebViewerHTML() {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPECTRE C2 — Live View</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #1b1b1b; color: #f5f6f7; font-family: 'Inter', system-ui, sans-serif; font-size: 13px; }
+.header { background: #212121; border-bottom: 1px solid #2a2a2a; padding: 8px 16px; display: flex; align-items: center; gap: 12px; height: 40px; }
+.header .logo { font-weight: 700; font-size: 13px; letter-spacing: 2px; color: #2a7de1; }
+.header .status { font-family: monospace; font-size: 10px; color: #888; }
+.header .dot { width: 6px; height: 6px; border-radius: 50%; background: #db3838; }
+.header .dot.connected { background: #2a7de1; }
+#map { width: 100%; height: calc(100vh - 40px); background: #141414; }
+.legend { position: absolute; bottom: 10px; left: 10px; background: rgba(27,27,27,0.95); border: 1px solid #2a2a2a; border-radius: 3px; padding: 8px 12px; font-family: monospace; font-size: 10px; z-index: 1000; pointer-events: none; }
+.legend div { margin-bottom: 2px; }
+.legend .label { color: #888; margin-bottom: 4px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <span class="logo">SPECTRE</span>
+  <div class="dot" id="dot"></div>
+  <span class="status" id="status">CONNECTING...</span>
+  <span class="status" id="unitCount"></span>
+</div>
+<div id="map"></div>
+<div class="legend">
+  <div class="label">LEGEND</div>
+  <div style="color:#2a7de1">○ FRIENDLY</div>
+  <div style="color:#db3838">● HOSTILE</div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([4100, 4100], 2);
+L.tileLayer('https://jetelain.github.io/Arma3Map/maps/stratis/{z}/{x}/{y}.png', {
+  maxZoom: 4, maxNativeZoom: 4, tileSize: 226, maxZoom: 8
+}).addTo(map);
+L.control.zoom({ position: 'topright' }).addTo(map);
+
+const unitMarkers = {};
+const contactMarkers = {};
+let connected = false;
+
+const VEHICLE_SYMBOL = { MBT: '▲', IFV: '■', APC: '◆', RECON: '◇', HELI: '✦', TRUCK: '▪', INFANTRY: '●', DEFAULT: '○' };
+
+function makeUnitIcon(unit) {
+  const symbol = VEHICLE_SYMBOL[unit.vehicle_type || unit.vtype] || VEHICLE_SYMBOL.DEFAULT;
+  const hp = unit.health ?? unit.hp ?? 100;
+  const hpColor = hp > 60 ? '#2a7de1' : hp > 30 ? '#f5a623' : '#db3838';
+  return L.divIcon({
+    className: '', iconSize: [60, 50], iconAnchor: [30, 25],
+    html: '<div style="display:flex;flex-direction:column;align-items:center">' +
+      '<div style="background:rgba(27,27,27,0.95);border:1px solid #2a7de1;border-radius:3px;padding:2px 6px;font-family:monospace;font-size:9px;font-weight:600;color:#f5f6f7;letter-spacing:0.5px;white-space:nowrap;margin-bottom:2px">' + (unit.callsign || unit.id) + '</div>' +
+      '<div style="font-size:14px;line-height:1;color:#2a7de1">' + symbol + '</div>' +
+      '<div style="width:24px;height:3px;background:rgba(42,42,42,0.8);border-radius:2px;overflow:hidden;margin-top:2px">' +
+      '<div style="width:' + hp + '%;height:100%;background:' + hpColor + ';border-radius:2px"></div></div></div>'
+  });
+}
+
+function makeContactIcon(contact) {
+  return L.divIcon({
+    className: '', iconSize: [50, 40], iconAnchor: [25, 20],
+    html: '<div style="display:flex;flex-direction:column;align-items:center">' +
+      '<div style="background:rgba(27,27,27,0.95);border:1px solid #db3838;border-radius:3px;padding:2px 6px;font-family:monospace;font-size:9px;font-weight:600;color:#f5a6a6;letter-spacing:0.5px;margin-bottom:2px">' + (contact.id || '?') + '</div>' +
+      '<div style="font-size:12px;line-height:1;color:#db3838">●</div></div>'
+  });
+}
+
+function getLatLng(pos) {
+  if (!pos) return null;
+  if (pos.lat !== undefined && pos.lng !== undefined) return [pos.lat, pos.lng];
+  if (pos.x !== undefined && pos.y !== undefined) return [pos.y, pos.x];
+  return null;
+}
+
+function updateState(data) {
+  if (!data) return;
+
+  // Update connection status
+  const dot = document.getElementById('dot');
+  const status = document.getElementById('status');
+  dot.className = 'dot connected';
+  status.textContent = 'LIVE';
+  connected = true;
+
+  // Update units
+  const units = data.units || [];
+  document.getElementById('unitCount').textContent = units.length + ' units';
+
+  const seen = new Set();
+  for (const u of units) {
+    const latlng = getLatLng(u.position || u.pos);
+    if (!latlng) continue;
+    seen.add(u.id);
+
+    if (unitMarkers[u.id]) {
+      unitMarkers[u.id].setLatLng(latlng);
+      unitMarkers[u.id].setIcon(makeUnitIcon(u));
+    } else {
+      unitMarkers[u.id] = L.marker(latlng, { icon: makeUnitIcon(u) }).addTo(map);
+      unitMarkers[u.id].bindTooltip(
+        '<div style="font-family:monospace;font-size:11px;background:#1b1b1b;border:1px solid #3a3a3a;padding:6px;border-radius:3px">' +
+        '<b style="color:#2a7de1">' + (u.callsign || u.id) + '</b><br>' +
+        (u.vehicle_type || u.vtype || '') + ' | HP:' + (u.health ?? u.hp ?? 100) + '%<br>' +
+        'Status: ' + (u.status || u.st || 'OK') +
+        '</div>',
+        { permanent: false, direction: 'top' }
+      );
+    }
+  }
+
+  // Remove stale markers
+  for (const id of Object.keys(unitMarkers)) {
+    if (!seen.has(id)) { map.removeLayer(unitMarkers[id]); delete unitMarkers[id]; }
+  }
+
+  // Update contacts
+  const contacts = data.contacts || [];
+  const seenC = new Set();
+  for (const c of contacts) {
+    const latlng = getLatLng(c.position || c.pos);
+    if (!latlng) continue;
+    seenC.add(c.id);
+
+    if (contactMarkers[c.id]) {
+      contactMarkers[c.id].setLatLng(latlng);
+    } else {
+      contactMarkers[c.id] = L.marker(latlng, { icon: makeContactIcon(c) }).addTo(map);
+    }
+  }
+  for (const id of Object.keys(contactMarkers)) {
+    if (!seenC.has(id)) { map.removeLayer(contactMarkers[id]); delete contactMarkers[id]; }
+  }
+
+  // Fit bounds to all units
+  const allLatLngs = [];
+  for (const u of units) { const ll = getLatLng(u.position || u.pos); if (ll) allLatLngs.push(ll); }
+  if (allLatLngs.length > 0) {
+    if (allLatLngs.length === 1) { map.setView(allLatLngs[0], map.getZoom()); }
+    else { map.fitBounds(L.latLngBounds(allLatLngs), { padding: [60, 60] }); }
+  }
+}
+
+// WebSocket connection
+function connect() {
+  const ws = new WebSocket('ws://' + location.hostname + ':' + ${WS_PORT});
+  ws.onopen = () => { document.getElementById('dot').className = 'dot connected'; document.getElementById('status').textContent = 'LIVE'; };
+  ws.onmessage = (e) => { try { updateState(JSON.parse(e.data)); } catch (_) {} };
+  ws.onclose = () => { document.getElementById('dot').className = 'dot'; document.getElementById('status').textContent = 'DISCONNECTED'; setTimeout(connect, 2000); };
+  ws.onerror = () => { ws.close(); };
+}
+connect();
+</script>
+</body>
+</html>`;
 }
 
 // ─── Command queue ───────────────────────────────────────────────────────────
@@ -488,6 +726,7 @@ app.whenReady().then(() => {
   createWindow();
   startBridgeWatcher();
   setupAutoUpdate();
+  startWebSocketServer();
   tryInstallMod();
 });
 
@@ -654,6 +893,7 @@ function parseArmaLog(chunk) {
         const data = expandLegacyState(raw);
         if (data.missionFolder) autoSetMissionFolder(data.missionFolder);
         sendToRenderer('arma-state-update', data);
+        broadcastToWebClients(data);
         gotData = true;
       } catch (e) {
         dbg('SPECTRE: legacy parse error: ' + e.message);
@@ -676,6 +916,7 @@ function parseArmaLog(chunk) {
 
     if (data.missionFolder) autoSetMissionFolder(data.missionFolder);
     sendToRenderer('arma-state-update', data);
+    broadcastToWebClients(data);
 
     // Reset accumulator (keep mapName and missionFolder for next chunk)
     pendingState.units = {};
@@ -860,7 +1101,9 @@ ipcMain.handle('get-paths', async () => {
     spectre_to_arma:      config.mission_folder_path
       ? path.join(config.mission_folder_path, 'spectre_to_arma.sqf')
       : '(waiting for Arma connection)',
-    arma_log_watched:     currentLogPath || '(not found — launch Arma first)'
+    arma_log_watched:     currentLogPath || '(not found — launch Arma first)',
+    web_viewer_url:       `http://${getLocalIP()}:${WS_PORT}`,
+    ws_clients:           wsClients.size
   };
 });
 
@@ -902,6 +1145,7 @@ ipcMain.handle('set-arma-path', async (_, manualPath) => {
 ipcMain.on('minimize-window', () => mainWindow?.minimize());
 ipcMain.on('maximize-window', () => mainWindow?.isMaximized() ? mainWindow.unmaximize() : mainWindow?.maximize());
 ipcMain.on('close-window',    () => mainWindow?.close());
+ipcMain.on('open-external',   (_, url) => shell.openExternal(url));
 ipcMain.on('restart-app',     () => {
   const { autoUpdater } = require('electron-updater');
   autoUpdater.quitAndInstall();
