@@ -61,6 +61,7 @@ export function useSpectreStore() {
   stateRef.current = state;
   const timerRef = useRef(null);
   const adaptationLockRef = useRef(false);
+  const lastUnitsKey = useRef('');
 
   const patch = useCallback((updates) => {
     setState(prev => typeof updates === 'function' ? updates(prev) : { ...prev, ...updates });
@@ -121,7 +122,14 @@ export function useSpectreStore() {
     });
   }, []);
 
-  useEffect(() => { recalcForceMetrics(); }, [state.units]); // eslint-disable-line
+  useEffect(() => {
+    const unitsArr = Object.values(state.units);
+    const key = unitsArr.map(u => `${u.id}:${u.status}:${u.health}`).join(',');
+    if (key !== lastUnitsKey.current) {
+      lastUnitsKey.current = key;
+      recalcForceMetrics();
+    }
+  }, [state.units, recalcForceMetrics]);
 
   // ── Abort threshold watcher ───────────────────────────────────────────────
   useEffect(() => {
@@ -249,9 +257,6 @@ function processArmaUpdate(data, stateRef, patch) {
   const unitsMap = {};
   units.forEach(u => { unitsMap[u.id] = { ...current.units[u.id], ...u, last_updated: timestamp }; });
 
-  console.log(`[SPECTRE-STORE] processArmaUpdate: ${units.length} units received, mapName=${mapName}`);
-  Object.values(unitsMap).forEach(u => console.log(`  store unit: ${u.id} pos=${JSON.stringify(u.position)}`));
-
   const contactsMap = { ...current.contacts };
   contacts.forEach(c => { contactsMap[c.id] = { ...contactsMap[c.id], ...c, state: 'CONFIRMED', last_seen: now }; });
   Object.keys(contactsMap).forEach(id => {
@@ -319,10 +324,11 @@ async function handleArmaEvents(events, stateRef, patch) {
 
     // Trigger AI adaptation for significant events (skip for kills and contact sightings)
     if (event.type === 'ENEMY_KILLED' || event.type === 'CONTACT_SPOTTED') continue;
-    if (!state.selectedCOA) continue;
+    const currentState = stateRef.current;
+    if (!currentState.selectedCOA) continue;
     try {
-      const context = { units: state.units, contacts: state.contacts, forceMetrics: state.forceMetrics, intelDB: state.intelDB };
-      const adaptation = await aiService.adaptPlan(event, state.selectedCOA, context, state.vaultPath);
+      const context = { units: currentState.units, contacts: currentState.contacts, forceMetrics: currentState.forceMetrics, intelDB: currentState.intelDB };
+      const adaptation = await aiService.adaptPlan(event, currentState.selectedCOA, context, currentState.vaultPath);
       if (!adaptation) continue;
 
       if (adaptation.auto_handle) {

@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-const DEBUG = true;
+const DEBUG = false;
 function dbg(msg) {
   if (DEBUG) console.log('[SPECTRE-RENDERER] ' + msg);
 }

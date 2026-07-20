@@ -85,6 +85,7 @@ export default function Home() {
   const [leafletReady, setLeafletReady] = useState(false);
   const mapData = useRef(null);
   const mapNameRef = useRef(null);
+  const prevUnitCountRef = useRef(0);
   const [connected, setConnected] = useState(false);
   const [unitCount, setUnitCount] = useState(0);
   const [contactCount, setContactCount] = useState(0);
@@ -157,7 +158,9 @@ export default function Home() {
           );
           unitLayer.addLayer(marker);
         }
-        if (latlngs.length > 0) {
+        // Only fit bounds when units first appear or count changes (not every poll)
+        if (latlngs.length > 0 && latlngs.length !== prevUnitCountRef.current) {
+          prevUnitCountRef.current = latlngs.length;
           if (latlngs.length === 1) map.setView(latlngs[0], Math.max(map.getZoom(), 3));
           else map.fitBounds(L.latLngBounds(latlngs), { padding: [80, 80] });
         }

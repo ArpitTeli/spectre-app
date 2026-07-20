@@ -23,13 +23,22 @@ const NODE_SHAPES = {
 export default function VaultGraph({ vaultPath, units, contacts }) {
   const containerRef = useRef(null);
   const cyRef = useRef(null);
+  const unitsRef = useRef(units);
+  const contactsRef = useRef(contacts);
   const [loading, setLoading] = useState(true);
   const [nodeCount, setNodeCount] = useState(0);
   const [edgeCount, setEdgeCount] = useState(0);
   const [selectedNode, setSelectedNode] = useState(null);
 
+  // Keep refs updated without triggering rebuilds
+  unitsRef.current = units;
+  contactsRef.current = contacts;
+
   const buildGraph = useCallback(async () => {
     if (!vaultPath || !containerRef.current) return;
+
+    const liveUnits = unitsRef.current;
+    const liveContacts = contactsRef.current;
 
     setLoading(true);
     try {
@@ -50,7 +59,7 @@ export default function VaultGraph({ vaultPath, units, contacts }) {
 
         const type = fm.type || 'unknown';
         const label = fm.callsign || fm.name || fm.id;
-        const live = type === 'unit' ? units?.[fm.id] : type === 'contact' ? contacts?.[fm.id] : null;
+        const live = type === 'unit' ? liveUnits?.[fm.id] : type === 'contact' ? liveContacts?.[fm.id] : null;
         const status = live?.status || fm.status || fm.state || '';
 
         elements.push({
@@ -212,7 +221,7 @@ export default function VaultGraph({ vaultPath, units, contacts }) {
       console.error('VaultGraph build failed:', e);
       setLoading(false);
     }
-  }, [vaultPath, units, contacts]);
+  }, [vaultPath]);
 
   useEffect(() => {
     buildGraph();

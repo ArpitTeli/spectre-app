@@ -846,21 +846,6 @@ function watchArmaLog() {
   });
 }
 
-// Check if a newer RPT file has appeared (log rotation by Arma)
-let lastLogCheck = 0;
-function checkForNewerLog() {
-  const now = Date.now();
-  if (now - lastLogCheck < 15000) return; // Check every 15s max
-  lastLogCheck = now;
-
-  const newer = findLatestRptLog(ARMA_DOCS);
-  if (newer && newer !== currentLogPath) {
-    console.log('SPECTRE: newer RPT log detected, switching:', newer);
-    currentLogPath = newer;
-    try { logFilePos = fs.statSync(newer).size; } catch (_) { logFilePos = 0; }
-  }
-}
-
 // Accumulator for multi-line state
 let pendingState = { units: {}, contacts: {}, events: [], mapName: null, missionFolder: null, timestamp: 0 };
 
@@ -1103,7 +1088,8 @@ ipcMain.handle('save-config', async (_, config) => {
   let existing = {};
   try { existing = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch (_) {}
   const merged = { ...existing, ...config };
-  if (ARMA_INSTALL) merged.arma_path = ARMA_INSTALL;
+  // Only overwrite arma_path if user explicitly set it via Settings
+  if (customArmaPath) merged.arma_path = customArmaPath;
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2));
   return { success: true };
 });
