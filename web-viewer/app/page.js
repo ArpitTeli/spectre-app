@@ -15,18 +15,7 @@ const MAP_CONFIGS = {
   malden:  { tilePattern: '/maps/malden/{z}/{x}/{y}.png',  maxZoom: 5, defaultZoom: 2, tileSize: 186, center: [7000, 7000] },
 };
 
-// Fallback CRS (same as desktop app's makeFallbackCRS)
-function makeFallbackCRS(L) {
-  return L.extend({}, L.CRS.Simple, {
-    projection: L.Projection.LonLat,
-    transformation: new L.Transformation(1, 0, -1, 0),
-    scale: z => Math.pow(2, z),
-    zoom: s => Math.log(s) / Math.LN2,
-    infinite: true
-  });
-}
-
-// Per-map CRS (exact same as desktop app)
+// Per-map CRS (created as full object to avoid L.extend issues)
 function makeMapCRS(L, mapName) {
   const configs = {
     stratis: { f: 0.027475, tw: 226 },
@@ -37,16 +26,32 @@ function makeMapCRS(L, mapName) {
     malden:  { f: 0.01448, tw: 186 },
   };
   const c = configs[(mapName || '').toLowerCase()];
-  if (!c) return makeFallbackCRS(L);
+  if (!c) return L.CRS.Simple;
   const fx = c.fx || c.f;
   const fy = c.fy || c.f;
-  return L.extend({}, L.CRS.Simple, {
+  const t = new L.Transformation(fx, 0, -fy, c.tw);
+  // Build CRS as plain object with all needed methods
+  return {
     projection: L.Projection.LonLat,
-    transformation: new L.Transformation(fx, 0, -fy, c.tw),
+    transformation: t,
     scale: z => Math.pow(2, z),
     zoom: s => Math.log(s) / Math.LN2,
-    infinite: true
-  });
+    infinite: true,
+    latLngToPoint(latlng, zoom) {
+      const projectedPoint = this.projection.project(latlng);
+      const scale = this.scale(zoom);
+      return this.transformation.transform(projectedPoint, scale);
+    },
+    pointToLatLng(point, zoom) {
+      const scale = this.scale(zoom);
+      const untransformedPoint = this.transformation.untransform(point, scale);
+      return this.projection.unproject(untransformedPoint);
+    },
+    wrapLatLng(latlng) {
+      const lng = ((latlng.lng + 180) % 360) - 180;
+      return L.latLng(latlng.lat, lng, latlng.alt);
+    }
+  };
 }
 
 function getLatLng(pos) {

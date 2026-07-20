@@ -188,6 +188,7 @@ export default function MapView({
   const coaLayer    = useRef(null);
   const [dismissOverlay, setDismissOverlay] = useState(false);
   const currentMapRef = useRef(null);
+  const prevUnitCountRef = useRef(0);
 
   // ── Create/recreate map when mapName changes ────────────────────────────────
   useEffect(() => {
@@ -246,6 +247,7 @@ export default function MapView({
     coaLayer.current     = L.layerGroup().addTo(map);
 
     mapInst.current = map;
+    prevUnitCountRef.current = 0;
   }, [mapName]);
 
   // ── Update unit markers ────────────────────────────────────────────────────
@@ -274,11 +276,12 @@ export default function MapView({
       unitLayer.current.addLayer(marker);
     });
 
-    // Auto-fit bounds to all units
+    // Auto-fit bounds only when units first appear or count changes
     if (mapInst.current) {
       const unitList = Object.values(units).filter(u => u.position);
       const latlngs = unitList.map(u => getUnitLatLng(u.position)).filter(Boolean);
-      if (latlngs.length > 0) {
+      if (latlngs.length > 0 && latlngs.length !== prevUnitCountRef.current) {
+        prevUnitCountRef.current = latlngs.length;
         const bounds = L.latLngBounds(latlngs);
         if (latlngs.length === 1) {
           mapInst.current.setView(latlngs[0], mapInst.current.getZoom());
