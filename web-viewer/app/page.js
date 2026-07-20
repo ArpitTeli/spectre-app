@@ -25,10 +25,9 @@ function makeUnitHTML(unit) {
   const symbol = VEHICLE_SYMBOL[unit.vehicle_type || unit.vtype] || VEHICLE_SYMBOL.DEFAULT;
   const hp = unit.health ?? unit.hp ?? 100;
   const hpColor = hp > 60 ? '#2a7de1' : hp > 30 ? '#f5a623' : '#db3838';
-  const borderColor = '#525252';
   return `<div style="display:flex;flex-direction:column;align-items:center">
-    <div style="background:rgba(27,27,27,0.95);border:1px solid ${borderColor};border-radius:3px;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:#f5f6f7;letter-spacing:0.5px;white-space:nowrap;margin-bottom:2px">${unit.callsign || unit.id}</div>
-    <div style="font-size:16px;line-height:1;color:${borderColor}">${symbol}</div>
+    <div style="background:rgba(27,27,27,0.95);border:1px solid #525252;border-radius:3px;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:#f5f6f7;letter-spacing:0.5px;white-space:nowrap;margin-bottom:2px">${unit.callsign || unit.id}</div>
+    <div style="font-size:16px;line-height:1;color:#525252">${symbol}</div>
     <div style="width:28px;height:3px;background:rgba(42,42,42,0.8);border-radius:2px;overflow:hidden;margin-top:2px">
       <div style="width:${hp}%;height:100%;background:${hpColor};border-radius:2px"></div>
     </div>
@@ -50,41 +49,12 @@ function makeContactHTML(contact) {
   </div>`;
 }
 
-export default function Home() {
+function LeafletMap({ onReady }) {
   const mapRef = useRef(null);
-  const mapInst = useRef(null);
-  const unitLayer = useRef(null);
-  const contactLayer = useRef(null);
-  const tileLayer = useRef(null);
-  const leafletRef = useRef(null);
-  const mapNameRef = useRef(null);
-  const [connected, setConnected] = useState(false);
-  const [unitCount, setUnitCount] = useState(0);
-  const [contactCount, setContactCount] = useState(0);
-  const [mapName, setMapName] = useState(null);
-  const [forceMetrics, setForceMetrics] = useState(null);
-  const [missionPhase, setMissionPhase] = useState(null);
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const loadLeaflet = async () => {
-      if (typeof window === 'undefined') return;
-      if (!document.querySelector('link[href*="leaflet"]')) {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-        document.head.appendChild(link);
-      }
-      const L = await import('https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.esm.js');
-      leafletRef.current = L.default || L;
-      setReady(true);
-    };
-    loadLeaflet();
-  }, []);
-
-  useEffect(() => {
-    if (!ready || !mapRef.current || mapInst.current) return;
-    const L = leafletRef.current;
+    if (!mapRef.current || !window.L) return;
+    const L = window.L;
 
     const map = L.map(mapRef.current, {
       crs: L.CRS.Simple,
@@ -100,16 +70,39 @@ export default function Home() {
 
     map.getContainer().style.background = '#0a0f14';
     L.control.zoom({ position: 'topright' }).addTo(map);
-    unitLayer.current = L.layerGroup().addTo(map);
-    contactLayer.current = L.layerGroup().addTo(map);
-    mapInst.current = map;
 
-    return () => { map.remove(); mapInst.current = null; };
-  }, [ready]);
+    const unitLayer = L.layerGroup().addTo(map);
+    const contactLayer = L.layerGroup().addTo(map);
+    let tileLayer = null;
+
+    onReady({ map, L, unitLayer, contactLayer, tileLayerRef: { current: null } });
+  }, []);
+
+  return <div ref={mapRef} style={{ width: '100%', height: '100%', background: '#0a0f14' }} />;
+}
+
+export default function Home() {
+  const [leafletReady, setLeafletReady] = useState(false);
+  const mapData = useRef(null);
+  const mapNameRef = useRef(null);
+  const [connected, setConnected] = useState(false);
+  const [unitCount, setUnitCount] = useState(0);
+  const [contactCount, setContactCount] = useState(0);
+  const [mapName, setMapName] = useState(null);
+  const [forceMetrics, setForceMetrics] = useState(null);
+  const [missionPhase, setMissionPhase] = useState(null);
 
   useEffect(() => {
-    if (!ready) return;
-    const L = leafletRef.current;
+    if (window.L) { setLeafletReady(true); return; }
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload = () => setLeafletReady(true);
+    document.head.appendChild(script);
+  }, []);
+
+  useEffect(() => {
+    if (!leafletReady || !mapData.current) return;
+    const { map, L, unitLayer, contactLayer, tileLayerRef } = mapData.current;
 
     const poll = async () => {
       try {
@@ -128,69 +121,64 @@ export default function Home() {
         if (state.missionPhase) setMissionPhase(state.missionPhase);
 
         const newMap = (state.mapName || '').toLowerCase();
-        if (newMap && newMap !== mapNameRef.current && mapInst.current) {
+        if (newMap && newMap !== mapNameRef.current) {
           mapNameRef.current = newMap;
           setMapName(newMap);
           const config = TILE_MAPS[newMap];
           if (config) {
-            if (tileLayer.current) mapInst.current.removeLayer(tileLayer.current);
-            tileLayer.current = L.tileLayer(TILE_BASE + config.pattern, {
+            if (tileLayerRef.current) map.removeLayer(tileLayerRef.current);
+            tileLayerRef.current = L.tileLayer(TILE_BASE + config.pattern, {
               tileSize: config.tileSize,
               maxZoom: config.maxZoom + 4,
               maxNativeZoom: config.maxZoom,
               minZoom: 0
-            }).addTo(mapInst.current);
-            mapInst.current.setView(config.center, config.defaultZoom);
+            }).addTo(map);
+            map.setView(config.center, config.defaultZoom);
           }
         }
 
-        if (unitLayer.current) {
-          unitLayer.current.clearLayers();
-          const latlngs = [];
-          for (const u of units) {
-            const ll = getLatLng(u.position || u.pos);
-            if (!ll) continue;
-            latlngs.push(ll);
-            const icon = L.divIcon({ className: '', iconSize: [64, 54], iconAnchor: [32, 27], html: makeUnitHTML(u) });
-            const marker = L.marker(ll, { icon });
-            const hp = u.health ?? u.hp ?? 100;
-            const status = u.status || u.st || 'OK';
-            marker.bindTooltip(
-              `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;background:#1b1b1b;border:1px solid #3a3a3a;padding:6px;border-radius:3px">
-                <b style="color:#2a7de1">${u.callsign || u.id}</b><br>
-                ${u.vehicle_type || u.vtype || ''} | HP:${hp}% Fuel:${u.fuel ?? 100}%<br>
-                Status: ${status}<br>
-                ${u.current_order || u.order ? `<span style="color:#a0a0a0">${u.current_order || u.order}</span>` : ''}
-              </div>`,
-              { permanent: false, direction: 'top' }
-            );
-            unitLayer.current.addLayer(marker);
-          }
-          if (latlngs.length > 0 && mapInst.current) {
-            if (latlngs.length === 1) mapInst.current.setView(latlngs[0], Math.max(mapInst.current.getZoom(), 3));
-            else mapInst.current.fitBounds(L.latLngBounds(latlngs), { padding: [80, 80] });
-          }
+        unitLayer.clearLayers();
+        const latlngs = [];
+        for (const u of units) {
+          const ll = getLatLng(u.position || u.pos);
+          if (!ll) continue;
+          latlngs.push(ll);
+          const icon = L.divIcon({ className: '', iconSize: [64, 54], iconAnchor: [32, 27], html: makeUnitHTML(u) });
+          const marker = L.marker(ll, { icon });
+          const hp = u.health ?? u.hp ?? 100;
+          marker.bindTooltip(
+            `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;background:#1b1b1b;border:1px solid #3a3a3a;padding:6px;border-radius:3px">
+              <b style="color:#2a7de1">${u.callsign || u.id}</b><br>
+              ${u.vehicle_type || u.vtype || ''} | HP:${hp}% Fuel:${u.fuel ?? 100}%<br>
+              Status: ${u.status || u.st || 'OK'}<br>
+              ${u.current_order || u.order ? `<span style="color:#a0a0a0">${u.current_order || u.order}</span>` : ''}
+            </div>`,
+            { permanent: false, direction: 'top' }
+          );
+          unitLayer.addLayer(marker);
+        }
+        if (latlngs.length > 0) {
+          if (latlngs.length === 1) map.setView(latlngs[0], Math.max(map.getZoom(), 3));
+          else map.fitBounds(L.latLngBounds(latlngs), { padding: [80, 80] });
         }
 
-        if (contactLayer.current) {
-          contactLayer.current.clearLayers();
-          for (const c of contacts) {
-            const ll = getLatLng(c.position || c.pos);
-            if (!ll) continue;
-            const icon = L.divIcon({ className: '', iconSize: [52, 42], iconAnchor: [26, 21], html: makeContactHTML(c) });
-            const marker = L.marker(ll, { icon });
-            const ageMin = c.last_seen ? Math.floor((Date.now() - c.last_seen) / 60000) : 0;
-            marker.bindTooltip(
-              `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;background:#1b1b1b;border:1px solid #3a3a3a;padding:6px;border-radius:3px">
-                <b style="color:#db3838">${c.id}</b><br>
-                Type: ${c.type || 'UNKNOWN'} | State: <b style="color:${c.state === 'CONFIRMED' ? '#db3838' : c.state === 'LAST_KNOWN' ? '#e87c3e' : '#f5a623'}">${c.state}</b><br>
-                Source: ${c.source || 'UNKNOWN'}<br>
-                ${ageMin > 0 ? `Last seen: ${ageMin}m ago` : 'Just spotted'}
-              </div>`,
-              { permanent: false, direction: 'top' }
-            );
-            contactLayer.current.addLayer(marker);
-          }
+        contactLayer.clearLayers();
+        for (const c of contacts) {
+          const ll = getLatLng(c.position || c.pos);
+          if (!ll) continue;
+          const icon = L.divIcon({ className: '', iconSize: [52, 42], iconAnchor: [26, 21], html: makeContactHTML(c) });
+          const marker = L.marker(ll, { icon });
+          const ageMin = c.last_seen ? Math.floor((Date.now() - c.last_seen) / 60000) : 0;
+          marker.bindTooltip(
+            `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;background:#1b1b1b;border:1px solid #3a3a3a;padding:6px;border-radius:3px">
+              <b style="color:#db3838">${c.id}</b><br>
+              Type: ${c.type || 'UNKNOWN'} | State: <b style="color:${c.state === 'CONFIRMED' ? '#db3838' : c.state === 'LAST_KNOWN' ? '#e87c3e' : '#f5a623'}">${c.state}</b><br>
+              Source: ${c.source || 'UNKNOWN'}<br>
+              ${ageMin > 0 ? `Last seen: ${ageMin}m ago` : 'Just spotted'}
+            </div>`,
+            { permanent: false, direction: 'top' }
+          );
+          contactLayer.addLayer(marker);
         }
       } catch (e) {
         setConnected(false);
@@ -200,14 +188,14 @@ export default function Home() {
     poll();
     const interval = setInterval(poll, 1000);
     return () => clearInterval(interval);
-  }, [ready]);
+  }, [leafletReady]);
 
   const fpColor = forceMetrics ? (forceMetrics.firepower_index < 50 ? '#db3838' : forceMetrics.firepower_index < 70 ? '#f5a623' : '#2a7de1') : '#888';
 
   return (
     <div style={{ background: '#1b1b1b', color: '#f5f6f7', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: '13px', height: '100vh', display: 'flex', flexDirection: 'column' }}>
 
-      {/* Title Bar — matches desktop exactly */}
+      {/* Title Bar */}
       <div style={{ display: 'flex', alignItems: 'center', height: '36px', background: '#212121', borderBottom: '1px solid #2a2a2a', padding: '0 12px', gap: '12px', flexShrink: 0 }}>
         <span style={{ fontWeight: 700, fontSize: '13px', letterSpacing: '2px', color: '#2a7de1', textTransform: 'uppercase' }}>SPECTRE</span>
         <div style={{ width: 1, height: 16, background: '#3a3a3a' }} />
@@ -225,18 +213,16 @@ export default function Home() {
         <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#888', letterSpacing: '1px' }}>LIVE WEB VIEW</span>
       </div>
 
-      {/* Map + overlays */}
+      {/* Map */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        <div ref={mapRef} style={{ width: '100%', height: '100%', background: '#0a0f14' }} />
+        {leafletReady && <LeafletMap onReady={(data) => { mapData.current = data; }} />}
 
-        {/* Map name badge */}
         {mapName && (
           <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(27,27,27,0.95)', border: '1px solid #2a2a2a', borderRadius: 3, padding: '6px 10px', zIndex: 1000, fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', color: '#f5f6f7', letterSpacing: '1px', fontWeight: 600 }}>
             {mapName.toUpperCase()}
           </div>
         )}
 
-        {/* Legend — matches desktop exactly */}
         <div style={{ position: 'absolute', bottom: 10, left: 10, background: 'rgba(27,27,27,0.95)', border: '1px solid #2a2a2a', borderRadius: '3px', padding: '8px 12px', zIndex: 1000, fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', pointerEvents: 'none' }}>
           <div style={{ color: '#888', marginBottom: 5, letterSpacing: '1px', fontWeight: 600 }}>LEGEND</div>
           <div style={{ color: '#2a7de1', marginBottom: 2 }}>○ FRIENDLY</div>
@@ -245,10 +231,9 @@ export default function Home() {
           <div style={{ color: '#f5a623', opacity: 0.6 }}>● SUSPECTED</div>
         </div>
 
-        {/* Waiting overlay */}
         {!connected && (
           <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 1000 }}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: '#888', background: 'rgba(27,27,27,0.95)', padding: '20px 30px', borderRadius: '3px', border: '1px solid #3a3a3a', position: 'relative' }}>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: '#888', background: 'rgba(27,27,27,0.95)', padding: '20px 30px', borderRadius: '3px', border: '1px solid #3a3a3a' }}>
               <div style={{ fontSize: '24px', marginBottom: '8px', color: '#888' }}>◎</div>
               <div style={{ fontWeight: 600, letterSpacing: '1px' }}>AWAITING ARMA CONNECTION</div>
               <div style={{ marginTop: '6px', fontSize: '10px', color: '#888' }}>Load SPECTRE bridge in your Arma 3 mission</div>
@@ -257,7 +242,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* Status Bar — matches desktop exactly */}
+      {/* Status Bar */}
       <div style={{ height: '28px', background: '#212121', borderTop: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', padding: '0 12px', gap: '12px', flexShrink: 0, fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#888' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ color: '#888' }}>ARMA:</span>
