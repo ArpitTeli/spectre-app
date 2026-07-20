@@ -53,6 +53,19 @@
   --color-blue: var(--blue);
   --color-white: var(--text-primary);
 
+  /* Aliases used by components */
+  --bg-primary: var(--surface-0);
+  --bg-secondary: var(--surface-2);
+  --bg-tertiary: var(--surface-3);
+  --bg-panel: var(--surface-1);
+  --bg-hover: var(--surface-3);
+  --text-bright: var(--text-primary);
+  --accent-bright: var(--accent);
+  --accent-primary: var(--accent);
+  --border-primary: var(--border-default);
+  --border-accent: var(--accent);
+  --font-condensed: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
   /* Typography */
   --font-display: 'Orbitron', sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', monospace;

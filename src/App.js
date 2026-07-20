@@ -10,6 +10,7 @@ import COAPanel from './components/COAPanel';
 import AbortModal from './components/AbortModal';
 import AdaptationModal from './components/AdaptationModal';
 import AARPanel from './components/AARPanel';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles/global.css';
 
 export default function App() {
@@ -87,6 +88,7 @@ export default function App() {
   }, [sendArmaCommand, addCommsEntry, patch]);
 
   return (
+    <ErrorBoundary>
     <div className="app">
       <TitleBar
         missionPhase={state.missionPhase}
@@ -199,5 +201,6 @@ export default function App() {
         />
       )}
     </div>
+    </ErrorBoundary>
   );
 }

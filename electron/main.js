@@ -38,7 +38,7 @@ const CONFIG_PATH  = path.join(USER_DATA, 'config.json');
 let _configData;
 try { _configData = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch (_) { _configData = {}; }
 
-const ARMA_INSTALL = (_configData.arma_path && fs.existsSync(_configData.arma_path))
+let ARMA_INSTALL = (_configData.arma_path && fs.existsSync(_configData.arma_path))
   ? _configData.arma_path
   : detectArma3();
 const ARMA_DOCS    = detectArmaDocuments();
