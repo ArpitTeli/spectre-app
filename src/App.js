@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useCallback, useRef, useState } from 'react';
 import { useSpectreStore } from './store/useSpectreStore';
 import { aiService } from './ai/aiService';
 import TitleBar from './components/TitleBar';
@@ -28,11 +28,16 @@ export default function App() {
   }, [state.config]);
 
   // Auto-update notifications
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [updateDownloaded, setUpdateDownloaded] = useState(false);
+
   useEffect(() => {
     window.spectreAPI?.onUpdateAvailable?.((info) => {
+      setUpdateInfo(info);
       addCommsEntry('SPECTRE', 'ALL', `Update available: v${info.version}. Downloading...`, 'BLUE');
     });
     window.spectreAPI?.onUpdateDownloaded?.((info) => {
+      setUpdateDownloaded(true);
       addCommsEntry('SPECTRE', 'ALL', `Update v${info.version} ready. Restart to apply.`, 'GREEN');
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -98,6 +103,30 @@ export default function App() {
         onMaximize={() => window.spectreAPI?.maximize()}
         onClose={() => window.spectreAPI?.close()}
       />
+
+      {/* Update notification banner */}
+      {updateDownloaded && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '6px 16px',
+          background: 'var(--accent-dim)',
+          borderBottom: '1px solid var(--accent)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '11px',
+          flexShrink: 0
+        }}>
+          <span style={{ color: 'var(--accent)' }}>
+            Update v{updateInfo?.version} downloaded — restart to apply
+          </span>
+          <button
+            className="btn btn-primary"
+            style={{ fontSize: '10px', padding: '3px 12px' }}
+            onClick={() => window.spectreAPI?.restartApp?.()}
+          >
+            RESTART NOW
+          </button>
+        </div>
+      )}
 
       <div className="app-body">
         <MapView

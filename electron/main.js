@@ -892,6 +892,10 @@ ipcMain.handle('set-arma-path', async (_, manualPath) => {
 ipcMain.on('minimize-window', () => mainWindow?.minimize());
 ipcMain.on('maximize-window', () => mainWindow?.isMaximized() ? mainWindow.unmaximize() : mainWindow?.maximize());
 ipcMain.on('close-window',    () => mainWindow?.close());
+ipcMain.on('restart-app',     () => {
+  const { autoUpdater } = require('electron-updater');
+  autoUpdater.quitAndInstall();
+});
 
 // ─── Vault (Ontology Layer) ──────────────────────────────────────────────────
 ipcMain.handle('vault-create', async (_, missionId) => {
