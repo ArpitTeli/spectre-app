@@ -1,4 +1,0 @@
-{
-  "buildCommand": "cd web-viewer && npm run build",
-  "outputDirectory": "web-viewer/.next"
-}
