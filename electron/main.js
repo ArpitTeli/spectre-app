@@ -69,7 +69,7 @@ dbg('SPECTRE: Arma 3 documents: ' + ARMA_DOCS);
 dbg('SPECTRE: Config path: ' + CONFIG_PATH);
 
 // ─── Default config ──────────────────────────────────────────────────────────
-const RELAY_URL = 'wss://spectre-relay-production.up.railway.app'; // cloud relay
+const RELAY_URL = 'wss://spectre-relay.onrender.com'; // cloud relay (Render free tier)
 const DEFAULT_CONFIG = {
   mode:          'host', // 'host' or 'client'
   room_code:     '',
