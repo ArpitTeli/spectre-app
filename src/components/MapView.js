@@ -19,7 +19,7 @@ const ARMA_MAPS = {
       });
     })(),
     tilePattern: '/maps/stratis/{z}/{x}/{y}.png',
-    maxZoom: 4, defaultZoom: 2, tileSize: 226, worldSize: 8192,
+    maxZoom: 8, defaultZoom: 2, tileSize: 226, worldSize: 8192,
     center: [4100, 4100]
   },
   altis: {
@@ -34,7 +34,7 @@ const ARMA_MAPS = {
       });
     })(),
     tilePattern: '/maps/altis/{z}/{x}/{y}.png',
-    maxZoom: 6, defaultZoom: 3, tileSize: 212, worldSize: 30720,
+    maxZoom: 10, defaultZoom: 3, tileSize: 212, worldSize: 30720,
     center: [15000, 15000]
   },
   tanoa: {
@@ -49,7 +49,7 @@ const ARMA_MAPS = {
       });
     })(),
     tilePattern: '/maps/tanoa/{z}/{x}/{y}.png',
-    maxZoom: 5, defaultZoom: 2, tileSize: 213, worldSize: 15360,
+    maxZoom: 9, defaultZoom: 2, tileSize: 213, worldSize: 15360,
     center: [7000, 7000]
   },
   enoch: {
@@ -64,7 +64,7 @@ const ARMA_MAPS = {
       });
     })(),
     tilePattern: '/maps/enoch/{z}/{x}/{y}.png',
-    maxZoom: 4, defaultZoom: 2, tileSize: 356, worldSize: 12800,
+    maxZoom: 8, defaultZoom: 2, tileSize: 356, worldSize: 12800,
     center: [7100, 7100]
   },
   livonia: {
@@ -79,7 +79,7 @@ const ARMA_MAPS = {
       });
     })(),
     tilePattern: '/maps/enoch/{z}/{x}/{y}.png',
-    maxZoom: 4, defaultZoom: 2, tileSize: 356, worldSize: 12800,
+    maxZoom: 8, defaultZoom: 2, tileSize: 356, worldSize: 12800,
     center: [7100, 7100]
   },
   malden: {
@@ -94,7 +94,7 @@ const ARMA_MAPS = {
       });
     })(),
     tilePattern: '/maps/malden/{z}/{x}/{y}.png',
-    maxZoom: 5, defaultZoom: 2, tileSize: 186, worldSize: 12800,
+    maxZoom: 9, defaultZoom: 2, tileSize: 186, worldSize: 12800,
     center: [7000, 7000]
   }
 };
