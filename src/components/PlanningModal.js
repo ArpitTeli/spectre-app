@@ -19,9 +19,9 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
   useEffect(() => {
     if (state.config) {
       aiService.setConfig(state.config);
-      aiService.resetConversation();
     }
-  }, [state.config]);
+    aiService.resetConversation();
+  }, []);
 
   // Number of user messages sent so far (used to decide when to show OPORD button)
   const userMessageCount = messages.filter(m => m.role === 'user').length;
@@ -36,10 +36,10 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
 
     try {
       const context = {
-        units: state.units,
-        contacts: state.contacts,
-        forceMetrics: state.forceMetrics,
-        intelDB: state.intelDB
+        units: state.units || {},
+        contacts: state.contacts || {},
+        forceMetrics: state.forceMetrics || {},
+        intelDB: state.intelDB || { locations: [], patterns: [] }
       };
       const response = await aiService.chat(userMsg, context, state.vaultPath);
       setMessages(prev => [...prev, { role: 'assistant', content: response }]);
@@ -48,7 +48,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
       setError(msg);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `⚠ Connection error: ${msg}\n\nCheck your API key in Settings (⚙).`
+        content: `Connection error: ${msg}\n\nCheck your API key in Settings.`
       }]);
     } finally {
       setThinking(false);
@@ -62,10 +62,10 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
 
     try {
       const context = {
-        units: state.units,
-        contacts: state.contacts,
-        forceMetrics: state.forceMetrics,
-        intelDB: state.intelDB
+        units: state.units || {},
+        contacts: state.contacts || {},
+        forceMetrics: state.forceMetrics || {},
+        intelDB: state.intelDB || { locations: [], patterns: [] }
       };
 
       const conversation = aiService.conversationHistory;
@@ -103,10 +103,10 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
 
     try {
       const context = {
-        units: state.units,
-        contacts: state.contacts,
-        forceMetrics: state.forceMetrics,
-        intelDB: state.intelDB
+        units: state.units || {},
+        contacts: state.contacts || {},
+        forceMetrics: state.forceMetrics || {},
+        intelDB: state.intelDB || { locations: [], patterns: [] }
       };
 
       const coaResult = await aiService.generateCOAs('Initial planning', opord, context, state.vaultPath);

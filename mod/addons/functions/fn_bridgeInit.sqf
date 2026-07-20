@@ -12,8 +12,8 @@
 */
 
 // ─── Rate config (globals — spawn block can't see private locals) ─────────────
-SPECTRE_broadcastRate = 1.0;
-SPECTRE_cmdReadRate   = 0.75;
+SPECTRE_broadcastRate = 0.5;
+SPECTRE_cmdReadRate   = 0.3;
 
 // ─── Map coordinate lookup ────────────────────────────────────────────────────
 // Format: [origin_lat, origin_lng, meters_per_lat, meters_per_lng]
@@ -46,10 +46,18 @@ if (SPECTRE_blufor isEqualTo []) then {
     };
 };
 
+// Assign variable names to units that don't have one (for command targeting)
 {
+    private _vn = vehicleVarName _x;
+    if (_vn isEqualTo "") then {
+        _vn = format ["SPECTRE_%1", _forEachIndex];
+        _x setVehicleVarName _vn;
+        // Also register in missionNamespace so getVariable works
+        missionNamespace setVariable [_vn, _x];
+    };
     _x setVariable ["SPECTRE_spawnPos",     getPos _x,          false];
     _x setVariable ["SPECTRE_wasAlive",     alive _x,           false];
-    _x setVariable ["SPECTRE_callsign",     vehicleVarName _x,  false];
+    _x setVariable ["SPECTRE_callsign",     _vn,                false];
     _x setVariable ["SPECTRE_currentOrder", "",                 false];
 } forEach SPECTRE_blufor;
 
@@ -380,12 +388,11 @@ SPECTRE_fnc_broadcastState = {
 
 // ─── Command reader ───────────────────────────────────────────────────────────
 SPECTRE_fnc_readCommands = {
-    private _path = getMissionPath "spectre_to_arma.sqf";
-    if (fileExists _path) then {
-        private _sqf = loadFile "spectre_to_arma.sqf";
-        if (!(_sqf isEqualTo "")) then {
-            call compile _sqf;
-        };
+    // loadFile searches in mission folder, so just use the filename
+    private _sqf = loadFile "spectre_to_arma.sqf";
+    if (!(_sqf isEqualTo "")) then {
+        diag_log format ["SPECTRE: Read %1 bytes from spectre_to_arma.sqf", count _sqf];
+        call compile _sqf;
     };
 };
 

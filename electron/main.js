@@ -577,14 +577,14 @@ function watchArmaLog() {
         }
       }
     } catch (_) {}
-  }, 2000);
+  }, 1000);
 }
 
 // Check if a newer RPT file has appeared (log rotation by Arma)
 let lastLogCheck = 0;
 function checkForNewerLog() {
   const now = Date.now();
-  if (now - lastLogCheck < 30000) return; // Check every 30s max
+  if (now - lastLogCheck < 15000) return; // Check every 15s max
   lastLogCheck = now;
 
   const newer = findLatestRptLog(ARMA_DOCS);
