@@ -556,16 +556,22 @@ function flushCommandsToMission() {
     dbg(`SPECTRE: Failed to write commands: ${e.message}`);
   }
 
-  // Also write to Arma 3 root directory for editor missions
-  // (loadFile searches in the Arma root when there's no mission folder on disk)
+  // Also write to @SPECTRE mod folder (Arma always reads from addons)
   if (ARMA_INSTALL) {
-    const armaRootPath = path.join(ARMA_INSTALL, 'spectre_to_arma.sqf');
+    const modPath = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_commands.sqf');
     try {
-      fs.writeFileSync(armaRootPath, content, 'utf8');
-      dbg(`SPECTRE: Also wrote commands to Arma root: ${armaRootPath}`);
-    } catch (e) {
-      // silently ignore - the mission folder copy is the primary target
-    }
+      fs.writeFileSync(modPath, content, 'utf8');
+      dbg(`SPECTRE: Wrote commands to mod folder: ${modPath}`);
+    } catch (e) { /* ignore */ }
+  }
+
+  // Also write to Arma root and AppData as fallbacks
+  const targets = [];
+  if (ARMA_INSTALL) targets.push(path.join(ARMA_INSTALL, 'spectre_to_arma.sqf'));
+  const localAppData = process.env.LOCALAPPDATA || '';
+  if (localAppData) targets.push(path.join(localAppData, 'Arma 3', 'spectre_to_arma.sqf'));
+  for (const t of targets) {
+    try { fs.writeFileSync(t, content, 'utf8'); } catch (e) { /* ignore */ }
   }
 
   pendingCommands = [];

@@ -388,10 +388,15 @@ SPECTRE_fnc_broadcastState = {
 
 // ─── Command reader ───────────────────────────────────────────────────────────
 SPECTRE_fnc_readCommands = {
-    // loadFile searches in mission folder, so just use the filename
-    private _sqf = loadFile "spectre_to_arma.sqf";
+    // For editor/preview missions, loadFile with relative path can't find
+    // external files. Write to @SPECTRE mod folder where Arma always reads.
+    private _sqf = preprocessFileLineNumbers "\@SPECTRE\addons\spectre_commands.sqf";
+    if (_sqf isEqualTo "") then {
+        // Fallback for saved/folder missions
+        _sqf = loadFile "spectre_to_arma.sqf";
+    };
     if (!(_sqf isEqualTo "")) then {
-        diag_log format ["SPECTRE: Read %1 bytes from spectre_to_arma.sqf", count _sqf];
+        diag_log format ["SPECTRE: Executing command (%1 bytes)", count _sqf];
         call compile _sqf;
     };
 };
