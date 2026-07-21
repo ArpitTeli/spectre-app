@@ -541,7 +541,7 @@ function flushCommandsToMission() {
 
   const missionFolder = config.mission_folder_path;
   if (!missionFolder || !fs.existsSync(missionFolder)) {
-    console.warn('SPECTRE: mission_folder_path not set or does not exist. Commands dropped.');
+    dbg(`SPECTRE: Commands dropped — mission folder not set or not found: ${missionFolder || '(empty)'}`);
     pendingCommands = [];
     return;
   }
@@ -551,9 +551,9 @@ function flushCommandsToMission() {
 
   try {
     fs.writeFileSync(outPath, content, 'utf8');
-    console.log(`SPECTRE: wrote ${pendingCommands.length} command(s) to ${outPath}`);
+    dbg(`SPECTRE: Wrote ${pendingCommands.length} command(s) to ${outPath}`);
   } catch (e) {
-    console.error('SPECTRE: failed to write command file:', e.message);
+    dbg(`SPECTRE: Failed to write commands: ${e.message}`);
   }
 
   pendingCommands = [];
@@ -1124,13 +1124,16 @@ function autoSetMissionFolder(missionPath) {
   // Normalize path
   let normalized = missionPath.replace(/\/$/, '').replace(/\//g, '\\');
 
-  // If path is relative (no drive letter), resolve against Arma install dir
-  if (normalized && !normalized.match(/^[A-Z]:\\/i) && ARMA_INSTALL) {
-    normalized = path.join(ARMA_INSTALL, normalized);
+  // If path is relative (no drive letter), resolve against Arma docs/missions folder
+  if (normalized && !normalized.match(/^[A-Z]:\\/i)) {
+    // The bridge sends the last 2 segments of the mission path (e.g., "missions\\MissionName.Island")
+    // These are relative to the Arma documents folder
+    normalized = path.join(ARMA_DOCS, normalized);
   }
 
   if (!fs.existsSync(normalized)) {
     console.warn('SPECTRE: mission folder not found:', normalized);
+    dbg(`SPECTRE: auto-detect mission path failed: ${normalized} does not exist`);
     return;
   }
 
