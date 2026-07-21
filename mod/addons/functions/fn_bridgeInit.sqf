@@ -389,7 +389,11 @@ SPECTRE_fnc_broadcastState = {
 // ─── Command reader ───────────────────────────────────────────────────────────
 SPECTRE_fnc_readCommands = {
     private _result = "spectre_ext" callExtension ["READ", ["addons\spectre_cmds.sqf"]];
-    if (isNil "_result" || { _result isEqualTo [] } || { (_result select 1) <= 0 }) exitWith {};
+    if (diag_tickTime % 10 < 0.5) then {
+        diag_log format ["SPECTRE DIAG: result=%1 type=%2", _result, typeName _result];
+    };
+    if (isNil "_result" || { _result isEqualTo [] }) exitWith {};
+    if (count _result < 2 || { (_result select 1) <= 0 }) exitWith {};
     private _sqf = _result select 0;
     if (!(_sqf isEqualTo "")) then {
         diag_log format ["SPECTRE: Executing command (%1 bytes)", count _sqf];
