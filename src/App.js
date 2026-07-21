@@ -58,7 +58,7 @@ export default function App() {
       if (data.connected && data.mode === 'client') {
         addCommsEntry('SPECTRE', 'ALL', `Connected to host. Room: ${data.room}`, 'GREEN');
       } else if (data.error) {
-        addCommsEntry('SPECTRE', `Relay: ${data.error}`, 'RED');
+        addCommsEntry('SPECTRE', 'ALL', `Relay: ${data.error}`, 'RED');
       }
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

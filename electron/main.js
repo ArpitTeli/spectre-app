@@ -556,13 +556,10 @@ function flushCommandsToMission() {
     dbg(`SPECTRE: Failed to write commands: ${e.message}`);
   }
 
-  // Primary: write to Arma root as spectre_cmds.sqf (no @ in path, clean)
+  // Primary: write to Arma root as spectre_to_arma.sqf (must match bridge's loadFile target)
   if (ARMA_INSTALL) {
-    const armaCmds = path.join(ARMA_INSTALL, 'spectre_cmds.sqf');
-    try {
-      fs.writeFileSync(armaCmds, content, 'utf8');
-      dbg(`SPECTRE: Wrote commands to ${armaCmds}`);
-    } catch (e) { /* ignore */ }
+    const armaCmds = path.join(ARMA_INSTALL, 'spectre_to_arma.sqf');
+    try { fs.writeFileSync(armaCmds, content, 'utf8'); } catch (e) { /* ignore */ }
   }
 
   // Secondary: also write to @SPECTRE mod folder and other locations as fallback
@@ -1120,7 +1117,7 @@ function parseArmaLog(chunk) {
   }
 
   // After processing all lines in this chunk, flush the accumulated state
-  if (gotData && (Object.keys(pendingState.units).length > 0 || pendingState.mapName)) {
+  if (gotData && (Object.keys(pendingState.units).length > 0 || Object.keys(pendingState.contacts).length > 0 || pendingState.mapName)) {
     const data = {
       missionFolder: pendingState.missionFolder || '',
       fullMissionPath: pendingState.fullMissionPath || '',
@@ -1183,6 +1180,7 @@ let lastFullAutoSet = '';
 function autoSetMissionFolder(missionPath, fullPath) {
   if (!missionPath || (missionPath === lastAutoSet && fullPath === lastFullAutoSet)) return;
   lastAutoSet = missionPath;
+  lastFullAutoSet = fullPath || '';
 
   // Use full absolute path if available and valid
   let normalized = (fullPath || '').replace(/\/$/, '').replace(/\//g, '\\');

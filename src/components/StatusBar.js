@@ -178,11 +178,11 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
 
   useEffect(() => {
     // Refresh bridge paths on every settings open
-    window.spectreAPI?.getPaths?.().then(setLivePaths);
+    window.spectreAPI?.getPaths?.().then(setLivePaths).catch(() => {});
     window.spectreAPI?.getArmaInfo?.().then(info => {
       if (info?.installPath) setArmaPath(info.installPath);
-    });
-    window.spectreAPI?.checkModStatus?.().then(setModStatus);
+    }).catch(() => {});
+    window.spectreAPI?.checkModStatus?.().then(setModStatus).catch(() => {});
   }, []);
 
   const PRESETS = {

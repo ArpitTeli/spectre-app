@@ -395,20 +395,6 @@ SPECTRE_fnc_readCommands = {
     };
 };
 
-// ─── Per-unit event handlers (immediate, not waiting for the poll loop) ───────
-{
-    private _u = _x;
-    _u addEventHandler ["Killed", {
-        params ["_killed"];
-        private _cs = _killed getVariable ["SPECTRE_callsign", vehicleVarName _killed];
-        private _t  = if (_killed isKindOf "Man") then { "UNIT_KIA" } else { "VEHICLE_DESTROYED" };
-        diag_log format [
-            "SPECTRE_EVENT:{""type"":""%1"",""unit"":""%2"",""id"":""%1_%2_%3""}",
-            _t, _cs, round time
-        ];
-    }];
-} forEach SPECTRE_blufor;
-
 // ─── Main loop ────────────────────────────────────────────────────────────────
 hint "SPECTRE C2 Bridge: ACTIVE";
 diag_log "SPECTRE: Bridge running (wall-clock mode). Broadcasting every 0.5s, reading commands every 0.3s.";
