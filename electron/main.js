@@ -835,6 +835,7 @@ function setupAutoUpdate() {
 
     autoUpdater.on('update-not-available', (info) => {
       console.log('SPECTRE: No update available. Current version:', info.version);
+      sendToRenderer('update-not-available', info);
     });
 
     autoUpdater.on('download-progress', (progress) => {

@@ -48,6 +48,9 @@ export default function App() {
       setUpdateInfo(info);
       addCommsEntry('SPECTRE', 'ALL', `Update v${info.version} ready. Restart to apply.`, 'GREEN');
     });
+    window.spectreAPI?.onUpdateNotAvailable?.((info) => {
+      addCommsEntry('SPECTRE', 'ALL', `No update available. Version ${info.version} is current.`, 'BLUE');
+    });
 
     // Listen for relay status updates
     window.spectreAPI?.onRelayStatus?.((data) => {

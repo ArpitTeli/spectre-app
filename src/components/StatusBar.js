@@ -485,7 +485,9 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
         )}
 
         <div className="settings-footer">
-          <button className="btn" onClick={() => { window.spectreAPI?.checkForUpdates?.(); onClose(); }}>
+          <button className="btn" onClick={() => {
+              window.spectreAPI?.checkForUpdates?.();
+            }}>
             CHECK FOR UPDATES
           </button>
           <div style={{ flex: 1 }} />
