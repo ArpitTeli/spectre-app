@@ -1250,9 +1250,14 @@ function getMissionFolders() {
 
 ipcMain.handle('send-command', async (_, command) => {
   try {
-    queueCommand(command);
+    const content = buildSQFContent([command]);
+    // Write directly to @SPECTRE\addons\ (bypasses queueCommand/pendingCommands)
+    const modPath = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
+    fs.writeFileSync(modPath, content, 'utf8');
+    dbg(`SPECTRE: CMD ${command.type} written to ${modPath}`);
     return { success: true };
   } catch (e) {
+    dbg(`SPECTRE: CMD write failed: ${e.message}`);
     return { success: false, error: e.message };
   }
 });
