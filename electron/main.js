@@ -1251,9 +1251,7 @@ function getMissionFolders() {
 ipcMain.handle('send-command', async (_, command) => {
   try {
     if (!ARMA_INSTALL) return { success: false, error: 'No ARMA_INSTALL' };
-    const type = (command.type || '').replace(/[^A-Z0-9_]/g, '');
-    const uid = (command.unit_id || 'ALL').replace(/["'\n\r]/g, '');
-    const sqf = `[${Date.now()}, "${type}", "${uid}"] call SPECTRE_fnc_execCmd;\n`;
+    const sqf = buildSQFContent([command]);
     fs.writeFileSync(path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf'), sqf, 'utf8');
     return { success: true };
   } catch (e) {
