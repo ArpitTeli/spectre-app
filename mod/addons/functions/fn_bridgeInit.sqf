@@ -388,8 +388,10 @@ SPECTRE_fnc_broadcastState = {
 
 // ─── Command reader ───────────────────────────────────────────────────────────
 SPECTRE_fnc_readCommands = {
-    // Try to load commands from the @SPECTRE mod folder (works for all mission types)
-    private _cmdPath = "@SPECTRE\addons\spectre_commands.sqf";
+    // Commands file is in @SPECTRE\addons\. Path must start with \
+    // for preprocessFileLineNumbers to search from Arma root (game dir).
+    // Without \, it searches the mission folder — wrong location.
+    private _cmdPath = "\@SPECTRE\addons\spectre_commands.sqf";
     if (fileExists _cmdPath) then {
         private _sqf = preprocessFileLineNumbers _cmdPath;
         if (!(_sqf isEqualTo "")) then {
