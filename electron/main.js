@@ -569,6 +569,12 @@ function flushCommandsToMission() {
   if (localAppData) {
     fallbacks.push(path.join(localAppData, 'Arma 3', 'spectre_to_arma.sqf'));
   }
+  // Also write to both possible Documents locations (regular + OneDrive)
+  const docs = process.env.USERPROFILE || '';
+  if (docs) {
+    fallbacks.push(path.join(docs, 'Documents', 'Arma 3', 'missions', 'SPECTRETEST2.Stratis', 'spectre_to_arma.sqf'));
+    fallbacks.push(path.join(docs, 'OneDrive', 'Documents', 'Arma 3', 'missions', 'SPECTRETEST2.Stratis', 'spectre_to_arma.sqf'));
+  }
   for (const t of fallbacks) {
     try { fs.writeFileSync(t, content, 'utf8'); } catch (e) { /* ignore */ }
   }
