@@ -532,38 +532,34 @@ function buildSQFContent(commands) {
 function flushCommandsToMission() {
   if (pendingCommands.length === 0) return;
 
-  let config;
-  try { config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); }
-  catch (_) { config = DEFAULT_CONFIG; }
-
-  const missionFolder = config.mission_folder_path;
-  if (!missionFolder || !fs.existsSync(missionFolder)) {
-    dbg(`SPECTRE: Commands dropped — mission folder not set or not found: ${missionFolder || '(empty)'}`);
-    pendingCommands = [];
-    return;
-  }
-
   const content = buildSQFContent(pendingCommands);
 
-  // PRIMARY: write to Arma root (never locked by loadFile)
+  // PRIMARY: write to ARMA_DOCS — matches $profile: prefix in bridge readCommands
+  // This directory is never locked by Arma because it's not the mission folder
+  if (ARMA_DOCS) {
+    const profilePath = path.join(ARMA_DOCS, 'spectre_cmds.sqf');
+    try {
+      fs.writeFileSync(profilePath, content, 'utf8');
+      dbg(`SPECTRE: Wrote commands to ${profilePath}`);
+    } catch (e) {
+      dbg(`SPECTRE: Failed to write to profile: ${e.message}`);
+    }
+  }
+
+  // SECONDARY: write to Arma root as additional fallback
   if (ARMA_INSTALL) {
     const armaRootPath = path.join(ARMA_INSTALL, 'spectre_cmds.sqf');
     try {
       fs.writeFileSync(armaRootPath, content, 'utf8');
-      dbg(`SPECTRE: Wrote commands to ${armaRootPath}`);
-    } catch (e) {
-      dbg(`SPECTRE: Failed to write to Arma root: ${e.message}`);
-    }
+    } catch (e) { /* ignore */ }
   }
 
-  // SECONDARY: try mission folder from config (may be locked by loadFile)
+  // TERTIARY: try mission folder (may be locked — silently ignore errors)
   let cfg;
   try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch (_) {}
   if (cfg?.mission_folder_path && fs.existsSync(cfg.mission_folder_path)) {
     try { fs.writeFileSync(path.join(cfg.mission_folder_path, 'spectre_cmds.sqf'), content, 'utf8'); } catch (e) {}
   }
-
-  // TERTIARY: try from bridge broadcast (may be locked)
   if (ARMA_INSTALL && pendingState.missionFolder) {
     try { fs.writeFileSync(path.join(ARMA_INSTALL, pendingState.missionFolder, 'spectre_cmds.sqf'), content, 'utf8'); } catch (e) {}
   }

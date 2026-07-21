@@ -388,7 +388,8 @@ SPECTRE_fnc_broadcastState = {
 
 // ─── Command reader ───────────────────────────────────────────────────────────
 SPECTRE_fnc_readCommands = {
-    private _sqf = preprocessFileLineNumbers "\spectre_cmds.sqf";
+    // $profile: resolves to Documents\Arma 3 - same as ARMA_DOCS on Electron side
+    private _sqf = preprocessFileLineNumbers "$profile:spectre_cmds.sqf";
     if (!(_sqf isEqualTo "")) then {
         diag_log format ["SPECTRE: Executing command (%1 bytes)", count _sqf];
         call compile _sqf;
