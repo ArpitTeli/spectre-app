@@ -390,15 +390,16 @@ SPECTRE_fnc_broadcastState = {
 SPECTRE_fnc_readCommands = {
     private _sqf = "";
     
-    // Try paths from most specific to most general
+    // Try paths — @ is special in Arma (PBO prefix), avoid it
     private _paths = [
-        "\spectre_cmds.sqf",                               // Arma root (no @ in path)
-        "\@SPECTRE\addons\spectre_commands.sqf"             // Mod folder
+        "\spectre_to_arma.sqf",              // Arma root (clean path)
+        "\spectre_cmds.sqf"                  // Alternate Arma root
     ];
     
     {
         if (fileExists _x) exitWith {
             _sqf = preprocessFileLineNumbers _x;
+            diag_log format ["SPECTRE: Found commands at %1", _x];
         };
     } forEach _paths;
     
