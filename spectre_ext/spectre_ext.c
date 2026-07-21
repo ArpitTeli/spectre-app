@@ -41,10 +41,6 @@ void readFile(const char* path, char* output, int outputSize) {
         snprintf(output, outputSize, "ERR_SIZE:%ld", fsize);
     }
     fclose(f);
-    // Truncate file to prevent duplicate execution
-    FILE* t = NULL;
-    fopen_s(&t, path, "wb");
-    if (t) fclose(t);
 }
 
 void stripQuotes(char* dest, const char* src, int maxLen) {
