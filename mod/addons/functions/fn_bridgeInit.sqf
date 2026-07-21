@@ -389,13 +389,12 @@ SPECTRE_fnc_broadcastState = {
 // ─── Command reader ───────────────────────────────────────────────────────────
 SPECTRE_fnc_readCommands = {
     private _result = "spectre_ext" callExtension ["READ", ["addons\spectre_cmds.sqf"]];
-    if (diag_tickTime % 10 < 0.5) then {
-        diag_log format ["SPECTRE DIAG: result=%1 type=%2", _result, typeName _result];
+    private _sqf = if (count _result >= 3) then { _result select 0 } else { "" };
+    // Log any error returned by the DLL
+    if (_sqf find "ERR_" == 0) then {
+        diag_log format ["SPECTRE: DLL error: %1", _sqf];
     };
-    if (isNil "_result" || { _result isEqualTo [] }) exitWith {};
-    if (count _result < 2 || { (_result select 1) <= 0 }) exitWith {};
-    private _sqf = _result select 0;
-    if (!(_sqf isEqualTo "")) then {
+    if (!(_sqf isEqualTo "") && { _sqf find "ERR_" != 0 }) then {
         diag_log format ["SPECTRE: Executing command (%1 bytes)", count _sqf];
         call compile _sqf;
     };

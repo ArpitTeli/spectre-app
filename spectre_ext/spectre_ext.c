@@ -43,33 +43,47 @@ void readFile(const char* path, char* output, int outputSize) {
     fclose(f);
 }
 
+void stripQuotes(char* dest, const char* src, int maxLen) {
+    const char* start = src;
+    const char* end = src + strlen(src) - 1;
+    while (*start == '"' || *start == ' ') start++;
+    while (end > start && (*end == '"' || *end == ' ')) end--;
+    int len = (int)(end - start + 1);
+    if (len < 0) len = 0;
+    if (len >= maxLen) len = maxLen - 1;
+    strncpy_s(dest, maxLen, start, len);
+}
+
 __declspec(dllexport) void __stdcall RVExtensionVersion(char *output, int outputSize) {
     strncpy_s(output, outputSize, "SPECTRE Ext v1.0", _TRUNCATE);
 }
 
 __declspec(dllexport) void __stdcall RVExtension(char *output, int outputSize, const char *function) {
+    if (!function || function[0] == '\0') { output[0] = '\0'; return; }
     ensureBasePath();
+    char stripped[512];
+    stripQuotes(stripped, function, sizeof(stripped));
     char fullPath[MAX_PATH];
-    if (function && function[0] != '\0') {
-        if (function[1] == ':' || function[0] == '\\') {
-            strncpy_s(fullPath, MAX_PATH, function, _TRUNCATE);
-        } else {
-            strncpy_s(fullPath, MAX_PATH, basePath, _TRUNCATE);
-            strncat_s(fullPath, MAX_PATH, function, _TRUNCATE);
-        }
-        readFile(fullPath, output, outputSize);
+    if (stripped[1] == ':' || stripped[0] == '\\') {
+        strncpy_s(fullPath, MAX_PATH, stripped, _TRUNCATE);
+    } else {
+        strncpy_s(fullPath, MAX_PATH, basePath, _TRUNCATE);
+        strncat_s(fullPath, MAX_PATH, stripped, _TRUNCATE);
     }
+    readFile(fullPath, output, outputSize);
 }
 
 __declspec(dllexport) int __stdcall RVExtensionArgs(char *output, int outputSize, const char *function, const char **args, int argc) {
     if (function && strcmp(function, "READ") == 0 && argc >= 1 && args[0]) {
         ensureBasePath();
+        char stripped[256];
+        stripQuotes(stripped, args[0], sizeof(stripped));
         char fullPath[MAX_PATH];
-        if (args[0][1] == ':' || args[0][0] == '\\') {
-            strncpy_s(fullPath, MAX_PATH, args[0], _TRUNCATE);
+        if (stripped[1] == ':' || stripped[0] == '\\') {
+            strncpy_s(fullPath, MAX_PATH, stripped, _TRUNCATE);
         } else {
             strncpy_s(fullPath, MAX_PATH, basePath, _TRUNCATE);
-            strncat_s(fullPath, MAX_PATH, args[0], _TRUNCATE);
+            strncat_s(fullPath, MAX_PATH, stripped, _TRUNCATE);
         }
         readFile(fullPath, output, outputSize);
         return output[0] != '\0' ? 1 : 0;
