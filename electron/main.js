@@ -1192,13 +1192,20 @@ function autoSetMissionFolder(missionPath, fullPath) {
   if (normalized && normalized.match(/^[A-Z]:\\/i) && fs.existsSync(normalized)) {
     // Good - use the absolute path directly
   } else if (normalized && !normalized.match(/^[A-Z]:\\/i)) {
-    // Relative path — resolve against Arma documents folder
-    normalized = path.join(ARMA_DOCS, normalized);
+    // Relative path — when playing from Scenarios, missions are under Arma install\Missions\
+    // Try ARMA_INSTALL first, then fall back to ARMA_DOCS
+    const resolved = path.join(ARMA_INSTALL, normalized);
+    if (fs.existsSync(resolved)) {
+      normalized = resolved;
+    } else {
+      normalized = path.join(ARMA_DOCS, normalized);
+    }
   } else {
-    // Fallback: use missionFolder (short path) resolved against ARMA_DOCS
+    // Fallback: use missionFolder (short path)
     normalized = missionPath.replace(/\/$/, '').replace(/\//g, '\\');
     if (!normalized.match(/^[A-Z]:\\/i)) {
-      normalized = path.join(ARMA_DOCS, normalized);
+      const resolved = path.join(ARMA_INSTALL, normalized);
+      normalized = fs.existsSync(resolved) ? resolved : path.join(ARMA_DOCS, normalized);
     }
   }
 
