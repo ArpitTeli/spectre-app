@@ -16,7 +16,7 @@ const PHASE_LABELS = {
   AAR: 'AFTER ACTION REVIEW'
 };
 
-export default function TitleBar({ missionPhase, missionElapsedSec, armaConnected, mode, roomCode, relayClients, onMinimize, onMaximize, onClose }) {
+export default function TitleBar({ missionPhase, missionElapsedSec, armaConnected, mode, roomCode, relayClients, relayError, relayConnecting, onSwitchMode, onMinimize, onMaximize, onClose }) {
   return (
     <div className="titlebar">
       <span className="titlebar__logo">SPECTRE</span>
@@ -38,12 +38,16 @@ export default function TitleBar({ missionPhase, missionElapsedSec, armaConnecte
       <div className="titlebar__connection">
         <div className={`titlebar__connection-dot ${armaConnected ? 'connected' : ''}`} />
         <span style={{
-          color: armaConnected ? 'var(--accent)' : 'var(--red)',
+          color: relayError ? 'var(--red)' : relayConnecting ? 'var(--yellow)' : armaConnected ? 'var(--accent)' : 'var(--red)',
           fontFamily: 'var(--font-mono)', fontSize: '10px'
         }}>
-          {mode === 'client'
-            ? (armaConnected ? 'CONNECTED TO HOST' : 'HOST DISCONNECTED')
-            : (armaConnected ? 'ARMA LINK ACTIVE' : 'ARMA NOT CONNECTED')
+          {relayError
+            ? relayError.toUpperCase()
+            : relayConnecting
+              ? 'CONNECTING...'
+              : mode === 'client'
+                ? (armaConnected ? 'CONNECTED TO HOST' : 'HOST DISCONNECTED')
+                : (armaConnected ? 'ARMA LINK ACTIVE' : 'ARMA NOT CONNECTED')
           }
         </span>
       </div>
@@ -68,6 +72,24 @@ export default function TitleBar({ missionPhase, missionElapsedSec, armaConnecte
               </span>
             )}
           </div>
+        </>
+      )}
+
+      {onSwitchMode && (
+        <>
+          <div className="titlebar__divider" />
+          <button
+            onClick={onSwitchMode}
+            style={{
+              background: 'none', border: '1px solid var(--border-default)', borderRadius: '3px',
+              color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--font-mono)',
+              fontSize: '9px', padding: '2px 8px', letterSpacing: '1px',
+              WebkitAppRegion: 'no-drag'
+            }}
+            title="Switch mode / change room"
+          >
+            ⇄ MODE
+          </button>
         </>
       )}
 

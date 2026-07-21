@@ -54,7 +54,7 @@ export default function App() {
       setRelayStatus(data);
       if (data.connected && data.mode === 'client') {
         addCommsEntry('SPECTRE', 'ALL', `Connected to host. Room: ${data.room}`, 'GREEN');
-      } else if (!data.connected && data.error) {
+      } else if (data.error) {
         addCommsEntry('SPECTRE', `Relay: ${data.error}`, 'RED');
       }
     });
@@ -109,35 +109,46 @@ export default function App() {
 
   // Mode selection handler
   const handleModeSelect = useCallback(({ mode, roomCode: code }) => {
+    // Host auto-generates a room code if none provided
+    const finalCode = mode === 'host' && !code
+      ? 'ROOM-' + Math.random().toString(36).substring(2, 6).toUpperCase()
+      : code;
+
     setAppMode(mode);
-    setRoomCode(code);
+    setRoomCode(finalCode);
 
     if (mode === 'host') {
-      // Host mode: start bridge + connect to relay as host
+      // Host mode: start bridge services + connect to relay as host
       setCommandMode('local');
+      window.spectreAPI?.startHostServices?.();
       patch({ missionPhase: 'BRIEFING' });
       const config = stateRef.current.config;
-      if (config?.relay_url) {
-        window.spectreAPI?.relayConnect?.({ mode: 'host', roomCode: code || 'DEFAULT', url: config.relay_url });
-      } else {
-        window.spectreAPI?.relayConnect?.({ mode: 'host', roomCode: code || 'DEFAULT' });
-      }
+      window.spectreAPI?.relayConnect?.({ mode: 'host', roomCode: finalCode, url: config?.relay_url });
     } else {
       // Client mode: connect to relay as client, skip Arma bridge
       setCommandMode('relay');
       patch({ missionPhase: 'BRIEFING', armaConnected: false });
       const config = stateRef.current.config;
-      if (config?.relay_url) {
-        window.spectreAPI?.relayConnect?.({ mode: 'client', roomCode: code, url: config.relay_url });
-      } else {
-        window.spectreAPI?.relayConnect?.({ mode: 'client', roomCode: code });
+      window.spectreAPI?.relayConnect?.({ mode: 'client', roomCode: finalCode, url: config?.relay_url });
+      // Persist room code for next session
+      if (finalCode) {
+        window.spectreAPI?.saveConfig?.({ ...config, last_room_code: finalCode });
       }
     }
   }, [patch, setCommandMode]);
 
+  // Switch back to mode select (disconnect relay, reset mode)
+  const handleSwitchMode = useCallback(() => {
+    window.spectreAPI?.relayDisconnect?.();
+    setAppMode(null);
+    setRoomCode('');
+    setRelayStatus({ connected: false, clients: 0 });
+    patch({ missionPhase: 'BRIEFING', armaConnected: false, units: {}, contacts: {}, mapName: null });
+  }, [patch]);
+
   // Show mode select if no mode chosen
   if (!appMode) {
-    return <ModeSelect onSelect={handleModeSelect} />;
+    return <ModeSelect onSelect={handleModeSelect} savedRoomCode={state.config?.last_room_code} />;
   }
 
   return (
@@ -150,6 +161,9 @@ export default function App() {
         mode={appMode}
         roomCode={roomCode}
         relayClients={relayStatus.clients}
+        relayError={relayStatus.error}
+        relayConnecting={relayStatus.connecting}
+        onSwitchMode={handleSwitchMode}
         onMinimize={() => window.spectreAPI?.minimize()}
         onMaximize={() => window.spectreAPI?.maximize()}
         onClose={() => window.spectreAPI?.close()}

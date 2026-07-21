@@ -6,10 +6,10 @@ const PORT = process.env.PORT || 3722;
 const server = http.createServer((req, res) => {
   if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok', rooms: rooms.size }));
+    res.end(JSON.stringify({ status: 'ok', rooms: rooms.size, uptime: Math.floor(process.uptime()) }));
   } else {
-    res.writeHead(404);
-    res.end('Not found');
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('SPECTRE Relay Server');
   }
 });
 
@@ -18,9 +18,22 @@ const wss = new WebSocket.Server({ server });
 // Room structure: { host: ws, clients: Set<ws>, lastState: object }
 const rooms = new Map();
 
+// Heartbeat: ping all clients every 30s to keep connections alive (Render can drop idle connections)
+const heartbeat = setInterval(() => {
+  wss.clients.forEach(ws => {
+    if (ws.isAlive === false) return ws.terminate();
+    ws.isAlive = false;
+    try { ws.ping(); } catch {}
+  });
+}, 30000);
+
+wss.on('close', () => clearInterval(heartbeat));
+
 wss.on('connection', (ws) => {
   let roomCode = null;
   let role = null;
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
 
   ws.on('message', (raw) => {
     let msg;
@@ -119,7 +132,9 @@ wss.on('connection', (ws) => {
     }
   });
 
-  ws.on('error', () => {});
+  ws.on('error', (e) => {
+    console.error(`WebSocket error (${role || 'unknown'} in ${roomCode || 'no-room'}):`, e.message);
+  });
 });
 
 server.listen(PORT, () => {

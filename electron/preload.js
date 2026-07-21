@@ -62,4 +62,5 @@ contextBridge.exposeInMainWorld('spectreAPI', {
   relayDisconnect: () => ipcRenderer.send('relay-disconnect'),
   relayCommand: (cmd) => ipcRenderer.send('relay-command', cmd),
   onRelayStatus: (cb) => ipcRenderer.on('relay-status', (_, data) => cb(data)),
+  startHostServices: () => ipcRenderer.send('start-host-services'),
 });

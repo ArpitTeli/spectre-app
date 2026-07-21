@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 
-export default function ModeSelect({ onSelect }) {
+export default function ModeSelect({ onSelect, savedRoomCode }) {
   const [mode, setMode] = useState(null);
-  const [roomCode, setRoomCode] = useState('');
+  const [roomCode, setRoomCode] = useState(savedRoomCode || '');
   const [error, setError] = useState('');
 
   const handleHost = () => {
@@ -142,7 +142,7 @@ export default function ModeSelect({ onSelect }) {
               marginBottom: 24
             }}>
               Host mode will start the Arma 3 bridge.
-              <br />Other commanders can connect using your room code.
+              <br />A room code will be generated automatically and shown in the title bar.
             </div>
 
             <button

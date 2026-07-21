@@ -211,15 +211,18 @@ let relayConnected = false;
 let relayRoomCode = '';
 let relayMode = 'host'; // 'host' or 'client'
 let relayReconnectTimer = null;
+let relayFatalError = false; // true when server rejects (don't reconnect)
 
 function connectToRelay(mode, roomCode, url) {
   relayMode = mode;
   relayRoomCode = roomCode;
+  relayFatalError = false;
   if (relayWs) { relayWs.close(); relayWs = null; }
   if (relayReconnectTimer) { clearTimeout(relayReconnectTimer); relayReconnectTimer = null; }
 
   const relayUrl = url || RELAY_URL;
   dbg(`SPECTRE: Connecting to relay as ${mode}, room ${roomCode}, url ${relayUrl}`);
+  sendToRenderer('relay-status', { connected: false, connecting: true, mode, room: roomCode });
 
   try {
     relayWs = new WebSocket(relayUrl);
@@ -233,7 +236,6 @@ function connectToRelay(mode, roomCode, url) {
     relayConnected = true;
     dbg('SPECTRE: Relay connected, joining room...');
     relayWs.send(JSON.stringify({ type: 'join', room: roomCode, role: mode }));
-    sendToRenderer('relay-status', { connected: true, mode, room: roomCode });
   });
 
   relayWs.on('message', (raw) => {
@@ -268,15 +270,20 @@ function connectToRelay(mode, roomCode, url) {
 
     if (msg.type === 'error') {
       dbg(`SPECTRE: Relay error: ${msg.message}`);
-      sendToRenderer('relay-status', { connected: false, mode, room: roomCode, error: msg.message });
+      // Fatal errors (room taken, invalid request) — don't reconnect
+      relayFatalError = true;
+      sendToRenderer('relay-status', { connected: false, mode, room: roomCode, error: msg.message, fatal: true });
     }
   });
 
   relayWs.on('close', () => {
     relayConnected = false;
     dbg('SPECTRE: Relay disconnected');
-    sendToRenderer('relay-status', { connected: false, mode, room: roomCode });
-    scheduleReconnect(mode, roomCode, url);
+    // Don't auto-reconnect on fatal errors (server rejected us)
+    if (!relayFatalError) {
+      sendToRenderer('relay-status', { connected: false, mode, room: roomCode });
+      scheduleReconnect(mode, roomCode, url);
+    }
   });
 
   relayWs.on('error', (e) => {
@@ -350,7 +357,7 @@ body { background: #1b1b1b; color: #f5f6f7; font-family: 'Inter', system-ui, san
 <script>
 const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([4100, 4100], 2);
 L.tileLayer('https://jetelain.github.io/Arma3Map/maps/stratis/{z}/{x}/{y}.png', {
-  maxZoom: 4, maxNativeZoom: 4, tileSize: 226, maxZoom: 8
+  maxNativeZoom: 4, maxZoom: 8, tileSize: 226
 }).addTo(map);
 L.control.zoom({ position: 'topright' }).addTo(map);
 
@@ -866,18 +873,31 @@ ipcMain.on('renderer-ready', () => {
 });
 
 // ─── App ready ───────────────────────────────────────────────────────────────
+let hostServicesStarted = false;
+
 app.whenReady().then(() => {
   createWindow();
-  startBridgeWatcher();
   setupAutoUpdate();
-  startWebSocketServer();
-  tryInstallMod();
+
+  // Host-only services (bridge watcher, web viewer, mod install) are NOT
+  // started here — they start when the user selects HOST mode via IPC.
+  // This prevents errors/log-spam when running in client mode.
 
   // Load Vercel relay URL from config
   try {
     const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
     if (config.vercel_url) setVercelUrl(config.vercel_url);
   } catch (_) {}
+});
+
+// Start host-only services (called from renderer when HOST mode is selected)
+ipcMain.on('start-host-services', () => {
+  if (hostServicesStarted) return;
+  hostServicesStarted = true;
+  dbg('SPECTRE: Starting host services (bridge watcher, web viewer, mod check)');
+  startBridgeWatcher();
+  startWebSocketServer();
+  tryInstallMod();
 });
 
 app.on('window-all-closed', () => {
