@@ -529,39 +529,18 @@ function buildSQFContent(commands) {
   return lines.join('\n') + '\n';
 }
 
-function flushCommandsToMission() {
-  if (pendingCommands.length === 0) return;
-
-  const content = buildSQFContent(pendingCommands);
-
-  // PRIMARY: write to @SPECTRE\addons\ — DLL reads from addons\spectre_cmds.sqf
-  if (ARMA_INSTALL) {
-    const modPath = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
-    try {
-      fs.writeFileSync(modPath, content, 'utf8');
-      dbg(`SPECTRE: Wrote commands to ${modPath}`);
-    } catch (e) {
-      dbg(`SPECTRE: Failed to write to mod folder: ${e.message}`);
-    }
-  }
-
-  // SECONDARY: write to ARMA_DOCS (profile path)
-  if (ARMA_DOCS) {
-    try { fs.writeFileSync(path.join(ARMA_DOCS, 'spectre_cmds.sqf'), content, 'utf8'); } catch (e) { /* ignore */ }
-  }
-
-  // Fallback: write to Arma root
-  if (ARMA_INSTALL) {
-    try { fs.writeFileSync(path.join(ARMA_INSTALL, 'spectre_cmds.sqf'), content, 'utf8'); } catch (e) { /* ignore */ }
-  }
-
-  pendingCommands = [];
+// ─── Write a single command to the SQF file ───────────────────────────────────
+function writeCommandToFile(cmd) {
+  if (!ARMA_INSTALL) return;
+  try {
+    if (!cmd._id) cmd._id = Date.now() + Math.floor(Math.random() * 10000);
+    const sqf = buildSQFContent([cmd]);
+    fs.writeFileSync(path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf'), sqf, 'utf8');
+  } catch (e) { /* ignore — bridge reads last command until new one is written */ }
 }
 
 function queueCommand(cmd) {
-  const id = Date.now() + Math.floor(Math.random() * 10000);
-  pendingCommands.push({ ...cmd, _id: id });
-  flushCommandsToMission();
+  writeCommandToFile(cmd);
 }
 
 // ─── Auto-install mod to Arma 3 ──────────────────────────────────────────────
@@ -1250,9 +1229,7 @@ function getMissionFolders() {
 
 ipcMain.handle('send-command', async (_, command) => {
   try {
-    if (!ARMA_INSTALL) return { success: false, error: 'No ARMA_INSTALL' };
-    const sqf = buildSQFContent([command]);
-    fs.writeFileSync(path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf'), sqf, 'utf8');
+    writeCommandToFile(command);
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message };

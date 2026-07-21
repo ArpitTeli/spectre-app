@@ -62,6 +62,7 @@ export function useSpectreStore() {
   const timerRef = useRef(null);
   const adaptationLockRef = useRef(false);
   const lastUnitsKey = useRef('');
+  const commandModeRef = useRef('local'); // default to local for compatibility
 
   const patch = useCallback((updates) => {
     setState(prev => typeof updates === 'function' ? updates(prev) : { ...prev, ...updates });
@@ -159,7 +160,7 @@ export function useSpectreStore() {
   const sendArmaCommand = useCallback(async (command) => {
     if (!window.spectreAPI) return;
     // In client mode, send through relay instead of local bridge
-    if (stateRef.current._commandMode === 'relay') {
+    if (commandModeRef.current === 'relay') {
       window.spectreAPI.relayCommand?.(command);
       return;
     }
@@ -168,6 +169,7 @@ export function useSpectreStore() {
 
   // ── Set command mode (host=local, client=relay) ───────────────────────────
   const setCommandMode = useCallback((mode) => {
+    commandModeRef.current = mode;
     setState(prev => ({ ...prev, _commandMode: mode }));
   }, []);
 

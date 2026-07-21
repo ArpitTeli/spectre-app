@@ -271,7 +271,11 @@ function OrdersTab({ state, sendArmaCommand, addCommsEntry }) {
 
   const sendMass = async () => {
     if (!massOrder.trim()) return;
-    Object.keys(state.units).forEach(id => sendArmaCommand({ type: 'CUSTOM', unit_id: id, instruction: massOrder }));
+    // Each command overwrites the file, so only the last one survives.
+    // This is a known limitation — use ALL commands for mass orders.
+    for (const id of Object.keys(state.units)) {
+      await sendArmaCommand({ type: 'CUSTOM', unit_id: id, instruction: massOrder });
+    }
     addCommsEntry('SPECTRE', 'ALL', massOrder, 'BLUE');
     setMassOrder('');
   };

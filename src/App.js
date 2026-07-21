@@ -84,9 +84,8 @@ export default function App() {
     if (choiceId === 'WITHDRAW' || choiceId === 'CONSOLIDATE') {
       addCommsEntry('SPECTRE', 'ALL', `Executing ${choiceId}. All units comply.`, 'RED');
       if (choiceId === 'WITHDRAW') {
-        Object.values(stateRef.current.units).forEach(u => {
-          sendArmaCommand({ type: 'RTB', unit_id: u.id });
-        });
+        addCommsEntry('SPECTRE', 'ALL', 'Executing WITHDRAWAL. All units RTB.', 'RED');
+        sendArmaCommand({ type: 'RTB_ALL' });
       } else {
         sendArmaCommand({ type: 'HOLD_ALL' });
         sendArmaCommand({ type: 'WEAPONS_FREE' });
@@ -143,11 +142,12 @@ export default function App() {
   // Switch back to mode select (disconnect relay, reset mode)
   const handleSwitchMode = useCallback(() => {
     window.spectreAPI?.relayDisconnect?.();
+    setCommandMode('local');
     setAppMode(null);
     setRoomCode('');
     setRelayStatus({ connected: false, clients: 0 });
     patch({ missionPhase: 'BRIEFING', armaConnected: false, units: {}, contacts: {}, mapName: null });
-  }, [patch]);
+  }, [patch, setCommandMode]);
 
   // Show mode select if no mode chosen
   if (!appMode) {

@@ -13,14 +13,23 @@ void ensureBasePath() {
     if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
         (LPCSTR)&ensureBasePath, &hm) && hm) {
         GetModuleFileNameA(hm, dllPath, MAX_PATH);
-    } else {
+    }
+    if (dllPath[0] == 0) {
         GetModuleFileNameA(GetModuleHandleA("spectre_ext_x64.dll"), dllPath, MAX_PATH);
+    }
+    if (dllPath[0] == 0) {
+        // Last resort: try Arma install directory
+        strncpy_s(basePath, MAX_PATH, "E:\\Games\\Arma 3\\@SPECTRE\\", _TRUNCATE);
+        return;
     }
     char* spectre = strstr(dllPath, "@SPECTRE");
     if (spectre) {
         spectre += 9;
         int len = (int)(spectre - dllPath);
         strncpy_s(basePath, MAX_PATH, dllPath, len);
+    } else {
+        // Not found in path — try Arma install directory as fallback
+        strncpy_s(basePath, MAX_PATH, "E:\\Games\\Arma 3\\@SPECTRE\\", _TRUNCATE);
     }
 }
 
@@ -44,9 +53,10 @@ void readFile(const char* path, char* output, int outputSize) {
 }
 
 void stripQuotes(char* dest, const char* src, int maxLen) {
+    if (!src || !*src || maxLen <= 0) { if (maxLen > 0) dest[0] = '\0'; return; }
     const char* start = src;
     const char* end = src + strlen(src) - 1;
-    while (*start == '"' || *start == ' ') start++;
+    while (*start == '"' || *start == ' ') { if (!*start) break; start++; }
     while (end > start && (*end == '"' || *end == ' ')) end--;
     int len = (int)(end - start + 1);
     if (len < 0) len = 0;
