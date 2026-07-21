@@ -1,6 +1,6 @@
 {
   "name": "spectre-arma",
-  "version": "1.5.5",
+  "version": "1.5.6",
   "description": "SPECTRE C2 System for Arma 3",
   "main": "electron/main.js",
   "homepage": "./",
@@ -58,7 +58,7 @@
     },
     "win": {
       "target": "nsis",
-      "artifactName": "${productName}-${version}.${ext}"
+      "artifactName": "SPECTRE.C2-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
