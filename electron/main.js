@@ -535,8 +535,12 @@ function writeCommandToFile(cmd) {
   try {
     if (!cmd._id) cmd._id = Date.now() + Math.floor(Math.random() * 10000);
     const sqf = buildSQFContent([cmd]);
-    fs.writeFileSync(path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf'), sqf, 'utf8');
-  } catch (e) { /* ignore — bridge reads last command until new one is written */ }
+    const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
+    fs.writeFileSync(p, sqf, 'utf8');
+    fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} OK ${cmd.type}\n`);
+  } catch (e) {
+    try { fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} FAIL ${e.message}\n`); } catch (_) {}
+  }
 }
 
 function queueCommand(cmd) {
