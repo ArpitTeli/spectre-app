@@ -9,9 +9,9 @@ function formatTime(sec) {
 }
 
 const PHASE_LABELS = {
-  PLANNING: 'PRE-MISSION PLANNING',
-  BRIEFING: 'MISSION BRIEFING',
-  ACTIVE: 'MISSION ACTIVE',
+  PLANNING: 'PLANNING',
+  BRIEFING: 'BRIEFING',
+  ACTIVE: 'ACTIVE',
   ABORTING: 'EMERGENCY',
   AAR: 'AFTER ACTION REVIEW'
 };
@@ -21,78 +21,46 @@ export default function TitleBar({ missionPhase, missionElapsedSec, armaConnecte
     <div className="titlebar">
       <span className="titlebar__logo">SPECTRE</span>
       <div className="titlebar__divider" />
-      <span className="titlebar__phase" style={{ color: missionPhase === 'ABORTING' ? 'var(--color-red)' : undefined }}>
+      <span className={`phase-badge ${(missionPhase || '').toLowerCase()}`}>
         {PHASE_LABELS[missionPhase] || 'STANDBY'}
       </span>
-
       {missionPhase === 'ACTIVE' && (
         <>
           <div className="titlebar__divider" />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--accent)', letterSpacing: '1px' }}>
-            T+{formatTime(missionElapsedSec || 0)}
-          </span>
+          <span className="timer-display">T+{formatTime(missionElapsedSec || 0)}</span>
         </>
       )}
-
       <div className="titlebar__divider" />
       <div className="titlebar__connection">
         <div className={`titlebar__connection-dot ${armaConnected ? 'connected' : ''}`} />
-        <span style={{
-          color: relayError ? 'var(--red)' : relayConnecting ? 'var(--yellow)' : armaConnected ? 'var(--accent)' : 'var(--red)',
-          fontFamily: 'var(--font-mono)', fontSize: '10px'
-        }}>
+        <span style={{ color: relayError ? 'var(--red)' : relayConnecting ? 'var(--yellow)' : armaConnected ? 'var(--green)' : 'var(--text-muted)' }}>
           {relayError
             ? relayError.toUpperCase()
             : relayConnecting
-              ? 'CONNECTING...'
+              ? 'CONNECTING'
               : mode === 'client'
-                ? (armaConnected ? 'CONNECTED TO HOST' : 'HOST DISCONNECTED')
-                : (armaConnected ? 'ARMA LINK ACTIVE' : 'ARMA NOT CONNECTED')
+                ? (armaConnected ? 'HOST LINKED' : 'NO HOST')
+                : (armaConnected ? 'ARMA LINKED' : 'NO LINK')
           }
         </span>
       </div>
-
       {roomCode && (
         <>
           <div className="titlebar__divider" />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)' }}>
-              {mode === 'client' ? 'ROOM:' : 'HOSTING:'}
+          <span className="badge badge-primary">{mode === 'client' ? 'ROOM' : 'HOST'}: {roomCode}</span>
+          {mode === 'host' && relayClients > 0 && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-muted)' }}>
+              {relayClients} CLIENT{(relayClients !== 1 ? 'S' : '')}
             </span>
-            <span style={{
-              fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 600,
-              color: 'var(--accent)', background: 'var(--accent-dim)',
-              padding: '1px 6px', borderRadius: '3px', letterSpacing: '1px'
-            }}>
-              {roomCode}
-            </span>
-            {mode === 'host' && relayClients > 0 && (
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)' }}>
-                {relayClients} connected
-              </span>
-            )}
-          </div>
+          )}
         </>
       )}
-
       {onSwitchMode && (
         <>
           <div className="titlebar__divider" />
-          <button
-            onClick={onSwitchMode}
-            style={{
-              background: 'none', border: '1px solid var(--border-default)', borderRadius: '3px',
-              color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--font-mono)',
-              fontSize: '9px', padding: '2px 8px', letterSpacing: '1px',
-              WebkitAppRegion: 'no-drag'
-            }}
-            title="Switch mode / change room"
-          >
-            ⇄ MODE
-          </button>
+          <button className="titlebar__btn" onClick={onSwitchMode} title="Switch mode">⇄</button>
         </>
       )}
-
       <div className="titlebar__spacer" />
       <div className="titlebar__controls">
         <button className="titlebar__btn" onClick={onMinimize}>─</button>

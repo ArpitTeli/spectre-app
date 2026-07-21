@@ -29,7 +29,6 @@ SPECTRE_mapCoords set ["cola",     [-23.0, -68.0, 111000, 95000]];
 
 // ─── Global state ─────────────────────────────────────────────────────────────
 SPECTRE_blufor         = [];
-SPECTRE_executedCmds   = [];
 SPECTRE_spottedEnemies = [];
 SPECTRE_initialized    = false;
 
@@ -167,14 +166,8 @@ SPECTRE_fnc_execCmd = {
         ["_action",    ""]
     ];
 
-    if (_id in SPECTRE_executedCmds) exitWith {};
-    SPECTRE_executedCmds pushBack _id;
-    if (count SPECTRE_executedCmds > 600) then {
-        SPECTRE_executedCmds = SPECTRE_executedCmds select [300, (count SPECTRE_executedCmds) - 300];
-    };
-
     private _unit = missionNamespace getVariable [_unitId, objNull];
-    diag_log format ["SPECTRE CMD: %1 -> %2", _type, _unitId];
+    diag_log format ["SPECTRE CMD: %1 -> %2 (units=%3)", _type, _unitId, count SPECTRE_blufor];
 
     switch (_type) do {
 
@@ -387,15 +380,33 @@ SPECTRE_fnc_broadcastState = {
 };
 
 // ─── Command reader ───────────────────────────────────────────────────────────
+// Parses the command file content and executes via execCmd.
+// No call compile — uses direct parsing + function call.
 SPECTRE_fnc_readCommands = {
     private _result = "spectre_ext" callExtension ["READ", ["addons\spectre_cmds.sqf"]];
-    private _sqf = if (count _result >= 3) then { _result select 0 } else { "" };
-    if (_sqf find "ERR_" == 0) exitWith {
-        diag_log format ["SPECTRE: DLL error: %1", _sqf];
-    };
-    if (!(_sqf isEqualTo "")) then {
-        diag_log format ["SPECTRE: Executing (%1 bytes) cmdCount=%2", count _sqf, count SPECTRE_executedCmds];
-        call compile _sqf;
+    if (count _result < 3) exitWith {};
+    private _sqf = _result select 0;
+    if (_sqf isEqualTo "" || { _sqf find "ERR_" == 0 }) exitWith {};
+
+    // Content-based dedup: skip if same content as last read
+    if (_sqf == SPECTRE_lastSQF) exitWith {};
+    SPECTRE_lastSQF = _sqf;
+
+    diag_log format ["SPECTRE: CMD %1", _sqf select [0, 60]];
+
+    // Extract the argument array by finding everything before " call SPECTRE_fnc_execCmd;"
+    // Handles both: [id, "TYPE", "UID"] and: [id, "EXECUTE_ORDER", "UID", [wp,wp], "ROE", "act"]
+    private _callIdx = _sqf find " call SPECTRE_fnc_execCmd;";
+    if (_callIdx < 0) exitWith {};
+    private _argsStr = _sqf select [0, _callIdx];
+    if (_argsStr select [0, 1] != "[") exitWith {};
+
+    private _args = call compile _argsStr;
+    if (!isNil "_args" && { typeName _args == "ARRAY" }) then {
+        _args call SPECTRE_fnc_execCmd;
+        diag_log format ["SPECTRE: Executed OK: %1", _argsStr select [0, 50]];
+    } else {
+        diag_log format ["SPECTRE: Bad args: %1", _argsStr];
     };
 };
 
@@ -403,6 +414,7 @@ SPECTRE_fnc_readCommands = {
 hint "SPECTRE C2 Bridge: ACTIVE";
 diag_log "SPECTRE: Bridge running (wall-clock mode). Broadcasting every 0.5s, reading commands every 0.3s.";
 SPECTRE_initialized = true;
+SPECTRE_lastSQF = "";
 
 [] spawn {
     private _lastBroadcast = -999;

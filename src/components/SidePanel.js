@@ -15,13 +15,11 @@ export default function SidePanel({ state, patch, addCommsEntry, sendArmaCommand
         sendArmaCommand={sendArmaCommand}
         endMission={endMission}
       />
-
       <div className="side-panel__tabs">
         {['UNITS','CONTACTS','INTEL','ORDERS','GRAPH'].map(t => (
           <button key={t} className={`side-panel__tab ${activeTab === t ? 'active' : ''}`} onClick={() => setActiveTab(t)}>{t}</button>
         ))}
       </div>
-
       <div className="side-panel__content">
         {activeTab === 'UNITS'    && <UnitsTab    units={state.units}    selectedUnit={state.selectedUnit} patch={patch} sendArmaCommand={sendArmaCommand} addCommsEntry={addCommsEntry} />}
         {activeTab === 'CONTACTS' && <ContactsTab contacts={state.contacts} patch={patch} />}
@@ -33,80 +31,55 @@ export default function SidePanel({ state, patch, addCommsEntry, sendArmaCommand
   );
 }
 
-// ─── Force Metrics + Mission Controls ────────────────────────────────────────
 function ForceMetrics({ forceMetrics, missionPhase, rewardData, patch, addCommsEntry, sendArmaCommand, endMission }) {
   const fpColor = forceMetrics.firepower_index < 50 ? 'danger' : forceMetrics.firepower_index < 70 ? 'warning' : '';
-
   return (
     <div className="force-metrics">
-      <div className="force-metrics__title">Force Status</div>
+      <div className="force-metrics__title">Force</div>
       <div className="force-metrics__grid">
         <div className="metric-box">
           <div className={`metric-box__value ${fpColor}`}>{forceMetrics.firepower_index}%</div>
-          <div className="metric-box__label">Firepower</div>
+          <div className="metric-box__label">FP</div>
         </div>
         <div className="metric-box">
-          <div className="metric-box__value">{forceMetrics.vehicles_active}</div>
-          <div className="metric-box__label">Vehicles</div>
+          <div className="metric-box__value" style={{ color: 'var(--text-primary)' }}>{forceMetrics.vehicles_active}<span style={{ color: 'var(--text-muted)', fontSize: 10 }}>/{forceMetrics.vehicles_total}</span></div>
+          <div className="metric-box__label">VEH</div>
         </div>
         <div className="metric-box">
           <div className={`metric-box__value ${forceMetrics.mobility === 'LOW' ? 'danger' : ''}`}>{forceMetrics.mobility}</div>
-          <div className="metric-box__label">Mobility</div>
+          <div className="metric-box__label">MOB</div>
         </div>
         <div className="metric-box">
           <div className={`metric-box__value ${rewardData?.score < 0 ? 'danger' : ''}`}>{(rewardData?.score || 0).toFixed(0)}</div>
-          <div className="metric-box__label">Score</div>
+          <div className="metric-box__label">SCORE</div>
         </div>
       </div>
-
-      <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-        {missionPhase === 'PLANNING' && (
-          <button className="btn btn-primary" style={{ flex: 1, fontSize: '11px' }} onClick={() => {
-            addCommsEntry('SPECTRE', 'ALL', 'Mission planning initiated.', 'BLUE');
-          }}>
-            BEGIN PLANNING
-          </button>
-        )}
+      <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
         {missionPhase === 'BRIEFING' && (
           <>
-            <button className="btn" style={{ flex: 1, fontSize: '11px' }} onClick={() => patch({ missionPhase: 'PLANNING' })}>
-              BEGIN PLANNING
-            </button>
-            <button className="btn btn-success" style={{ fontSize: '11px', padding: '6px 10px' }} onClick={() => {
-              patch({ missionPhase: 'ACTIVE', missionStartTime: Date.now() });
-              addCommsEntry('SPECTRE', 'ALL', 'Mission is GO. Execute plan.', 'GREEN');
-            }}>
-              EXECUTE
-            </button>
+            <button className="btn btn-sm flex-1" onClick={() => patch({ missionPhase: 'PLANNING' })}>PLAN</button>
+            <button className="btn btn-sm btn-primary flex-1" onClick={() => { patch({ missionPhase: 'ACTIVE', missionStartTime: Date.now() }); addCommsEntry('SPECTRE', 'ALL', 'Mission GO. Execute.', 'GREEN'); }}>EXEC</button>
           </>
+        )}
+        {missionPhase === 'PLANNING' && (
+          <button className="btn btn-sm flex-1 btn-primary" onClick={() => addCommsEntry('SPECTRE', 'ALL', 'Planning phase.', 'BLUE')}>PLAN</button>
         )}
         {missionPhase === 'ACTIVE' && (
           <>
-            <button className="btn" style={{ flex: 1, fontSize: '11px' }} onClick={() => patch({ showCOAPanel: true })}>
-              COA
-            </button>
-            <button className="btn btn-success" style={{ fontSize: '11px', padding: '6px 10px' }} onClick={() => endMission(true)}>
-              OBJ
-            </button>
-            <button className="btn btn-danger" style={{ fontSize: '11px', padding: '6px 10px' }} onClick={() => endMission(false)}>
-              END
-            </button>
+            <button className="btn btn-sm flex-1" onClick={() => patch({ showCOAPanel: true })}>COA</button>
+            <button className="btn btn-sm btn-primary flex-1" onClick={() => endMission(true)}>OBJ</button>
+            <button className="btn btn-sm btn-danger" onClick={() => endMission(false)}>END</button>
           </>
         )}
-        <button className="btn" style={{ fontSize: '11px', padding: '6px 10px' }} onClick={() => patch({ showSettings: true })}>⚙</button>
+        <button className="btn btn-sm" onClick={() => patch({ showSettings: true })} style={{ fontSize: 10, padding: '3px 8px' }}>⚙</button>
       </div>
     </div>
   );
 }
 
-// ─── Units Tab ────────────────────────────────────────────────────────────────
 function UnitsTab({ units, selectedUnit, patch, sendArmaCommand, addCommsEntry }) {
   const list = Object.values(units).sort((a, b) => (a.callsign || '').localeCompare(b.callsign || ''));
-  if (list.length === 0) return (
-    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
-      No units detected.<br />Awaiting Arma connection.
-    </div>
-  );
+  if (list.length === 0) return <div className="empty-state">No units detected.<br />Awaiting Arma link.</div>;
   return (
     <div className="unit-list">
       {list.map(u => <UnitCard key={u.id} unit={u} selected={u.id === selectedUnit} onSelect={() => patch({ selectedUnit: u.id })} sendArmaCommand={sendArmaCommand} addCommsEntry={addCommsEntry} />)}
@@ -136,21 +109,19 @@ function UnitCard({ unit, selected, onSelect, sendArmaCommand, addCommsEntry }) 
         <Bar label="AMMO" value={unit.ammo   ?? 100} type="ammo" />
       </div>
       {unit.current_order && <div className="unit-card__status">▶ {unit.current_order}</div>}
-
       {selected && !dead && (
-        <div style={{ marginTop: '8px', display: 'flex', gap: '4px', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
-          <button className="btn" style={{ fontSize: '10px', padding: '3px 8px' }} onClick={() => send('HOLD')}>HOLD</button>
-          <button className="btn" style={{ fontSize: '10px', padding: '3px 8px' }} onClick={() => send('RTB')}>RTB</button>
-          <button className="btn" style={{ fontSize: '10px', padding: '3px 8px' }} onClick={() => { setShowOrder(v => !v); setOrderText(''); }}>ORDER</button>
+        <div style={{ marginTop: '6px', display: 'flex', gap: '3px', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+          <button className="btn btn-sm" onClick={() => send('HOLD')}>HOLD</button>
+          <button className="btn btn-sm" onClick={() => send('RTB')}>RTB</button>
+          <button className="btn btn-sm" onClick={() => { setShowOrder(v => !v); setOrderText(''); }}>ORDER</button>
         </div>
       )}
       {showOrder && (
-        <div style={{ marginTop: '6px' }} onClick={e => e.stopPropagation()}>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <input className="modify-input" placeholder="e.g. move to building north"
-              value={orderText} onChange={e => setOrderText(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && orderText.trim()) { send('CUSTOM', { instruction: orderText }); setOrderText(''); setShowOrder(false); } }}
-            />
+        <div style={{ marginTop: '4px' }} onClick={e => e.stopPropagation()}>
+          <div style={{ display: 'flex', gap: '3px' }}>
+            <input className="settings-field input" style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border-hairline)', borderRadius: '2px', padding: '3px 6px', color: 'var(--text-primary)', outline: 'none' }}
+              placeholder="order..." value={orderText} onChange={e => setOrderText(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && orderText.trim()) { send('CUSTOM', { instruction: orderText }); setOrderText(''); setShowOrder(false); } }} />
           </div>
         </div>
       )}
@@ -167,45 +138,32 @@ function Bar({ label, value, type }) {
       <div className="unit-bar__track">
         <div className={`unit-bar__fill ${type} ${cls}`} style={{ width: `${pct}%` }} />
       </div>
-      <span style={{ fontSize: '10px', color: 'var(--text-muted)', minWidth: '28px' }}>{pct}%</span>
+      <span style={{ fontSize: '9px', color: 'var(--text-muted)', minWidth: '24px' }}>{pct}%</span>
     </div>
   );
 }
 
-// ─── Contacts Tab ─────────────────────────────────────────────────────────────
 function ContactsTab({ contacts, patch }) {
   const list = Object.values(contacts).sort((a, b) => {
     const o = { CONFIRMED: 0, LAST_KNOWN: 1, SUSPECTED: 2 };
     return (o[a.state] || 2) - (o[b.state] || 2);
   });
-  const stateColors = { CONFIRMED: 'var(--color-hostile)', LAST_KNOWN: 'var(--color-last-known)', SUSPECTED: 'var(--color-suspected)' };
-
-  if (list.length === 0) return (
-    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>No contacts detected.</div>
-  );
-
+  if (list.length === 0) return <div className="empty-state">No contacts.</div>;
   return (
-    <div style={{ padding: '8px' }}>
+    <div className="contact-list">
       {list.map(c => (
-        <div key={c.id} style={{
-          background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)',
-          borderLeft: `3px solid ${stateColors[c.state] || 'var(--text-muted)'}`,
-          borderRadius: '3px', padding: '8px 10px', marginBottom: '4px', cursor: 'pointer'
-        }} onClick={() => patch({ selectedContact: c.id })}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-            <span style={{ fontFamily: 'var(--font-condensed)', fontWeight: 700, color: 'var(--text-bright)', fontSize: '13px' }}>{c.id}</span>
-            <span className={`intel-tag ${c.state === 'CONFIRMED' ? 'HIGH' : c.state === 'LAST_KNOWN' ? 'MEDIUM' : 'LOW'}`}>{c.state}</span>
+        <div key={c.id} className={`contact-card ${c.id === patch.selectedContact ? 'selected' : ''}`} data-confidence={c.state} onClick={() => patch({ selectedContact: c.id })}>
+          <div className="contact-card__header">
+            <span className="contact-card__type">{c.type || c.id}</span>
+            <span className={`contact-card__confidence ${(c.state || '').toLowerCase()}`}>{c.state}</span>
           </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-secondary)' }}>
-            {c.type} · {c.source} · {c.position ? `(${Math.round(c.position.x)}, ${Math.round(c.position.y)})` : 'pos unknown'}
-          </div>
+          <div className="contact-card__position">{c.position ? `(${Math.round(c.position.x)}, ${Math.round(c.position.y)})` : '? pos'} · {c.source}</div>
         </div>
       ))}
     </div>
   );
 }
 
-// ─── Intel Tab ────────────────────────────────────────────────────────────────
 function IntelTab({ intelDB, addIntel }) {
   const [input, setInput] = useState('');
   const [saved, setSaved] = useState(false);
@@ -217,12 +175,8 @@ function IntelTab({ intelDB, addIntel }) {
       : lower.includes('patrol') || lower.includes('infantry') ? 'MEDIUM' : 'LOW';
     const words = input.split(' ');
     const name = words.find(w => w.length > 3 && /^[A-Z]/.test(w) && !/^(The|An|A|Is|Enemy|Friendly|There)$/.test(w)) || 'Unknown';
-
     addIntel('location', {
-      name,
-      raw_intel: input,
-      confidence: 'PLAYER_REPORTED',
-      threat_level: threat,
+      name, raw_intel: input, confidence: 'PLAYER_REPORTED', threat_level: threat,
       timestamp: new Date().toISOString(),
       observations: [{ text: input, timestamp: new Date().toISOString(), source: 'COMMANDER' }]
     });
@@ -232,47 +186,39 @@ function IntelTab({ intelDB, addIntel }) {
   };
 
   return (
-    <div style={{ padding: '10px' }}>
-      <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-accent)', borderRadius: '4px', padding: '10px', marginBottom: '12px' }}>
-        <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '2px', marginBottom: '8px' }}>REPORT INTELLIGENCE</div>
-        <textarea className="planning-input" rows={3}
-          placeholder={'e.g. "Firna is an enemy stronghold with 2 IFVs"\n"Enemy patrol on eastern road every 10 min"'}
+    <div className="intel-list">
+      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+        <div className="panel-section__title" style={{ marginBottom: '6px' }}>Report Intel</div>
+        <textarea className="sidebar-input" rows={2}
+          placeholder={'e.g. "Firna is enemy stronghold with IFVs"' }
           value={input} onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) submit(); }}
+          style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-hairline)', borderRadius: '2px', padding: '4px 8px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '10px', outline: 'none', resize: 'vertical' }}
         />
-        <button className={`btn ${saved ? 'btn-success' : 'btn-primary'}`} style={{ marginTop: '6px', width: '100%', fontSize: '11px' }} onClick={submit}>
-          {saved ? 'INTEL LOGGED' : 'LOG INTELLIGENCE'}
+        <button className={`btn btn-sm ${saved ? 'btn-primary' : ''}`} style={{ marginTop: '4px', width: '100%' }} onClick={submit}>
+          {saved ? 'LOGGED' : 'LOG INTEL'}
         </button>
       </div>
-
-      <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '2px', marginBottom: '8px' }}>
-        DATABASE ({(intelDB?.locations || []).length} locations · {(intelDB?.patterns || []).length} patterns)
-      </div>
-
+      <div className="panel-section__title" style={{ marginBottom: '6px' }}>Database · {(intelDB?.locations || []).length} loc {(intelDB?.patterns || []).length} pat</div>
       {(intelDB?.locations || []).map((loc, i) => (
-        <div key={i} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '3px', padding: '8px 10px', marginBottom: '4px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-            <span style={{ fontFamily: 'var(--font-condensed)', fontWeight: 700, color: 'var(--text-bright)', fontSize: '13px' }}>{loc.name}</span>
-            <span className={`intel-tag ${loc.threat_level || 'MEDIUM'}`}>{loc.threat_level || 'MEDIUM'}</span>
+        <div key={i} className="intel-item">
+          <div className="intel-item__header">
+            <span className="intel-item__type">{loc.name}</span>
+            <span className="intel-item__time">{loc.threat_level || 'MED'}</span>
           </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-secondary)' }}>
-            {(loc.observations || []).length} obs · {loc.confidence}
-          </div>
-          {loc.raw_intel && <div style={{ fontFamily: 'var(--font-body)', fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>"{loc.raw_intel}"</div>}
+          <div className="intel-item__content">{(loc.observations || []).length} obs · {loc.confidence}</div>
+          {loc.raw_intel && <div style={{ color: 'var(--text-muted)', marginTop: '4px', fontSize: '9px', fontStyle: 'italic' }}>"{loc.raw_intel}"</div>}
         </div>
       ))}
     </div>
   );
 }
 
-// ─── Orders Tab ───────────────────────────────────────────────────────────────
 function OrdersTab({ state, sendArmaCommand, addCommsEntry }) {
   const [massOrder, setMassOrder] = useState('');
 
   const sendMass = async () => {
     if (!massOrder.trim()) return;
-    // Each command overwrites the file, so only the last one survives.
-    // This is a known limitation — use ALL commands for mass orders.
     for (const id of Object.keys(state.units)) {
       await sendArmaCommand({ type: 'CUSTOM', unit_id: id, instruction: massOrder });
     }
@@ -290,17 +236,17 @@ function OrdersTab({ state, sendArmaCommand, addCommsEntry }) {
   ];
 
   return (
-    <div style={{ padding: '10px' }}>
-      <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '2px', marginBottom: '10px' }}>ALL UNITS ORDER</div>
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
-        <input className="modify-input" placeholder="Order for all units..."
-          value={massOrder} onChange={e => setMassOrder(e.target.value)}
+    <div className="orders-section">
+      <div className="orders-section__title">All Units</div>
+      <div style={{ display: 'flex', gap: '4px' }}>
+        <input className="sidebar-input" style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border-hairline)', borderRadius: '2px', padding: '4px 8px', color: 'var(--text-primary)', outline: 'none' }}
+          placeholder="Custom order..." value={massOrder} onChange={e => setMassOrder(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && sendMass()} />
-        <button className="btn btn-primary" onClick={sendMass}>SEND</button>
+        <button className="btn btn-sm btn-primary" onClick={sendMass}>SEND</button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+      <div className="orders-actions">
         {CMDS.map(cmd => (
-          <button key={cmd.type} className="btn" style={{ fontSize: '11px' }}
+          <button key={cmd.type} className={`order-btn ${cmd.type === 'WEAPONS_FREE' ? 'danger' : cmd.type === 'WEAPONS_SAFE' ? 'primary' : ''}`}
             onClick={async () => { await sendArmaCommand({ type: cmd.type }); addCommsEntry('SPECTRE', 'ALL', cmd.label, 'BLUE'); }}>
             {cmd.label}
           </button>
