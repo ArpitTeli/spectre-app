@@ -1036,7 +1036,7 @@ function watchArmaLog() {
 }
 
 // Accumulator for multi-line state
-let pendingState = { units: {}, contacts: {}, events: [], mapName: null, missionFolder: null, timestamp: 0 };
+let pendingState = { units: {}, contacts: {}, events: [], mapName: null, missionFolder: null, fullMissionPath: null, timestamp: 0 };
 
 function parseArmaLog(chunk) {
   const lines = chunk.split('\n');
@@ -1133,7 +1133,7 @@ function parseArmaLog(chunk) {
     dbg(`SPECTRE: FLUSH — units: ${data.units.length}, map: ${data.mapName}`);
     data.units.forEach(u => dbg(`  UNIT: id=${u.id}, pos=${JSON.stringify(u.position)}, hp=${u.health}`));
 
-    if (data.missionFolder) autoSetMissionFolder(data.missionFolder);
+        if (data.missionFolder) autoSetMissionFolder(data.missionFolder, data.fullMissionPath || '');
     sendToRenderer('arma-state-update', data);
     broadcastToWebClients(data);
     postToVercel(data);
@@ -1179,8 +1179,9 @@ function expandLegacyState(raw) {
 
 // Auto-set mission folder from bridge's getMissionPath broadcast
 let lastAutoSet = '';
+let lastFullAutoSet = '';
 function autoSetMissionFolder(missionPath, fullPath) {
-  if (!missionPath || missionPath === lastAutoSet) return;
+  if (!missionPath || (missionPath === lastAutoSet && fullPath === lastFullAutoSet)) return;
   lastAutoSet = missionPath;
 
   // Use full absolute path if available and valid
