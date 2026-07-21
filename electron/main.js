@@ -1249,17 +1249,25 @@ function getMissionFolders() {
 // ─── IPC Handlers ────────────────────────────────────────────────────────────
 
 ipcMain.handle('send-command', async (_, command) => {
-  try {
-    const content = buildSQFContent([command]);
-    // Write directly to @SPECTRE\addons\ (bypasses queueCommand/pendingCommands)
-    const modPath = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
-    fs.writeFileSync(modPath, content, 'utf8');
-    dbg(`SPECTRE: CMD ${command.type} written to ${modPath}`);
-    return { success: true };
-  } catch (e) {
-    dbg(`SPECTRE: CMD write failed: ${e.message}`);
-    return { success: false, error: e.message };
+  const content = buildSQFContent([command]);
+  const modPath = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
+  // Retry up to 10 times in case DLL has file open momentarily
+  for (let i = 0; i < 10; i++) {
+    try {
+      fs.writeFileSync(modPath, content, 'utf8');
+      dbg(`SPECTRE: CMD ${command.type} written`);
+      return { success: true };
+    } catch (e) {
+      if (i < 9 && e.code === 'EBUSY') {
+        // DLL has file open — wait 50ms and retry
+        await new Promise(r => setTimeout(r, 50));
+        continue;
+      }
+      dbg(`SPECTRE: CMD write failed: ${e.message}`);
+      return { success: false, error: e.message };
+    }
   }
+  return { success: false, error: 'Max retries' };
 });
 
 ipcMain.handle('get-config', async () => {
