@@ -553,9 +553,9 @@ function flushCommandsToMission() {
     dbg(`SPECTRE: Failed to write commands: ${e.message}`);
   }
 
-  // Primary: write to Arma root as spectre_cmds.sqf (must match bridge's loadFile target)
+  // Primary: write to Arma root as spectre_to_arma.sqf (must match bridge's loadFile target)
   if (ARMA_INSTALL) {
-    const armaCmds = path.join(ARMA_INSTALL, 'spectre_cmds.sqf');
+    const armaCmds = path.join(ARMA_INSTALL, 'spectre_to_arma.sqf');
     try { fs.writeFileSync(armaCmds, content, 'utf8'); } catch (e) { /* ignore */ }
   }
 
