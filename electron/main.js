@@ -849,6 +849,28 @@ function setupAutoUpdate() {
 }
 
 // When renderer is ready, check for updates and send any pending state
+let updateCheckDone = false;
+
+function doUpdateCheck() {
+  if (updateCheckDone) return;
+  updateCheckDone = true;
+  console.log('SPECTRE: Starting update check...');
+  dbg('SPECTRE: Starting update check from GitHub releases');
+  try {
+    const { autoUpdater } = require('electron-updater');
+    autoUpdater.checkForUpdates().then((result) => {
+      console.log('SPECTRE: Update check result:', result?.updateInfo?.version || 'none');
+      dbg(`SPECTRE: Update check complete — latest: ${result?.updateInfo?.version || 'none'}, current: ${app.getVersion()}`);
+    }).catch((err) => {
+      console.error('SPECTRE: Update check failed:', err.message);
+      dbg(`SPECTRE: Update check failed: ${err.message}`);
+    });
+  } catch (err) {
+    console.error('SPECTRE: Update check error:', err.message);
+    dbg(`SPECTRE: Update check error: ${err.message}`);
+  }
+}
+
 ipcMain.on('renderer-ready', () => {
   console.log('SPECTRE: Renderer ready, checking for updates...');
 
@@ -859,17 +881,20 @@ ipcMain.on('renderer-ready', () => {
     sendToRenderer('update-available', updateInfo);
   }
 
-  // Start the update check
-  try {
-    const { autoUpdater } = require('electron-updater');
-    autoUpdater.checkForUpdates().then((result) => {
-      console.log('SPECTRE: Update check result:', result?.updateInfo?.version || 'none');
-    }).catch((err) => {
-      console.error('SPECTRE: Update check failed:', err.message);
-    });
-  } catch (err) {
-    console.error('SPECTRE: Update check error:', err.message);
-  }
+  doUpdateCheck();
+});
+
+// Fallback: if renderer-ready never arrives (e.g. React app crashes),
+// check anyway after 30 seconds
+setTimeout(() => {
+  console.log('SPECTRE: Fallback update check timer fired');
+  doUpdateCheck();
+}, 30000);
+
+// Manual check from renderer
+ipcMain.on('check-for-updates', () => {
+  updateCheckDone = false;
+  doUpdateCheck();
 });
 
 // ─── App ready ───────────────────────────────────────────────────────────────

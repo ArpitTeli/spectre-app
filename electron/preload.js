@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld('spectreAPI', {
   // ── Auto-update ───────────────────────────────────────────────────────────
   onUpdateAvailable:  (cb) => ipcRenderer.on('update-available',  (_, info) => cb(info)),
   onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', (_, info) => cb(info)),
+  checkForUpdates:   ()   => ipcRenderer.send('check-for-updates'),
 
   // ── Window controls ───────────────────────────────────────────────────────
   minimize: () => ipcRenderer.send('minimize-window'),
