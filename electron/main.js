@@ -544,28 +544,28 @@ function flushCommandsToMission() {
   }
 
   const content = buildSQFContent(pendingCommands);
-  const outPath = path.join(missionFolder, 'spectre_cmds.sqf');
 
-  try {
-    fs.writeFileSync(outPath, content, 'utf8');
-    dbg(`SPECTRE: Wrote ${pendingCommands.length} command(s) to ${outPath}`);
-  } catch (e) {
-    dbg(`SPECTRE: Failed to write commands: ${e.message}`);
-  }
-
-  // CRITICAL: Also write to ARMA_INSTALL\Missions\<mission_name>\ 
-  // When playing from Scenarios, loadFile searches THIS folder
-  if (ARMA_INSTALL && pendingState.missionFolder) {
-    const missionInArma = path.join(ARMA_INSTALL, pendingState.missionFolder);
-    try {
-      fs.writeFileSync(path.join(missionInArma, 'spectre_cmds.sqf'), content, 'utf8');
-      dbg(`SPECTRE: Also wrote to Arma Missions: ${missionInArma}`);
-    } catch (e) { /* ignore */ }
-  }
-
-  // Also write to Arma root as fallback
+  // PRIMARY: write to Arma root (never locked by loadFile)
   if (ARMA_INSTALL) {
-    try { fs.writeFileSync(path.join(ARMA_INSTALL, 'spectre_cmds.sqf'), content, 'utf8'); } catch (e) { /* ignore */ }
+    const armaRootPath = path.join(ARMA_INSTALL, 'spectre_cmds.sqf');
+    try {
+      fs.writeFileSync(armaRootPath, content, 'utf8');
+      dbg(`SPECTRE: Wrote commands to ${armaRootPath}`);
+    } catch (e) {
+      dbg(`SPECTRE: Failed to write to Arma root: ${e.message}`);
+    }
+  }
+
+  // SECONDARY: try mission folder from config (may be locked by loadFile)
+  let cfg;
+  try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch (_) {}
+  if (cfg?.mission_folder_path && fs.existsSync(cfg.mission_folder_path)) {
+    try { fs.writeFileSync(path.join(cfg.mission_folder_path, 'spectre_cmds.sqf'), content, 'utf8'); } catch (e) {}
+  }
+
+  // TERTIARY: try from bridge broadcast (may be locked)
+  if (ARMA_INSTALL && pendingState.missionFolder) {
+    try { fs.writeFileSync(path.join(ARMA_INSTALL, pendingState.missionFolder, 'spectre_cmds.sqf'), content, 'utf8'); } catch (e) {}
   }
 
   pendingCommands = [];
