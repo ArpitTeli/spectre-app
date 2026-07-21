@@ -174,8 +174,11 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
   const [browsing, setBrowsing]     = useState(false);
   const [modStatus, setModStatus]   = useState({});
   const [installing, setInstalling] = useState('');
+  const [livePaths, setLivePaths]   = useState(null);
 
   useEffect(() => {
+    // Refresh bridge paths on every settings open
+    window.spectreAPI?.getPaths?.().then(setLivePaths);
     window.spectreAPI?.getArmaInfo?.().then(info => {
       if (info?.installPath) setArmaPath(info.installPath);
     });
@@ -473,8 +476,9 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
               BRIDGE DIAGNOSTICS
             </div>
             {[
-              ['Arma log', bridgePaths.arma_log_watched],
-              ['Commands file', bridgePaths.spectre_to_arma],
+              ['Arma log', (livePaths || bridgePaths)?.arma_log_watched],
+              ['Commands file', (livePaths || bridgePaths)?.spectre_to_arma],
+              ['Web viewer', (livePaths || bridgePaths)?.web_viewer_url + ' (' + ((livePaths || bridgePaths)?.ws_clients || 0) + ' clients)'],
             ].map(([label, val]) => (
               <div key={label} style={{ display: 'flex', gap: '8px', marginBottom: '3px', fontFamily: 'var(--font-mono)', fontSize: '10px' }}>
                 <span style={{ color: 'var(--text-muted)', minWidth: '90px' }}>{label}:</span>
