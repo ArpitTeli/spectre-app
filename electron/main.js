@@ -556,21 +556,26 @@ function flushCommandsToMission() {
     dbg(`SPECTRE: Failed to write commands: ${e.message}`);
   }
 
-  // Also write to @SPECTRE mod folder (Arma always reads from addons)
+  // Primary: write to Arma root as spectre_cmds.sqf (no @ in path, clean)
   if (ARMA_INSTALL) {
-    const modPath = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_commands.sqf');
+    const armaCmds = path.join(ARMA_INSTALL, 'spectre_cmds.sqf');
     try {
-      fs.writeFileSync(modPath, content, 'utf8');
-      dbg(`SPECTRE: Wrote commands to mod folder: ${modPath}`);
+      fs.writeFileSync(armaCmds, content, 'utf8');
+      dbg(`SPECTRE: Wrote commands to ${armaCmds}`);
     } catch (e) { /* ignore */ }
   }
 
-  // Also write to Arma root and AppData as fallbacks
-  const targets = [];
-  if (ARMA_INSTALL) targets.push(path.join(ARMA_INSTALL, 'spectre_to_arma.sqf'));
+  // Secondary: also write to @SPECTRE mod folder and other locations as fallback
+  const fallbacks = [];
+  if (ARMA_INSTALL) {
+    fallbacks.push(path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_commands.sqf'));
+    fallbacks.push(path.join(ARMA_INSTALL, 'spectre_to_arma.sqf'));
+  }
   const localAppData = process.env.LOCALAPPDATA || '';
-  if (localAppData) targets.push(path.join(localAppData, 'Arma 3', 'spectre_to_arma.sqf'));
-  for (const t of targets) {
+  if (localAppData) {
+    fallbacks.push(path.join(localAppData, 'Arma 3', 'spectre_to_arma.sqf'));
+  }
+  for (const t of fallbacks) {
     try { fs.writeFileSync(t, content, 'utf8'); } catch (e) { /* ignore */ }
   }
 

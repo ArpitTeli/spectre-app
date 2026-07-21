@@ -388,16 +388,23 @@ SPECTRE_fnc_broadcastState = {
 
 // ─── Command reader ───────────────────────────────────────────────────────────
 SPECTRE_fnc_readCommands = {
-    // Commands file is in @SPECTRE\addons\. Path must start with \
-    // for preprocessFileLineNumbers to search from Arma root (game dir).
-    // Without \, it searches the mission folder — wrong location.
-    private _cmdPath = "\@SPECTRE\addons\spectre_commands.sqf";
-    if (fileExists _cmdPath) then {
-        private _sqf = preprocessFileLineNumbers _cmdPath;
-        if (!(_sqf isEqualTo "")) then {
-            diag_log format ["SPECTRE: Executing command (%1 bytes)", count _sqf];
-            call compile _sqf;
+    private _sqf = "";
+    
+    // Try paths from most specific to most general
+    private _paths = [
+        "\spectre_cmds.sqf",                               // Arma root (no @ in path)
+        "\@SPECTRE\addons\spectre_commands.sqf"             // Mod folder
+    ];
+    
+    {
+        if (fileExists _x) exitWith {
+            _sqf = preprocessFileLineNumbers _x;
         };
+    } forEach _paths;
+    
+    if (!(_sqf isEqualTo "")) then {
+        diag_log format ["SPECTRE: Executing command (%1 bytes)", count _sqf];
+        call compile _sqf;
     };
 };
 
