@@ -1051,6 +1051,8 @@ function parseArmaLog(chunk) {
         const meta = JSON.parse(jsonStr);
         if (meta.map) pendingState.mapName = meta.map;
         if (meta.mf) pendingState.missionFolder = meta.mf;
+        // Full absolute path (added for folder-based mission support)
+        if (meta.path) pendingState.fullMissionPath = meta.path;
         if (meta.ts) pendingState.timestamp = meta.ts;
         gotData = true;
       } catch (e) { dbg('SPECTRE: meta parse error: ' + e.message); }
@@ -1105,7 +1107,7 @@ function parseArmaLog(chunk) {
         const jsonStr = stateMatch[1].replace(/""/g, '"');
         const raw = JSON.parse(jsonStr);
         const data = expandLegacyState(raw);
-        if (data.missionFolder) autoSetMissionFolder(data.missionFolder);
+    if (data.missionFolder) autoSetMissionFolder(data.missionFolder, data.fullMissionPath);
         sendToRenderer('arma-state-update', data);
         broadcastToWebClients(data);
         postToVercel(data);
@@ -1121,6 +1123,7 @@ function parseArmaLog(chunk) {
   if (gotData && (Object.keys(pendingState.units).length > 0 || pendingState.mapName)) {
     const data = {
       missionFolder: pendingState.missionFolder || '',
+      fullMissionPath: pendingState.fullMissionPath || '',
       mapName: pendingState.mapName || '',
       timestamp: pendingState.timestamp,
       units: Object.values(pendingState.units),
@@ -1176,23 +1179,29 @@ function expandLegacyState(raw) {
 
 // Auto-set mission folder from bridge's getMissionPath broadcast
 let lastAutoSet = '';
-function autoSetMissionFolder(missionPath) {
+function autoSetMissionFolder(missionPath, fullPath) {
   if (!missionPath || missionPath === lastAutoSet) return;
   lastAutoSet = missionPath;
 
-  // Normalize path
-  let normalized = missionPath.replace(/\/$/, '').replace(/\//g, '\\');
+  // Use full absolute path if available and valid
+  let normalized = (fullPath || '').replace(/\/$/, '').replace(/\//g, '\\');
 
-  // If path is relative (no drive letter), resolve against Arma docs/missions folder
-  if (normalized && !normalized.match(/^[A-Z]:\\/i)) {
-    // The bridge sends the last 2 segments of the mission path (e.g., "missions\\MissionName.Island")
-    // These are relative to the Arma documents folder
+  // If full path is valid (starts with drive letter and folder exists), use it directly
+  if (normalized && normalized.match(/^[A-Z]:\\/i) && fs.existsSync(normalized)) {
+    // Good - use the absolute path directly
+  } else if (normalized && !normalized.match(/^[A-Z]:\\/i)) {
+    // Relative path — resolve against Arma documents folder
     normalized = path.join(ARMA_DOCS, normalized);
+  } else {
+    // Fallback: use missionFolder (short path) resolved against ARMA_DOCS
+    normalized = missionPath.replace(/\/$/, '').replace(/\//g, '\\');
+    if (!normalized.match(/^[A-Z]:\\/i)) {
+      normalized = path.join(ARMA_DOCS, normalized);
+    }
   }
 
   if (!fs.existsSync(normalized)) {
-    console.warn('SPECTRE: mission folder not found:', normalized);
-    dbg(`SPECTRE: auto-detect mission path failed: ${normalized} does not exist`);
+    dbg(`SPECTRE: Mission folder not found at: ${normalized}`);
     return;
   }
 

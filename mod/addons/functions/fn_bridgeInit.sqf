@@ -351,15 +351,15 @@ SPECTRE_fnc_broadcastState = {
     private _mapName = worldName;
     private _mp = getMissionPath "";
     private _mf = "";
-    if (count _mp > 0) then {
-        private _clean = _mp regexReplace ["\\\\$", ""];
-        private _parts = _clean splitString "\\";
+    private _fullPath = (_mp regexReplace ["\\\\$", ""]); // full path without trailing backslash
+    if (count _fullPath > 0) then {
+        private _parts = _fullPath splitString "\\";
         private _cnt = count _parts;
         if (_cnt >= 2) then {
             _mf = format ["%1\\%2", _parts select (_cnt - 2), _parts select (_cnt - 1)];
-        } else { _mf = _mp; };
+        } else { _mf = _fullPath; };
     };
-    diag_log format ["SPECTRE_META:{""map"":""%1"",""mf"":""%2"",""ts"":%3}", _mapName, _mf regexReplace ["\\", "\\\\"], _ts];
+    diag_log format ["SPECTRE_META:{""map"":""%1"",""mf"":""%2"",""path"":""%3"",""ts"":%4}", _mapName, _mf regexReplace ["\\", "\\\\"], _fullPath regexReplace ["\\", "\\\\"], _ts];
 
     // Send each unit on its own line (well under 1024 char RPT limit)
     {
@@ -388,22 +388,10 @@ SPECTRE_fnc_broadcastState = {
 
 // ─── Command reader ───────────────────────────────────────────────────────────
 SPECTRE_fnc_readCommands = {
-    // Find Arma root from our own PBO path
-    private _myPath = __FILE__;
-    // _myPath looks like: "E:\Games\Arma 3\@SPECTRE\addons\spectre_bridge.pbo\functions\fn_bridgeInit.sqf"
-    // Strip to get Arma root: find position of "@SPECTRE" and take everything before it
-    private _idx = _myPath find "@SPECTRE";
-    private _armaRoot = if (_idx > 0) then { _myPath select [0, _idx] } else { "" };
-    
-    // Build absolute path to command file
-    private _sqfPath = _armaRoot + "spectre_to_arma.sqf";
-    
-    if (_armaRoot != "" && { fileExists _sqfPath }) then {
-        private _sqf = preprocessFileLineNumbers _sqfPath;
-        if (!(_sqf isEqualTo "")) then {
-            diag_log format ["SPECTRE: Executing command (%1 bytes)", count _sqf];
-            call compile _sqf;
-        };
+    private _sqf = loadFile "spectre_to_arma.sqf";
+    if (!(_sqf isEqualTo "")) then {
+        diag_log format ["SPECTRE: Executing command (%1 bytes)", count _sqf];
+        call compile _sqf;
     };
 };
 
