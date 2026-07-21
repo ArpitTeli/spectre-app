@@ -388,7 +388,7 @@ SPECTRE_fnc_broadcastState = {
 
 // ─── Command reader ───────────────────────────────────────────────────────────
 SPECTRE_fnc_readCommands = {
-    private _sqf = loadFile "spectre_to_arma.sqf";
+    private _sqf = loadFile "spectre_cmds.sqf";
     if (!(_sqf isEqualTo "")) then {
         diag_log format ["SPECTRE: Executing command (%1 bytes)", count _sqf];
         call compile _sqf;

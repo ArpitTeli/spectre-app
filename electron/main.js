@@ -544,7 +544,7 @@ function flushCommandsToMission() {
   }
 
   const content = buildSQFContent(pendingCommands);
-  const outPath = path.join(missionFolder, 'spectre_to_arma.sqf');
+  const outPath = path.join(missionFolder, 'spectre_cmds.sqf');
 
   try {
     fs.writeFileSync(outPath, content, 'utf8');
@@ -553,30 +553,19 @@ function flushCommandsToMission() {
     dbg(`SPECTRE: Failed to write commands: ${e.message}`);
   }
 
-  // Primary: write to Arma root as spectre_to_arma.sqf (must match bridge's loadFile target)
-  if (ARMA_INSTALL) {
-    const armaCmds = path.join(ARMA_INSTALL, 'spectre_to_arma.sqf');
-    try { fs.writeFileSync(armaCmds, content, 'utf8'); } catch (e) { /* ignore */ }
-  }
-
   // CRITICAL: Also write to ARMA_INSTALL\Missions\<mission_name>\ 
-  // When playing from Scenarios, loadFile searches THIS folder, not Documents
+  // When playing from Scenarios, loadFile searches THIS folder
   if (ARMA_INSTALL && pendingState.missionFolder) {
     const missionInArma = path.join(ARMA_INSTALL, pendingState.missionFolder);
     try {
-      fs.writeFileSync(path.join(missionInArma, 'spectre_to_arma.sqf'), content, 'utf8');
+      fs.writeFileSync(path.join(missionInArma, 'spectre_cmds.sqf'), content, 'utf8');
       dbg(`SPECTRE: Also wrote to Arma Missions: ${missionInArma}`);
-    } catch (e) { /* ignore — folder might not exist */ }
+    } catch (e) { /* ignore */ }
   }
 
-  // Secondary fallbacks
-  const fallbacks = [];
-  const localAppData = process.env.LOCALAPPDATA || '';
-  if (localAppData) {
-    fallbacks.push(path.join(localAppData, 'Arma 3', 'spectre_to_arma.sqf'));
-  }
-  for (const t of fallbacks) {
-    try { fs.writeFileSync(t, content, 'utf8'); } catch (e) { /* ignore */ }
+  // Also write to Arma root as fallback
+  if (ARMA_INSTALL) {
+    try { fs.writeFileSync(path.join(ARMA_INSTALL, 'spectre_cmds.sqf'), content, 'utf8'); } catch (e) { /* ignore */ }
   }
 
   pendingCommands = [];
