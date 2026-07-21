@@ -534,34 +534,25 @@ function flushCommandsToMission() {
 
   const content = buildSQFContent(pendingCommands);
 
-  // PRIMARY: write to ARMA_DOCS — matches $profile: prefix in bridge readCommands
-  // This directory is never locked by Arma because it's not the mission folder
-  if (ARMA_DOCS) {
-    const profilePath = path.join(ARMA_DOCS, 'spectre_cmds.sqf');
+  // PRIMARY: write to @SPECTRE\addons\ — DLL reads from addons\spectre_cmds.sqf
+  if (ARMA_INSTALL) {
+    const modPath = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
     try {
-      fs.writeFileSync(profilePath, content, 'utf8');
-      dbg(`SPECTRE: Wrote commands to ${profilePath}`);
+      fs.writeFileSync(modPath, content, 'utf8');
+      dbg(`SPECTRE: Wrote commands to ${modPath}`);
     } catch (e) {
-      dbg(`SPECTRE: Failed to write to profile: ${e.message}`);
+      dbg(`SPECTRE: Failed to write to mod folder: ${e.message}`);
     }
   }
 
-  // SECONDARY: write to Arma root as additional fallback
-  if (ARMA_INSTALL) {
-    const armaRootPath = path.join(ARMA_INSTALL, 'spectre_cmds.sqf');
-    try {
-      fs.writeFileSync(armaRootPath, content, 'utf8');
-    } catch (e) { /* ignore */ }
+  // SECONDARY: write to ARMA_DOCS (profile path)
+  if (ARMA_DOCS) {
+    try { fs.writeFileSync(path.join(ARMA_DOCS, 'spectre_cmds.sqf'), content, 'utf8'); } catch (e) { /* ignore */ }
   }
 
-  // TERTIARY: try mission folder (may be locked — silently ignore errors)
-  let cfg;
-  try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch (_) {}
-  if (cfg?.mission_folder_path && fs.existsSync(cfg.mission_folder_path)) {
-    try { fs.writeFileSync(path.join(cfg.mission_folder_path, 'spectre_cmds.sqf'), content, 'utf8'); } catch (e) {}
-  }
-  if (ARMA_INSTALL && pendingState.missionFolder) {
-    try { fs.writeFileSync(path.join(ARMA_INSTALL, pendingState.missionFolder, 'spectre_cmds.sqf'), content, 'utf8'); } catch (e) {}
+  // Fallback: write to Arma root
+  if (ARMA_INSTALL) {
+    try { fs.writeFileSync(path.join(ARMA_INSTALL, 'spectre_cmds.sqf'), content, 'utf8'); } catch (e) { /* ignore */ }
   }
 
   pendingCommands = [];

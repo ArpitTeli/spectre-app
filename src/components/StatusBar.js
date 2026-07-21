@@ -91,7 +91,7 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
         ◈ COMMS
       </button>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '2px', marginLeft: '10px' }}>
-        SPECTRE C2 v1.5.15
+        SPECTRE C2 v1.6.0
       </div>
     </div>
   );

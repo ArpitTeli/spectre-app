@@ -388,8 +388,9 @@ SPECTRE_fnc_broadcastState = {
 
 // ─── Command reader ───────────────────────────────────────────────────────────
 SPECTRE_fnc_readCommands = {
-    // $profile: resolves to Documents\Arma 3 - same as ARMA_DOCS on Electron side
-    private _sqf = preprocessFileLineNumbers "$profile:spectre_cmds.sqf";
+    private _result = "spectre_ext" callExtension ["READ", ["addons\spectre_cmds.sqf"]];
+    if (isNil "_result" || { _result isEqualTo [] } || { (_result select 1) <= 0 }) exitWith {};
+    private _sqf = _result select 0;
     if (!(_sqf isEqualTo "")) then {
         diag_log format ["SPECTRE: Executing command (%1 bytes)", count _sqf];
         call compile _sqf;

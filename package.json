@@ -1,6 +1,6 @@
 {
   "name": "spectre-arma",
-  "version": "1.5.15",
+  "version": "1.6.0",
   "description": "SPECTRE C2 System for Arma 3",
   "main": "electron/main.js",
   "homepage": "./",
