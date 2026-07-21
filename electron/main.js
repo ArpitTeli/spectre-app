@@ -559,21 +559,21 @@ function flushCommandsToMission() {
     try { fs.writeFileSync(armaCmds, content, 'utf8'); } catch (e) { /* ignore */ }
   }
 
-  // Secondary: also write to @SPECTRE mod folder and other locations as fallback
-  const fallbacks = [];
-  if (ARMA_INSTALL) {
-    fallbacks.push(path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_commands.sqf'));
-    fallbacks.push(path.join(ARMA_INSTALL, 'spectre_to_arma.sqf'));
+  // CRITICAL: Also write to ARMA_INSTALL\Missions\<mission_name>\ 
+  // When playing from Scenarios, loadFile searches THIS folder, not Documents
+  if (ARMA_INSTALL && pendingState.missionFolder) {
+    const missionInArma = path.join(ARMA_INSTALL, pendingState.missionFolder);
+    try {
+      fs.writeFileSync(path.join(missionInArma, 'spectre_to_arma.sqf'), content, 'utf8');
+      dbg(`SPECTRE: Also wrote to Arma Missions: ${missionInArma}`);
+    } catch (e) { /* ignore — folder might not exist */ }
   }
+
+  // Secondary fallbacks
+  const fallbacks = [];
   const localAppData = process.env.LOCALAPPDATA || '';
   if (localAppData) {
     fallbacks.push(path.join(localAppData, 'Arma 3', 'spectre_to_arma.sqf'));
-  }
-  // Also write to both possible Documents locations (regular + OneDrive)
-  const docs = process.env.USERPROFILE || '';
-  if (docs) {
-    fallbacks.push(path.join(docs, 'Documents', 'Arma 3', 'missions', 'SPECTRETEST2.Stratis', 'spectre_to_arma.sqf'));
-    fallbacks.push(path.join(docs, 'OneDrive', 'Documents', 'Arma 3', 'missions', 'SPECTRETEST2.Stratis', 'spectre_to_arma.sqf'));
   }
   for (const t of fallbacks) {
     try { fs.writeFileSync(t, content, 'utf8'); } catch (e) { /* ignore */ }
