@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld('spectreAPI', {
   onArmaEvent:  (cb) => ipcRenderer.on('arma-event',        (_, data) => cb(data)),
 
   // ── Commands to Arma ─────────────────────────────────────────────────────
-  sendCommand: (cmd) => ipcRenderer.invoke('send-command', cmd),
+  sendCommand: (cmd) => ipcRenderer.send('send-command', cmd),
 
   // ── Config ────────────────────────────────────────────────────────────────
   getConfig:   ()     => ipcRenderer.invoke('get-config'),

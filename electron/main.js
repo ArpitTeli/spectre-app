@@ -1231,13 +1231,8 @@ function getMissionFolders() {
 
 // ─── IPC Handlers ────────────────────────────────────────────────────────────
 
-ipcMain.handle('send-command', async (_, command) => {
-  try {
-    writeCommandToFile(command);
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e.message };
-  }
+ipcMain.on('send-command', (_, command) => {
+  writeCommandToFile(command);
 });
 
 ipcMain.handle('get-config', async () => {
