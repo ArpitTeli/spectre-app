@@ -50,7 +50,7 @@ contextBridge.exposeInMainWorld('spectreAPI', {
   onUpdateAvailable:  (cb) => ipcRenderer.on('update-available',  (_, info) => cb(info)),
   onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', (_, info) => cb(info)),
   onUpdateNotAvailable: (cb) => ipcRenderer.on('update-not-available', (_, info) => cb(info)),
-  checkForUpdates:   ()   => ipcRenderer.send('check-for-updates'),
+  checkForUpdates:   ()   => ipcRenderer.invoke('check-for-updates'),
 
   // ── Window controls ───────────────────────────────────────────────────────
   minimize: () => ipcRenderer.send('minimize-window'),

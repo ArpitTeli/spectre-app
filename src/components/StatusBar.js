@@ -91,7 +91,7 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
         ◈ COMMS
       </button>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '2px', marginLeft: '10px' }}>
-        SPECTRE C2 v1.5.2
+        SPECTRE C2 v1.5.3
       </div>
     </div>
   );
@@ -485,9 +485,19 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
         )}
 
         <div className="settings-footer">
-          <button className="btn" onClick={() => {
-              window.spectreAPI?.checkForUpdates?.();
-            }}>
+          <button className="btn" onClick={async () => {
+              const result = await window.spectreAPI?.checkForUpdates?.();
+              if (!result) {
+                alert('Update check unavailable — please reinstall the app.');
+              } else if (result.error) {
+                alert(`Update check failed: ${result.error}`);
+              } else if (result.hasUpdate) {
+                alert(`Update available! v${result.latestVersion} (you have v${result.currentVersion}). Downloading now...`);
+              } else {
+                alert(`You are up to date (v${result.currentVersion}).`);
+              }
+            }}
+            style={{ fontSize: '10px' }}>
             CHECK FOR UPDATES
           </button>
           <div style={{ flex: 1 }} />

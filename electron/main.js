@@ -911,9 +911,19 @@ setTimeout(() => {
 }, 30000);
 
 // Manual check from renderer
-ipcMain.on('check-for-updates', () => {
+ipcMain.handle('check-for-updates', async () => {
   updateCheckDone = false;
-  doUpdateCheck();
+  try {
+    const { autoUpdater } = require('electron-updater');
+    const result = await autoUpdater.checkForUpdates();
+    return { 
+      hasUpdate: result?.updateInfo?.version !== app.getVersion(),
+      currentVersion: app.getVersion(),
+      latestVersion: result?.updateInfo?.version || 'unknown'
+    };
+  } catch (err) {
+    return { error: err.message, currentVersion: app.getVersion() };
+  }
 });
 
 // ─── App ready ───────────────────────────────────────────────────────────────
