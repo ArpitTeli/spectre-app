@@ -388,24 +388,22 @@ SPECTRE_fnc_broadcastState = {
 
 // ─── Command reader ───────────────────────────────────────────────────────────
 SPECTRE_fnc_readCommands = {
-    private _sqf = "";
+    // Find Arma root from our own PBO path
+    private _myPath = __FILE__;
+    // _myPath looks like: "E:\Games\Arma 3\@SPECTRE\addons\spectre_bridge.pbo\functions\fn_bridgeInit.sqf"
+    // Strip to get Arma root: find position of "@SPECTRE" and take everything before it
+    private _idx = _myPath find "@SPECTRE";
+    private _armaRoot = if (_idx > 0) then { _myPath select [0, _idx] } else { "" };
     
-    // Try paths — @ is special in Arma (PBO prefix), avoid it
-    private _paths = [
-        "\spectre_to_arma.sqf",              // Arma root (clean path)
-        "\spectre_cmds.sqf"                  // Alternate Arma root
-    ];
+    // Build absolute path to command file
+    private _sqfPath = _armaRoot + "spectre_to_arma.sqf";
     
-    {
-        if (fileExists _x) exitWith {
-            _sqf = preprocessFileLineNumbers _x;
-            diag_log format ["SPECTRE: Found commands at %1", _x];
+    if (_armaRoot != "" && { fileExists _sqfPath }) then {
+        private _sqf = preprocessFileLineNumbers _sqfPath;
+        if (!(_sqf isEqualTo "")) then {
+            diag_log format ["SPECTRE: Executing command (%1 bytes)", count _sqf];
+            call compile _sqf;
         };
-    } forEach _paths;
-    
-    if (!(_sqf isEqualTo "")) then {
-        diag_log format ["SPECTRE: Executing command (%1 bytes)", count _sqf];
-        call compile _sqf;
     };
 };
 
