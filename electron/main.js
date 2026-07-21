@@ -556,6 +556,18 @@ function flushCommandsToMission() {
     dbg(`SPECTRE: Failed to write commands: ${e.message}`);
   }
 
+  // Also write to Arma 3 root directory for editor missions
+  // (loadFile searches in the Arma root when there's no mission folder on disk)
+  if (ARMA_INSTALL) {
+    const armaRootPath = path.join(ARMA_INSTALL, 'spectre_to_arma.sqf');
+    try {
+      fs.writeFileSync(armaRootPath, content, 'utf8');
+      dbg(`SPECTRE: Also wrote commands to Arma root: ${armaRootPath}`);
+    } catch (e) {
+      // silently ignore - the mission folder copy is the primary target
+    }
+  }
+
   pendingCommands = [];
 }
 
