@@ -226,6 +226,60 @@ export default function MapView3D({ units }) {
       };
     }).catch(() => {});
 
+    // Roads
+    fetch('maps/stratis_roads.bin').then(r => r.arrayBuffer()).then(buf => {
+      const dv = new DataView(buf);
+      let off = 0;
+      const totalSeg = dv.getUint32(off, true); off += 4;
+      const totalChains = dv.getUint32(off, true); off += 4;
+      const chainLens = [];
+      for (let i = 0; i < totalChains; i++) {
+        chainLens.push(dv.getUint32(off, true)); off += 4;
+      }
+      const roadData = [];
+      for (let i = 0; i < totalSeg; i++) {
+        roadData.push({
+          x: dv.getFloat32(off, true), y: dv.getFloat32(off + 4, true),
+          dir: dv.getFloat32(off + 8, true), w: dv.getFloat32(off + 12, true),
+        });
+        off += 16;
+      }
+
+      const roadGroup = new THREE.Group();
+      scene.add(roadGroup);
+      const roadMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.95, metalness: 0 });
+      const HALF_W = 4;
+
+      let segIdx = 0;
+      for (const len of chainLens) {
+        if (len < 2) { segIdx += len; continue; }
+        for (let i = 0; i < len - 1; i++) {
+          const p1 = roadData[segIdx + i];
+          const p2 = roadData[segIdx + i + 1];
+          const ax = p1.x - HALF, az = -(p1.y - HALF);
+          const bx = p2.x - HALF, bz = -(p2.y - HALF);
+          const h1 = getHeightAt(p1.x, p1.y) + 0.5;
+          const h2 = getHeightAt(p2.x, p2.y) + 0.5;
+          const dx = bx - ax, dz = bz - az;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+          const nx = -dz / dist, nz = dx / dist;
+          const hw = HALF_W;
+          const verts = new Float32Array([
+            ax + nx * hw, h1, az + nz * hw,
+            ax - nx * hw, h1, az - nz * hw,
+            bx + nx * hw, h2, bz + nz * hw,
+            bx - nx * hw, h2, bz - nz * hw,
+          ]);
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+          geo.setIndex([0, 1, 2, 1, 3, 2]);
+          geo.computeVertexNormals();
+          roadGroup.add(new THREE.Mesh(geo, roadMat));
+        }
+        segIdx += len;
+      }
+    }).catch(() => {});
+
     // Unit markers
     const markers = new THREE.Group();
     scene.add(markers);
