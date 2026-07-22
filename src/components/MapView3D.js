@@ -184,8 +184,9 @@ export default function MapView3D({ units }) {
         const coneGeo = new THREE.ConeGeometry(0.5, 1, 6);
         const sphereGeo = new THREE.SphereGeometry(0.5, 6, 6);
         const flatGeo = new THREE.SphereGeometry(0.5, 8, 4);
-        const geos = [coneGeo, sphereGeo, flatGeo];
-        const baseColors = [0x2d5a1e, 0x3a6a28, 0x4a6a30];
+        const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+        const geos = [coneGeo, sphereGeo, flatGeo, boxGeo];
+        const baseColors = [0x2d5a1e, 0x3a6a28, 0x4a6a30, 0x888888];
 
         const m4 = new THREE.Matrix4();
         const euler = new THREE.Euler();
@@ -198,9 +199,10 @@ export default function MapView3D({ units }) {
           if (g.count === 0) continue;
           const geo = geos[g.shape];
           const color = baseColors[g.shape];
-          const opacity = DENSITY_OPACITY[g.density];
+          const isBox = g.shape === 3;
+          const opacity = isBox ? 1.0 : DENSITY_OPACITY[g.density];
           const mat = new THREE.MeshStandardMaterial({
-            color, roughness: 0.9, transparent: true, opacity, side: THREE.DoubleSide,
+            color, roughness: 0.9, transparent: !isBox, opacity, side: THREE.DoubleSide,
           });
           const instMesh = new THREE.InstancedMesh(geo, mat, g.count);
           for (let i = 0; i < g.count; i++) {
