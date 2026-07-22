@@ -8,10 +8,9 @@ const RES = 256;
 const EXAG = 1.5;
 
 function buildMesh(heightImg) {
-  const verts = [], cols = [], idx = [];
+  const verts = [], uvs = [], cols = [], idx = [];
   const step = MAP / RES;
 
-  // Read height pixels: 16-bit PNG, 0=low, 65535=high
   const canvas = document.createElement('canvas');
   canvas.width = heightImg.width;
   canvas.height = heightImg.height;
@@ -23,12 +22,8 @@ function buildMesh(heightImg) {
     const px = Math.round((x / MAP) * (canvas.width - 1));
     const py = Math.round((y / MAP) * (canvas.height - 1));
     const i = (py * canvas.width + px) * 4;
-    // 8-bit PNG: single byte
     const val = pixels[i];
-    // Convert to meters: 0=-157.5m, 255=234.9m
-    const min_h = -157.5;
-    const max_h = 234.9;
-    const h = min_h + (val / 255) * (max_h - min_h);
+    const h = -157.5 + (val / 255) * 392.4;
     return Math.max(0, h) * EXAG;
   }
 
@@ -40,10 +35,8 @@ function buildMesh(heightImg) {
     { up: 0.70, c: [0.42, 0.38, 0.26] },
     { up: 1.00, c: [0.45, 0.35, 0.25] },
   ];
-  function heightColor(t) {
-    for (let i = 0; i < COLORS.length; i++) {
-      if (t <= COLORS[i].up) return COLORS[i].c;
-    }
+  function hc(t) {
+    for (let i = 0; i < COLORS.length; i++) if (t <= COLORS[i].up) return COLORS[i].c;
     return COLORS[COLORS.length - 1].c;
   }
 
@@ -52,7 +45,9 @@ function buildMesh(heightImg) {
       const wx = ix * step, wy = iy * step;
       const h = getH(wx, wy);
       verts.push(wx - HALF, h, wy - HALF);
-      const c = heightColor(Math.min(1, h / (135 * EXAG)));
+      // UV: U=west→east (0→1), V=south→north (0→1)
+      uvs.push(ix / RES, iy / RES);
+      const c = hc(Math.min(1, h / (135 * EXAG)));
       cols.push(c[0], c[1], c[2]);
     }
   }
@@ -64,10 +59,21 @@ function buildMesh(heightImg) {
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
   geo.setIndex(idx);
   geo.computeVertexNormals();
   return geo;
+}
+
+function loadSatTile() {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = 'https://jetelain.github.io/Arma3Map/maps/stratis/0/0/0.png';
+  });
 }
 
 export default function MapView3D({ units }) {
@@ -76,7 +82,6 @@ export default function MapView3D({ units }) {
   const [status, setStatus] = useState('loading');
   const [heightImg, setHeightImg] = useState(null);
 
-  // Load the heightmap image
   useEffect(() => {
     const img = new Image();
     img.onload = () => setHeightImg(img);
@@ -84,7 +89,6 @@ export default function MapView3D({ units }) {
     img.src = 'maps/stratis_height.png';
   }, []);
 
-  // Build scene when heightmap is loaded
   useEffect(() => {
     if (!heightImg) return;
     const c = ref.current;
@@ -121,13 +125,31 @@ export default function MapView3D({ units }) {
     const grid = new THREE.GridHelper(MAP, 32, 0x333355, 0x222244);
     grid.position.set(0, -3, 0); scene.add(grid);
 
-    const mesh = new THREE.Mesh(buildMesh(heightImg), new THREE.MeshStandardMaterial({
+    const geo = buildMesh(heightImg);
+    const mat = new THREE.MeshStandardMaterial({
       vertexColors: true, roughness: 0.9, metalness: 0, side: THREE.DoubleSide,
-    }));
+    });
+    const mesh = new THREE.Mesh(geo, mat);
     scene.add(mesh);
 
+    // Load satellite texture and superimpose
+    setStatus('loading sat');
+    loadSatTile().then(satImg => {
+      if (satImg) {
+        const tex = new THREE.Texture(satImg);
+        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+        tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        mat.map = tex;
+        mat.vertexColors = false;
+        mat.needsUpdate = true;
+        setStatus('ready');
+      } else {
+        setStatus('ready (no sat)');
+      }
+    });
+
     const markers = new THREE.Group(); scene.add(markers);
-    st.current = { scene, cam, ctrl, renderer, markers };
+    st.current = { scene, cam, ctrl, renderer, markers, mat, mesh };
 
     const keys = {};
     function kd(e) { keys[e.key] = true; if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); }
@@ -170,8 +192,6 @@ export default function MapView3D({ units }) {
     }
     window.addEventListener('resize', rs);
 
-    setStatus('ready');
-
     return () => {
       running = false;
       window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku);
@@ -181,7 +201,6 @@ export default function MapView3D({ units }) {
     };
   }, [heightImg]);
 
-  // Update markers
   useEffect(() => {
     const s = st.current;
     if (!s.markers) return;
@@ -191,24 +210,17 @@ export default function MapView3D({ units }) {
     Object.values(units || {}).forEach(u => {
       const p = u.position;
       if (!p || p.x === undefined || p.y === undefined) return;
-
-      // Read height from heightmap image
       const tx = p.x - HALF;
       const tz = p.y - HALF;
-
-      // Use the cached heightImg to sample height at this position
-      const img = heightImg;
-      if (!img) return;
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width; canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      const px = Math.round((p.x / MAP) * (img.width - 1));
-      const py = Math.round((p.y / MAP) * (img.height - 1));
-      const pixelData = ctx.getImageData(px, py, 1, 1).data;
-      const val = pixelData[0];
-      const h = Math.max(0, (-157.5 + (val / 255) * (234.9 + 157.5))) * 3;
-
+      if (!heightImg) return;
+      const c2 = document.createElement('canvas');
+      c2.width = heightImg.width; c2.height = heightImg.height;
+      const c2x = c2.getContext('2d');
+      c2x.drawImage(heightImg, 0, 0);
+      const px2 = Math.round((p.x / MAP) * (heightImg.width - 1));
+      const py2 = Math.round((p.y / MAP) * (heightImg.height - 1));
+      const pd = c2x.getImageData(px2, py2, 1, 1).data;
+      const h = Math.max(0, (-157.5 + (pd[0] / 255) * 392.4)) * 1.5;
       const dead = u.status === 'DESTROYED' || u.status === 'DEAD';
       const op = dead ? 0.25 : 1;
       const veh = u.vehicle_type && !['INFANTRY','MAN'].includes(u.vehicle_type);
