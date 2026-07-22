@@ -3,6 +3,7 @@ import { useSpectreStore } from './store/useSpectreStore';
 import { aiService } from './ai/aiService';
 import TitleBar from './components/TitleBar';
 import MapView from './components/MapView';
+import MapView3D from './components/MapView3D';
 import SidePanel from './components/SidePanel';
 import { CommsLog, StatusBar, SettingsModal } from './components/StatusBar';
 import PlanningModal from './components/PlanningModal';
@@ -26,6 +27,18 @@ export default function App() {
   const [appMode, setAppMode] = useState(null); // 'host' | 'client' | null
   const [roomCode, setRoomCode] = useState('');
   const [relayStatus, setRelayStatus] = useState({ connected: false, clients: 0 });
+  const [viewMode, setViewMode] = useState('2d'); // '2d' | '3d'
+
+  // Keyboard shortcut: M to toggle 2D/3D map
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'm' || e.key === 'M') {
+        setViewMode(v => v === '2d' ? '3d' : '2d');
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Sync AI config
   useEffect(() => {
@@ -196,19 +209,41 @@ export default function App() {
       )}
 
       <div className="app-body">
-        <MapView
-          units={state.units}
-          contacts={state.contacts}
-          zones={state.zones}
-          selectedUnit={state.selectedUnit}
-          selectedContact={state.selectedContact}
-          currentCOAs={state.currentCOAs}
-          selectedCOA={state.selectedCOA}
-          showCOAOverlay={state.showCOAOverlay}
-          mapName={state.mapName}
-          onUnitSelect={id => patch({ selectedUnit: id })}
-          onContactSelect={id => patch({ selectedContact: id })}
-        />
+        {viewMode === '2d' ? (
+          <MapView
+            units={state.units}
+            contacts={state.contacts}
+            zones={state.zones}
+            selectedUnit={state.selectedUnit}
+            selectedContact={state.selectedContact}
+            currentCOAs={state.currentCOAs}
+            selectedCOA={state.selectedCOA}
+            showCOAOverlay={state.showCOAOverlay}
+            mapName={state.mapName}
+            onUnitSelect={id => patch({ selectedUnit: id })}
+            onContactSelect={id => patch({ selectedContact: id })}
+          />
+        ) : (
+          <MapView3D
+            units={state.units}
+            contacts={state.contacts}
+            onUnitSelect={id => patch({ selectedUnit: id })}
+            onContactSelect={id => patch({ selectedContact: id })}
+          />
+        )}
+
+        {/* 3D toggle button */}
+        <button
+          onClick={() => setViewMode(v => v === '2d' ? '3d' : '2d')}
+          className="btn btn-sm"
+          style={{
+            position: 'absolute', bottom: 'calc(var(--statusbar-height) + 12px)',
+            left: 12, zIndex: 1000, fontSize: 9
+          }}
+          title="Press M to toggle 2D/3D"
+        >
+          {viewMode === '2d' ? '◈ 3D' : '◈ 2D'}
+        </button>
 
         <SidePanel
           state={state}

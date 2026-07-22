@@ -1,6 +1,6 @@
 {
   "name": "spectre-arma",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "SPECTRE C2 System for Arma 3",
   "main": "electron/main.js",
   "homepage": "./",
@@ -13,11 +13,14 @@
     "react": "react-scripts start"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
     "cytoscape": "^3.34.0",
     "electron-updater": "^6.1.0",
     "leaflet": "^1.9.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "three": "^0.185.1",
     "ws": "^8.21.1"
   },
   "devDependencies": {
