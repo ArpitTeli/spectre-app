@@ -18,7 +18,7 @@ const MODEL_SCALE = {
   tank_destroyer: 0.12,
   vehicle: 0.10,
   jeep: 0.10,
-  infantry: 0.005,
+  infantry: 0.0005,
 };
 
 const MODEL_HEIGHT_OFFSET = {
@@ -129,7 +129,12 @@ function loadOBJ(url) {
 function loadFBX(url) {
   return new Promise((resolve, reject) => {
     const loader = new FBXLoader();
-    loader.load(url, resolve, undefined, reject);
+    loader.load(url, (model) => {
+      const box = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.sub(center);
+      resolve(model);
+    }, undefined, reject);
   });
 }
 
