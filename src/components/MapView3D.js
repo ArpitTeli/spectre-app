@@ -247,8 +247,8 @@ export default function MapView3D({ units }) {
 
       const roadGroup = new THREE.Group();
       scene.add(roadGroup);
-      const roadMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.95, metalness: 0 });
-      const HALF_W = 4;
+      const roadMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.85, metalness: 0.05 });
+      const HALF_W = 5;
 
       let segIdx = 0;
       for (const len of chainLens) {
