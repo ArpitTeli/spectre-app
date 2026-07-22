@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 const MAP = 8192;
 const HALF = MAP / 2;
 const RES = 256;
-const EXAG = 3;
+const EXAG = 1.5;
 
 function buildMesh(heightImg) {
   const verts = [], cols = [], idx = [];
@@ -23,12 +23,12 @@ function buildMesh(heightImg) {
     const px = Math.round((x / MAP) * (canvas.width - 1));
     const py = Math.round((y / MAP) * (canvas.height - 1));
     const i = (py * canvas.width + px) * 4;
-    // 16-bit PNG: two bytes per pixel
-    const val = (pixels[i] << 8) | pixels[i + 1];
-    // Convert to meters: 0=-152.4m, 65535=6.5m
-    const min_h = -152.4;
-    const max_h = 6.5;
-    const h = min_h + (val / 65535) * (max_h - min_h);
+    // 8-bit PNG: single byte
+    const val = pixels[i];
+    // Convert to meters: 0=-157.5m, 255=234.9m
+    const min_h = -157.5;
+    const max_h = 234.9;
+    const h = min_h + (val / 255) * (max_h - min_h);
     return Math.max(0, h) * EXAG;
   }
 
@@ -206,8 +206,8 @@ export default function MapView3D({ units }) {
       const px = Math.round((p.x / MAP) * (img.width - 1));
       const py = Math.round((p.y / MAP) * (img.height - 1));
       const pixelData = ctx.getImageData(px, py, 1, 1).data;
-      const val = (pixelData[0] << 8) | pixelData[1];
-      const h = Math.max(0, -152.4 + (val / 65535) * (6.5 + 152.4)) * 3;
+      const val = pixelData[0];
+      const h = Math.max(0, (-157.5 + (val / 255) * (234.9 + 157.5))) * 3;
 
       const dead = u.status === 'DESTROYED' || u.status === 'DEAD';
       const op = dead ? 0.25 : 1;
