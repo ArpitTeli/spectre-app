@@ -227,15 +227,11 @@ export default function MapView3D({ units }) {
     }).catch(() => {});
 
     // Roads
-    fetch('maps/stratis_roads.bin').then(r => {
-      if (!r.ok) throw new Error('fetch failed ' + r.status);
-      return r.arrayBuffer();
-    }).then(buf => {
+    fetch('maps/stratis_roads.bin').then(r => r.arrayBuffer()).then(buf => {
       const dv = new DataView(buf);
       let off = 0;
       const totalSeg = dv.getUint32(off, true); off += 4;
       const totalChains = dv.getUint32(off, true); off += 4;
-      console.log('[ROADS] Loading', totalSeg, 'segments in', totalChains, 'chains, buf size', buf.byteLength);
       const chainLens = [];
       for (let i = 0; i < totalChains; i++) {
         chainLens.push(dv.getUint32(off, true)); off += 4;
@@ -249,9 +245,6 @@ export default function MapView3D({ units }) {
         off += 16;
       }
 
-      console.log('[ROADS] First 3 points:', roadData.slice(0, 3).map(p => `(${p.x.toFixed(0)},${p.y.toFixed(0)})`));
-      console.log('[ROADS] Sample height:', getHeightAt(roadData[0].x, roadData[0].y));
-
       const roadGroup = new THREE.Group();
       scene.add(roadGroup);
       const roadMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.85, metalness: 0.05, side: THREE.DoubleSide });
@@ -261,58 +254,40 @@ export default function MapView3D({ units }) {
       let meshCount = 0;
       for (const len of chainLens) {
         if (len < 2) { segIdx += len; continue; }
-        const pts = [];
-        for (let i = 0; i < len; i++) {
-          const p = roadData[segIdx + i];
-          pts.push({ x: p.x, y: p.y, h: getHeightAt(p.x, p.y) + 2 });
-        }
-        const segN = [];
-        for (let i = 0; i < pts.length - 1; i++) {
-          const dx = pts[i + 1].x - pts[i].x;
-          const dy = pts[i + 1].y - pts[i].y;
-          const l = Math.sqrt(dx * dx + dy * dy);
-          segN.push(l > 0.01 ? { x: -dy / l, y: dx / l } : { x: 0, y: 1 });
-        }
-        let refX = segN[0].x, refY = segN[0].y;
-        for (let i = 1; i < segN.length; i++) {
-          if (segN[i].x * refX + segN[i].y * refY < 0) {
-            segN[i].x = -segN[i].x; segN[i].y = -segN[i].y;
-          }
-        }
-        const ptN = [];
-        for (let i = 0; i < pts.length; i++) {
-          if (i === 0) ptN.push(segN[0]);
-          else if (i === pts.length - 1) ptN.push(segN[segN.length - 1]);
-          else {
-            let ax = segN[i - 1].x + segN[i].x, ay = segN[i - 1].y + segN[i].y;
-            const al = Math.sqrt(ax * ax + ay * ay);
-            if (al > 0.01) { ax /= al; ay /= al; } else { ax = segN[i].x; ay = segN[i].y; }
-            if (ax * refX + ay * refY < 0) { ax = -ax; ay = -ay; }
-            ptN.push({ x: ax, y: ay });
-          }
-        }
-        const verts = [], idx = [];
-        for (let i = 0; i < pts.length; i++) {
-          const p = pts[i];
-          const wx = p.x - HALF, wz = -(p.y - HALF);
+        const allV = [], allI = [];
+        for (let i = 0; i < len - 1; i++) {
+          const p1 = roadData[segIdx + i];
+          const p2 = roadData[segIdx + i + 1];
+          const dx = p2.x - p1.x, dy = p2.y - p1.y;
+          const dl = Math.sqrt(dx * dx + dy * dy);
+          if (dl < 0.01) continue;
+          const nx = -dy / dl, ny = dx / dl;
           const hw = HALF_W;
-          verts.push(wx + ptN[i].x * hw, p.h, wz + ptN[i].y * hw);
-          verts.push(wx - ptN[i].x * hw, p.h, wz - ptN[i].y * hw);
+          const h1 = getHeightAt(p1.x, p1.y) + 2;
+          const h2 = getHeightAt(p2.x, p2.y) + 2;
+          const wx1 = p1.x - HALF, wz1 = -(p1.y - HALF);
+          const wx2 = p2.x - HALF, wz2 = -(p2.y - HALF);
+          const vi = allV.length / 3;
+          allV.push(
+            wx1 + nx * hw, h1, wz1 + ny * hw,
+            wx1 - nx * hw, h1, wz1 - ny * hw,
+            wx2 + nx * hw, h2, wz2 + ny * hw,
+            wx2 - nx * hw, h2, wz2 - ny * hw
+          );
+          allI.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
         }
-        for (let i = 0; i < pts.length - 1; i++) {
-          const a = i * 2, b = i * 2 + 1, c = (i + 1) * 2, d = (i + 1) * 2 + 1;
-          idx.push(a, b, c, b, d, c);
+        if (allV.length > 0) {
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.Float32BufferAttribute(allV, 3));
+          geo.setIndex(allI);
+          geo.computeVertexNormals();
+          roadGroup.add(new THREE.Mesh(geo, roadMat));
+          meshCount++;
         }
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-        geo.setIndex(idx);
-        geo.computeVertexNormals();
-        roadGroup.add(new THREE.Mesh(geo, roadMat));
-        meshCount++;
         segIdx += len;
       }
       console.log('[ROADS] Created', meshCount, 'road chain meshes');
-    }).catch(e => console.error('[ROADS] FAILED:', e));
+    }).catch(() => {});
 
     // Unit markers
     const markers = new THREE.Group();
