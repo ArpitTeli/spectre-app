@@ -18,7 +18,7 @@ const MODEL_SCALE = {
   tank_destroyer: 0.12,
   vehicle: 0.10,
   jeep: 0.10,
-  infantry: 1,
+  infantry: 0.005,
 };
 
 const MODEL_HEIGHT_OFFSET = {
@@ -27,7 +27,7 @@ const MODEL_HEIGHT_OFFSET = {
   tank_destroyer: 3,
   vehicle: 3,
   jeep: 3,
-  infantry: 3,
+  infantry: 1.5,
 };
 
 function loadSatTiles() {
