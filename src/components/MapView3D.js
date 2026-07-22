@@ -59,8 +59,8 @@ function buildMesh(heightImg) {
     for (let ix = 0; ix <= RES; ix++) {
       const wx = ix * step, wy = iy * step;
       const h = gH(wx, wy);
-      verts.push(wx - HALF, h, -(wy - HALF));
-      uvs.push(1 - ix / RES, 1 - iy / RES);
+      verts.push(wx - HALF, h, wy - HALF);
+      uvs.push(ix / RES, iy / RES);
       const c = hc(Math.min(1, h / (135 * EXAG)));
       cols.push(c[0], c[1], c[2]);
     }
