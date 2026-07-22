@@ -256,6 +256,7 @@ export default function MapView3D({ units }) {
       scene.add(roadGroup);
       const roadMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.85, metalness: 0.05, side: THREE.DoubleSide });
       const HALF_W = 5;
+      const STEP = 10; // subdivide every 10m
 
       let segIdx = 0;
       let meshCount = 0;
@@ -264,27 +265,38 @@ export default function MapView3D({ units }) {
         for (let i = 0; i < len - 1; i++) {
           const p1 = roadData[segIdx + i];
           const p2 = roadData[segIdx + i + 1];
-          const ax = p1.x - HALF, az = -(p1.y - HALF);
-          const bx = p2.x - HALF, bz = -(p2.y - HALF);
-          const h1 = getHeightAt(p1.x, p1.y) + 2;
-          const h2 = getHeightAt(p2.x, p2.y) + 2;
-          const dx = bx - ax, dz = bz - az;
-          const dist = Math.sqrt(dx * dx + dz * dz);
-          if (dist < 0.01) continue;
-          const nx = -dz / dist, nz = dx / dist;
-          const hw = HALF_W;
-          const verts = new Float32Array([
-            ax + nx * hw, h1, az + nz * hw,
-            ax - nx * hw, h1, az - nz * hw,
-            bx + nx * hw, h2, bz + nz * hw,
-            bx - nx * hw, h2, bz - nz * hw,
-          ]);
-          const geo = new THREE.BufferGeometry();
-          geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-          geo.setIndex([0, 1, 2, 1, 3, 2]);
-          geo.computeVertexNormals();
-          roadGroup.add(new THREE.Mesh(geo, roadMat));
-          meshCount++;
+          const ax = p1.x, ay = p1.y;
+          const bx = p2.x, by = p2.y;
+          const dx = bx - ax, dy = by - ay;
+          const segLen = Math.sqrt(dx * dx + dy * dy);
+          if (segLen < 0.01) continue;
+          const steps = Math.max(1, Math.ceil(segLen / STEP));
+          for (let s = 0; s < steps; s++) {
+            const t0 = s / steps, t1 = (s + 1) / steps;
+            const ix0 = ax + dx * t0, iy0 = ay + dy * t0;
+            const ix1 = ax + dx * t1, iy1 = ay + dy * t1;
+            const wx0 = ix0 - HALF, wz0 = -(iy0 - HALF);
+            const wx1 = ix1 - HALF, wz1 = -(iy1 - HALF);
+            const h0 = getHeightAt(ix0, iy0) + 2;
+            const h1 = getHeightAt(ix1, iy1) + 2;
+            const sdx = wx1 - wx0, sdz = wz1 - wz0;
+            const sdist = Math.sqrt(sdx * sdx + sdz * sdz);
+            if (sdist < 0.01) continue;
+            const nx = -sdz / sdist, nz = sdx / sdist;
+            const hw = HALF_W;
+            const verts = new Float32Array([
+              wx0 + nx * hw, h0, wz0 + nz * hw,
+              wx0 - nx * hw, h0, wz0 - nz * hw,
+              wx1 + nx * hw, h1, wz1 + nz * hw,
+              wx1 - nx * hw, h1, wz1 - nz * hw,
+            ]);
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+            geo.setIndex([0, 1, 2, 1, 3, 2]);
+            geo.computeVertexNormals();
+            roadGroup.add(new THREE.Mesh(geo, roadMat));
+            meshCount++;
+          }
         }
         segIdx += len;
       }
