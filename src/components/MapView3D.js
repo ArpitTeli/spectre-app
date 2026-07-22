@@ -59,8 +59,8 @@ function buildMesh(heightImg) {
     for (let ix = 0; ix <= RES; ix++) {
       const wx = ix * step, wy = iy * step;
       const h = gH(wx, wy);
-      verts.push(wx - HALF, h, wy - HALF);
-      uvs.push(ix / RES, iy / RES);
+      verts.push(wx - HALF, h, -(wy - HALF));
+      uvs.push(ix / RES, 1 - iy / RES);
       const c = hc(Math.min(1, h / (135 * EXAG)));
       cols.push(c[0], c[1], c[2]);
     }
@@ -119,6 +119,12 @@ export default function MapView3D({ units }) {
     ctrl.rotateSpeed = 0.8;
     ctrl.keys = { LEFT: 0, RIGHT: 0, UP: 0, BOTTOM: 0 };
     ctrl.enableKeys = false;
+    // Left-drag pans like 2D map, right-drag orbits
+    ctrl.mouseButtons = {
+      LEFT: THREE.MOUSE.PAN,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.ROTATE,
+    };
     ctrl.update();
 
     scene.add(new THREE.AmbientLight(0x888888, 0.5));
@@ -247,7 +253,7 @@ export default function MapView3D({ units }) {
         <span className={`badge ${status==='ready'?'badge-success':''}`}>{status}</span>
       </div>
       <div style={{ position:'absolute', bottom:12, left:12, zIndex:10, fontFamily:'var(--font-mono)', fontSize:9, color:'var(--text-muted)', background:'rgba(0,0,0,0.7)', padding:'5px 10px', borderRadius:3, pointerEvents:'none' }}>
-        WASD+Shift=fly · Drag=orbit · Scroll=zoom · M=2D
+        WASD+Shift=fly · Left-drag=pan · Right-drag=orbit · Scroll=zoom · M=2D
       </div>
     </div>
   );
