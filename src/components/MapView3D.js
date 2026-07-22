@@ -81,15 +81,21 @@ function buildMesh(heightImg) {
   return geo;
 }
 
-function getHeightAt(heightImg, armaX, armaY) {
+let _hCache = null;
+function cacheHeightmap(heightImg) {
   const can = document.createElement('canvas');
   can.width = heightImg.width;
   can.height = heightImg.height;
   const c2d = can.getContext('2d');
   c2d.drawImage(heightImg, 0, 0);
-  const px = Math.round((armaX / MAP) * (heightImg.width - 1));
-  const py = Math.round((armaY / MAP) * (heightImg.height - 1));
-  const v = c2d.getImageData(px, py, 1, 1).data[0];
+  _hCache = c2d.getImageData(0, 0, can.width, can.height).data;
+}
+function getHeightAt(armaX, armaY) {
+  if (!_hCache) return 0;
+  const w = 512;
+  const px = Math.round((armaX / MAP) * (w - 1));
+  const py = Math.round((armaY / MAP) * (w - 1));
+  const v = _hCache[(py * w + px) * 4];
   return Math.max(0, -157.5 + (v / 255) * 392.4) * EXAG;
 }
 
@@ -156,6 +162,7 @@ export default function MapView3D({ units }) {
     scene.add(new THREE.DirectionalLight(0x8888ff, 0.3).position.set(-3000, 2000, -4000));
 
     const geo = buildMesh(hImg);
+    cacheHeightmap(hImg);
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true, roughness: 0.9, metalness: 0, side: THREE.DoubleSide,
     });
@@ -222,7 +229,7 @@ export default function MapView3D({ units }) {
         const instMesh = new THREE.InstancedMesh(unitGeo, g.mat, g.instances.length);
         for (let i = 0; i < g.instances.length; i++) {
           const inst = g.instances[i];
-          const th = getHeightAt(hImg, inst.x, inst.y);
+          const th = getHeightAt(inst.x, inst.y);
           pos.set(inst.x - HALF, th + inst.z + inst.h / 2, -(inst.y - HALF));
           scl.set(inst.w, inst.h, inst.d);
           euler.set(0, -inst.dir * Math.PI / 180, 0, 'YXZ');
@@ -303,14 +310,7 @@ export default function MapView3D({ units }) {
       const tx = p.x - HALF;
       const tz = -(p.y - HALF);
       if (!hImg) return;
-      const c2 = document.createElement('canvas');
-      c2.width = hImg.width; c2.height = hImg.height;
-      const c2x = c2.getContext('2d');
-      c2x.drawImage(hImg, 0, 0);
-      const px2 = Math.round((p.x / MAP) * (hImg.width - 1));
-      const py2 = Math.round((p.y / MAP) * (hImg.height - 1));
-      const pd = c2x.getImageData(px2, py2, 1, 1).data;
-      const h = Math.max(0, (-157.5 + (pd[0] / 255) * 392.4)) * 1.5;
+      const h = getHeightAt(p.x, p.y);
       const dead = u.status === 'DESTROYED' || u.status === 'DEAD';
       const op = dead ? 0.25 : 1;
       const veh = u.vehicle_type && !['INFANTRY','MAN'].includes(u.vehicle_type);
