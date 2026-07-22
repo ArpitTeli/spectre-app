@@ -191,33 +191,40 @@ export default function MapView3D({ units }) {
     const buildingsGroup = new THREE.Group();
     scene.add(buildingsGroup);
     fetch('maps/stratis_buildings.json').then(r => r.json()).then(data => {
-      const bs = data.buildings || [];
+      const bs = Array.isArray(data) ? data : (data.buildings || []);
       const typeGroups = {};
       for (const b of bs) {
-        const [x, y, z, dir, w, h, d, type] = b;
-        const ww = Math.max(1, w || 5), hh = Math.max(1, h || 5), dd = Math.max(1, d || 5);
-        const key = `${type}_${Math.round(ww)}_${Math.round(hh)}_${Math.round(dd)}`;
-        if (!typeGroups[key]) {
-          typeGroups[key] = { geo: new THREE.BoxGeometry(ww, hh, dd), mat: new THREE.MeshStandardMaterial({ color: buildingColor(type), roughness: 0.9 }), instances: [] };
+        const type = b.type || '';
+        if (!type) continue;
+        if (!typeGroups[type]) {
+          typeGroups[type] = { mat: new THREE.MeshStandardMaterial({ color: buildingColor(type), roughness: 0.9 }), instances: [] };
         }
-        typeGroups[key].instances.push({ x, y, z: z || 0, dir: dir || 0 });
+        typeGroups[type].instances.push({
+          x: b.x, y: b.y, z: b.z || 0,
+          dir: b.direction || 0,
+          w: Math.max(0.5, b.width || 3),
+          h: Math.max(0.5, b.height || 3),
+          d: Math.max(0.5, b.depth || 3),
+        });
       }
-      for (const key in typeGroups) {
-        const g = typeGroups[key];
-        const instMesh = new THREE.InstancedMesh(g.geo, g.mat, g.instances.length);
-        const m = new THREE.Matrix4();
-        const e = new THREE.Euler();
-        const q = new THREE.Quaternion();
-        const s = new THREE.Vector3(1, 1, 1);
-        const p = new THREE.Vector3();
+      const unitGeo = new THREE.BoxGeometry(1, 1, 1);
+      const m4 = new THREE.Matrix4();
+      const euler = new THREE.Euler();
+      const quat = new THREE.Quaternion();
+      const scl = new THREE.Vector3();
+      const pos = new THREE.Vector3();
+      for (const type in typeGroups) {
+        const g = typeGroups[type];
+        const instMesh = new THREE.InstancedMesh(unitGeo, g.mat, g.instances.length);
         for (let i = 0; i < g.instances.length; i++) {
           const inst = g.instances[i];
           const th = getHeightAt(hImg, inst.x, inst.y);
-          p.set(inst.x - HALF, th + (inst.z || 0) + g.geo.parameters.height / 2, -(inst.y - HALF));
-          e.set(0, -inst.dir * Math.PI / 180, 0, 'YXZ');
-          q.setFromEuler(e);
-          m.compose(p, q, s);
-          instMesh.setMatrixAt(i, m);
+          pos.set(inst.x - HALF, th + inst.z + inst.h / 2, -(inst.y - HALF));
+          scl.set(inst.w, inst.h, inst.d);
+          euler.set(0, -inst.dir * Math.PI / 180, 0, 'YXZ');
+          quat.setFromEuler(euler);
+          m4.compose(pos, quat, scl);
+          instMesh.setMatrixAt(i, m4);
         }
         instMesh.instanceMatrix.needsUpdate = true;
         buildingsGroup.add(instMesh);
