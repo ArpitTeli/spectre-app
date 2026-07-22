@@ -181,9 +181,9 @@ export default function MapView3D({ units }) {
       worker.postMessage(buf);
       worker.onmessage = (e) => {
         const groups = e.data;
-        const coneGeo = new THREE.ConeGeometry(1, 1, 6);
-        const sphereGeo = new THREE.SphereGeometry(1, 6, 6);
-        const flatGeo = new THREE.SphereGeometry(1, 8, 4);
+        const coneGeo = new THREE.ConeGeometry(0.5, 1, 6);
+        const sphereGeo = new THREE.SphereGeometry(0.5, 6, 6);
+        const flatGeo = new THREE.SphereGeometry(0.5, 8, 4);
         const geos = [coneGeo, sphereGeo, flatGeo];
         const baseColors = [0x2d5a1e, 0x3a6a28, 0x4a6a30];
 
