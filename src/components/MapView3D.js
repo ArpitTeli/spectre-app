@@ -80,6 +80,45 @@ function buildMesh(heightImg) {
   return geo;
 }
 
+function getHeightAt(heightImg, armaX, armaY) {
+  const can = document.createElement('canvas');
+  can.width = heightImg.width;
+  can.height = heightImg.height;
+  const c2d = can.getContext('2d');
+  c2d.drawImage(heightImg, 0, 0);
+  const px = Math.round((armaX / MAP) * (heightImg.width - 1));
+  const py = Math.round((armaY / MAP) * (heightImg.height - 1));
+  const v = c2d.getImageData(px, py, 1, 1).data[0];
+  return Math.max(0, -157.5 + (v / 255) * 392.4) * EXAG;
+}
+
+function buildingColor(type) {
+  const t = (type || '').toLowerCase();
+  if (t.includes('hangar') || t.includes('industrial')) return 0x666670;
+  if (t.includes('wall') || t.includes('fence')) return 0x8a8a82;
+  if (t.includes('tower')) return 0x4a4a52;
+  if (t.includes('bunker') || t.includes('fortress')) return 0x6a6a62;
+  if (t.includes('chapel') || t.includes('church')) return 0xc8b890;
+  if (t.includes('fuel')) return 0x808088;
+  if (t.includes('house') || t.includes('cabin')) return 0xa89070;
+  if (t.includes('rock')) return 0x707068;
+  return 0x888888;
+}
+
+function generateTrees(heightImg, count = 2000) {
+  const trees = [];
+  for (let i = 0; i < count; i++) {
+    const ax = Math.random() * MAP;
+    const ay = Math.random() * MAP;
+    const h = getHeightAt(heightImg, ax, ay);
+    if (h < 0.5 || h > 100) continue;
+    const prob = h < 30 ? 0.3 : h < 60 ? 0.7 : 0.4;
+    if (Math.random() > prob) continue;
+    trees.push([ax, ay, h]);
+  }
+  return trees;
+}
+
 export default function MapView3D({ units }) {
   const ref = useRef(null);
   const st = useRef({});
@@ -119,21 +158,13 @@ export default function MapView3D({ units }) {
     ctrl.rotateSpeed = 0.8;
     ctrl.keys = { LEFT: 0, RIGHT: 0, UP: 0, BOTTOM: 0 };
     ctrl.enableKeys = false;
-    // Left-drag pans like 2D map, right-drag orbits
-    ctrl.mouseButtons = {
-      LEFT: THREE.MOUSE.PAN,
-      MIDDLE: THREE.MOUSE.DOLLY,
-      RIGHT: THREE.MOUSE.ROTATE,
-    };
+    ctrl.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
     ctrl.update();
 
-    scene.add(new THREE.AmbientLight(0x888888, 0.5));
+    scene.add(new THREE.AmbientLight(0x888888, 0.6));
     const sun = new THREE.DirectionalLight(0xffeedd, 1.0);
     sun.position.set(5000, 8000, 3000); scene.add(sun);
     scene.add(new THREE.DirectionalLight(0x8888ff, 0.3).position.set(-3000, 2000, -4000));
-
-    const grid = new THREE.GridHelper(MAP, 32, 0x333355, 0x222244);
-    grid.position.set(0, -3, 0); scene.add(grid);
 
     const geo = buildMesh(hImg);
     const mat = new THREE.MeshStandardMaterial({
@@ -148,7 +179,6 @@ export default function MapView3D({ units }) {
       tex.wrapS = THREE.ClampToEdgeWrapping;
       tex.wrapT = THREE.ClampToEdgeWrapping;
       tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-
       const texMat = new THREE.MeshStandardMaterial({
         map: tex, roughness: 0.9, metalness: 0, side: THREE.DoubleSide,
       });
@@ -157,7 +187,79 @@ export default function MapView3D({ units }) {
       setStatus('ready');
     });
 
-    const markers = new THREE.Group(); scene.add(markers);
+    // Buildings
+    const buildingsGroup = new THREE.Group();
+    scene.add(buildingsGroup);
+    fetch('maps/stratis_buildings.json').then(r => r.json()).then(data => {
+      const bs = data.buildings || [];
+      const typeGroups = {};
+      for (const b of bs) {
+        const [x, y, z, dir, w, h, d, type] = b;
+        const ww = Math.max(1, w || 5), hh = Math.max(1, h || 5), dd = Math.max(1, d || 5);
+        const key = `${type}_${Math.round(ww)}_${Math.round(hh)}_${Math.round(dd)}`;
+        if (!typeGroups[key]) {
+          typeGroups[key] = { geo: new THREE.BoxGeometry(ww, hh, dd), mat: new THREE.MeshStandardMaterial({ color: buildingColor(type), roughness: 0.9 }), instances: [] };
+        }
+        typeGroups[key].instances.push({ x, y, z: z || 0, dir: dir || 0 });
+      }
+      for (const key in typeGroups) {
+        const g = typeGroups[key];
+        const instMesh = new THREE.InstancedMesh(g.geo, g.mat, g.instances.length);
+        const m = new THREE.Matrix4();
+        const e = new THREE.Euler();
+        const q = new THREE.Quaternion();
+        const s = new THREE.Vector3(1, 1, 1);
+        const p = new THREE.Vector3();
+        for (let i = 0; i < g.instances.length; i++) {
+          const inst = g.instances[i];
+          const th = getHeightAt(hImg, inst.x, inst.y);
+          p.set(inst.x - HALF, th + (inst.z || 0) + g.geo.parameters.height / 2, -(inst.y - HALF));
+          e.set(0, -inst.dir * Math.PI / 180, 0, 'YXZ');
+          q.setFromEuler(e);
+          m.compose(p, q, s);
+          instMesh.setMatrixAt(i, m);
+        }
+        instMesh.instanceMatrix.needsUpdate = true;
+        buildingsGroup.add(instMesh);
+      }
+    }).catch(() => {});
+
+    // Trees (procedural, low-poly 3D)
+    const treesGroup = new THREE.Group();
+    scene.add(treesGroup);
+    const treePositions = generateTrees(hImg, 1500);
+    const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 3, 6);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3a2818, roughness: 1 });
+    const foliageGeo = new THREE.IcosahedronGeometry(1.5, 0);
+    const foliageMat = new THREE.MeshStandardMaterial({ color: 0x2d5a1e, roughness: 1 });
+    const treeCount = treePositions.length;
+    const trunkInst = new THREE.InstancedMesh(trunkGeo, trunkMat, treeCount);
+    const foliageInst = new THREE.InstancedMesh(foliageGeo, foliageMat, treeCount);
+    const mat2 = new THREE.Matrix4();
+    const p2 = new THREE.Vector3();
+    const s2 = new THREE.Vector3();
+    for (let i = 0; i < treeCount; i++) {
+      const [ax, ay, ah] = treePositions[i];
+      const scale = 0.8 + Math.random() * 0.6;
+      s2.set(scale, scale, scale);
+      // Trunk at base
+      p2.set(ax - HALF, ah + 1.5 * scale, -(ay - HALF));
+      mat2.compose(p2, new THREE.Quaternion(), s2);
+      trunkInst.setMatrixAt(i, mat2);
+      // Foliage above trunk
+      p2.set(ax - HALF, ah + 4 * scale, -(ay - HALF));
+      mat2.compose(p2, new THREE.Quaternion(), s2);
+      foliageInst.setMatrixAt(i, mat2);
+    }
+    trunkInst.instanceMatrix.needsUpdate = true;
+    foliageInst.instanceMatrix.needsUpdate = true;
+    treesGroup.add(trunkInst);
+    treesGroup.add(foliageInst);
+
+    // Unit markers
+    const markers = new THREE.Group();
+    scene.add(markers);
+
     st.current = { scene, cam, ctrl, renderer, markers };
 
     const keys = {};
@@ -250,7 +352,7 @@ export default function MapView3D({ units }) {
       <div ref={ref} style={{ width:'100%', height:'100%' }} />
       <div style={{ position:'absolute', top:12, left:12, zIndex:10, display:'flex', gap:4, alignItems:'center' }}>
         <span className="badge badge-primary">3D</span>
-        <span className={`badge ${status==='ready'?'badge-success':''}`}>{status}</span>
+        <span className={`badge ${status.startsWith('ready')?'badge-success':''}`}>{status}</span>
       </div>
       <div style={{ position:'absolute', bottom:12, left:12, zIndex:10, fontFamily:'var(--font-mono)', fontSize:9, color:'var(--text-muted)', background:'rgba(0,0,0,0.7)', padding:'5px 10px', borderRadius:3, pointerEvents:'none' }}>
         WASD+Shift=fly · Left-drag=pan · Right-drag=orbit · Scroll=zoom · M=2D
