@@ -59,8 +59,8 @@ function buildMesh(heightImg) {
     for (let ix = 0; ix <= RES; ix++) {
       const wx = ix * step, wy = iy * step;
       const h = gH(wx, wy);
-      verts.push(wx - HALF, h, wy - HALF);
-      uvs.push(ix / RES, iy / RES);
+      verts.push(wx - HALF, h, -(wy - HALF));
+      uvs.push(1 - ix / RES, iy / RES);
       const c = hc(Math.min(1, h / (135 * EXAG)));
       cols.push(c[0], c[1], c[2]);
     }
@@ -214,7 +214,7 @@ export default function MapView3D({ units }) {
       const p = u.position;
       if (!p || p.x === undefined || p.y === undefined) return;
       const tx = p.x - HALF;
-      const tz = p.y - HALF;
+      const tz = -(p.y - HALF);
       if (!hImg) return;
       const c2 = document.createElement('canvas');
       c2.width = hImg.width; c2.height = hImg.height;
