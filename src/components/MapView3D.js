@@ -18,7 +18,7 @@ const MODEL_SCALE = {
   tank_destroyer: 0.12,
   vehicle: 0.10,
   jeep: 0.10,
-  infantry: 0.0005,
+  infantry: 1,
 };
 
 const MODEL_HEIGHT_OFFSET = {
@@ -131,7 +131,13 @@ function loadFBX(url) {
     const loader = new FBXLoader();
     loader.load(url, (model) => {
       const box = new THREE.Box3().setFromObject(model);
-      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const targetSize = 2;
+      const autoScale = targetSize / maxDim;
+      model.scale.set(autoScale, autoScale, autoScale);
+      const box2 = new THREE.Box3().setFromObject(model);
+      const center = box2.getCenter(new THREE.Vector3());
       model.position.sub(center);
       resolve(model);
     }, undefined, reject);
@@ -256,7 +262,15 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
         infantry: soldier,
       };
       setModels(loaded);
-      console.log('[MODELS] Loaded:', Object.entries(loaded).map(([k, v]) => `${k}:${v ? 'ok' : 'fail'}`).join(', '));
+      Object.entries(loaded).forEach(([k, v]) => {
+        if (v) {
+          const box = new THREE.Box3().setFromObject(v);
+          const size = box.getSize(new THREE.Vector3());
+          console.log(`[MODELS] ${k}: size ${size.x.toFixed(1)} x ${size.y.toFixed(1)} x ${size.z.toFixed(1)}`);
+        } else {
+          console.log(`[MODELS] ${k}: FAILED to load`);
+        }
+      });
     });
   }, []);
 
