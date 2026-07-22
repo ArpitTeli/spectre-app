@@ -266,21 +266,29 @@ export default function MapView3D({ units }) {
           const p = roadData[segIdx + i];
           pts.push({ x: p.x, y: p.y, h: getHeightAt(p.x, p.y) + 2 });
         }
-        const norms = [];
-        for (let i = 0; i < pts.length; i++) {
-          let fx = 0, fy = 0;
-          if (i > 0) { fx += pts[i].x - pts[i - 1].x; fy += pts[i].y - pts[i - 1].y; }
-          if (i < pts.length - 1) { fx += pts[i + 1].x - pts[i].x; fy += pts[i + 1].y - pts[i].y; }
-          const fl = Math.sqrt(fx * fx + fy * fy);
-          if (fl > 0.01) { fx /= fl; fy /= fl; }
-          norms.push({ x: -fy, y: fx });
+        const segN = [];
+        for (let i = 0; i < pts.length - 1; i++) {
+          const dx = pts[i + 1].x - pts[i].x;
+          const dy = pts[i + 1].y - pts[i].y;
+          const l = Math.sqrt(dx * dx + dy * dy);
+          segN.push(l > 0.01 ? { x: -dy / l, y: dx / l } : { x: 0, y: 1 });
         }
-        if (norms.length > 1) {
-          let ref = norms[0].x * norms[1].x + norms[0].y * norms[1].y;
-          if (ref < 0) { norms[0].x = -norms[0].x; norms[0].y = -norms[0].y; }
-          for (let i = 1; i < norms.length; i++) {
-            const dot = norms[i].x * norms[i - 1].x + norms[i].y * norms[i - 1].y;
-            if (dot < 0) { norms[i].x = -norms[i].x; norms[i].y = -norms[i].y; }
+        let refX = segN[0].x, refY = segN[0].y;
+        for (let i = 1; i < segN.length; i++) {
+          if (segN[i].x * refX + segN[i].y * refY < 0) {
+            segN[i].x = -segN[i].x; segN[i].y = -segN[i].y;
+          }
+        }
+        const ptN = [];
+        for (let i = 0; i < pts.length; i++) {
+          if (i === 0) ptN.push(segN[0]);
+          else if (i === pts.length - 1) ptN.push(segN[segN.length - 1]);
+          else {
+            let ax = segN[i - 1].x + segN[i].x, ay = segN[i - 1].y + segN[i].y;
+            const al = Math.sqrt(ax * ax + ay * ay);
+            if (al > 0.01) { ax /= al; ay /= al; } else { ax = segN[i].x; ay = segN[i].y; }
+            if (ax * refX + ay * refY < 0) { ax = -ax; ay = -ay; }
+            ptN.push({ x: ax, y: ay });
           }
         }
         const verts = [], idx = [];
@@ -288,8 +296,8 @@ export default function MapView3D({ units }) {
           const p = pts[i];
           const wx = p.x - HALF, wz = -(p.y - HALF);
           const hw = HALF_W;
-          verts.push(wx + norms[i].x * hw, p.h, wz + norms[i].y * hw);
-          verts.push(wx - norms[i].x * hw, p.h, wz - norms[i].y * hw);
+          verts.push(wx + ptN[i].x * hw, p.h, wz + ptN[i].y * hw);
+          verts.push(wx - ptN[i].x * hw, p.h, wz - ptN[i].y * hw);
         }
         for (let i = 0; i < pts.length - 1; i++) {
           const a = i * 2, b = i * 2 + 1, c = (i + 1) * 2, d = (i + 1) * 2 + 1;
