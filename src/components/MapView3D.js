@@ -256,7 +256,6 @@ export default function MapView3D({ units }) {
       scene.add(roadGroup);
       const roadMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.85, metalness: 0.05, side: THREE.DoubleSide });
       const HALF_W = 5;
-      const STEP = 10;
 
       let segIdx = 0;
       let meshCount = 0;
@@ -267,23 +266,30 @@ export default function MapView3D({ units }) {
           const p = roadData[segIdx + i];
           pts.push({ x: p.x, y: p.y, h: getHeightAt(p.x, p.y) + 2 });
         }
+        const norms = [];
+        for (let i = 0; i < pts.length; i++) {
+          let fx = 0, fy = 0;
+          if (i > 0) { fx += pts[i].x - pts[i - 1].x; fy += pts[i].y - pts[i - 1].y; }
+          if (i < pts.length - 1) { fx += pts[i + 1].x - pts[i].x; fy += pts[i + 1].y - pts[i].y; }
+          const fl = Math.sqrt(fx * fx + fy * fy);
+          if (fl > 0.01) { fx /= fl; fy /= fl; }
+          norms.push({ x: -fy, y: fx });
+        }
+        if (norms.length > 1) {
+          let ref = norms[0].x * norms[1].x + norms[0].y * norms[1].y;
+          if (ref < 0) { norms[0].x = -norms[0].x; norms[0].y = -norms[0].y; }
+          for (let i = 1; i < norms.length; i++) {
+            const dot = norms[i].x * norms[i - 1].x + norms[i].y * norms[i - 1].y;
+            if (dot < 0) { norms[i].x = -norms[i].x; norms[i].y = -norms[i].y; }
+          }
+        }
         const verts = [], idx = [];
         for (let i = 0; i < pts.length; i++) {
           const p = pts[i];
           const wx = p.x - HALF, wz = -(p.y - HALF);
-          let nx = 0, nz = 1;
-          if (i < pts.length - 1) {
-            const nx2 = -(pts[i + 1].y - p.y), nz2 = (pts[i + 1].x - p.x);
-            const len2 = Math.sqrt(nx2 * nx2 + nz2 * nz2);
-            if (len2 > 0.01) { nx = nx2 / len2; nz = nz2 / len2; }
-          } else {
-            const nx2 = -(p.y - pts[i - 1].y), nz2 = (p.x - pts[i - 1].x);
-            const len2 = Math.sqrt(nx2 * nx2 + nz2 * nz2);
-            if (len2 > 0.01) { nx = nx2 / len2; nz = nz2 / len2; }
-          }
           const hw = HALF_W;
-          verts.push(wx + nx * hw, p.h, wz + nz * hw);
-          verts.push(wx - nx * hw, p.h, wz - nz * hw);
+          verts.push(wx + norms[i].x * hw, p.h, wz + norms[i].y * hw);
+          verts.push(wx - norms[i].x * hw, p.h, wz - norms[i].y * hw);
         }
         for (let i = 0; i < pts.length - 1; i++) {
           const a = i * 2, b = i * 2 + 1, c = (i + 1) * 2, d = (i + 1) * 2 + 1;
