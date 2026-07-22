@@ -6,56 +6,61 @@ const MAP = 8192;
 const HALF = MAP / 2;
 const RES = 256;
 const EXAG = 1.5;
+const SAT_ZOOM = 3;
+const TS = 226;
 
-// Create a POT canvas from an image (handles NPOT textures)
-function imgToPOT(img, size) {
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const ctx = c.getContext('2d');
-  ctx.drawImage(img, 0, 0, size, size);
-  return c;
+function loadSatTiles() {
+  return new Promise((resolve) => {
+    const tpr = Math.pow(2, SAT_ZOOM);
+    const out = tpr * TS;
+    const c = document.createElement('canvas');
+    c.width = c.height = out;
+    const ctx = c.getContext('2d');
+    let n = 0, total = tpr * tpr;
+    for (let ty = 0; ty < tpr; ty++) {
+      for (let tx = 0; tx < tpr; tx++) {
+        const img = new Image();
+        img.onload = () => { ctx.drawImage(img, tx * TS, ty * TS, TS, TS); n++; if (n === total) resolve(c); };
+        img.onerror = () => { n++; if (n === total) resolve(c); };
+        img.src = `https://jetelain.github.io/Arma3Map/maps/stratis/${SAT_ZOOM}/${tx}/${ty}.png`;
+      }
+    }
+  });
 }
 
 function buildMesh(heightImg) {
   const verts = [], uvs = [], cols = [], idx = [];
   const step = MAP / RES;
+  const can = document.createElement('canvas');
+  can.width = heightImg.width;
+  can.height = heightImg.height;
+  const c2d = can.getContext('2d');
+  c2d.drawImage(heightImg, 0, 0);
+  const pxls = c2d.getImageData(0, 0, can.width, can.height).data;
 
-  const canvas = document.createElement('canvas');
-  canvas.width = heightImg.width;
-  canvas.height = heightImg.height;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(heightImg, 0, 0);
-  const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-
-  function getH(x, y) {
-    const px = Math.round((x / MAP) * (canvas.width - 1));
-    const py = Math.round((y / MAP) * (canvas.height - 1));
-    const i = (py * canvas.width + px) * 4;
-    const val = pixels[i];
-    const h = -157.5 + (val / 255) * 392.4;
-    return Math.max(0, h) * EXAG;
+  function gH(x, y) {
+    const pxx = Math.round((x / MAP) * (can.width - 1));
+    const pxy = Math.round((y / MAP) * (can.height - 1));
+    const v = pxls[(pxy * can.width + pxx) * 4];
+    return Math.max(0, -157.5 + (v / 255) * 392.4) * EXAG;
   }
 
-  const COLORS = [
-    { up: 0.05, c: [0.20, 0.30, 0.18] },
-    { up: 0.15, c: [0.25, 0.38, 0.20] },
-    { up: 0.30, c: [0.30, 0.42, 0.22] },
-    { up: 0.50, c: [0.38, 0.40, 0.24] },
-    { up: 0.70, c: [0.42, 0.38, 0.26] },
-    { up: 1.00, c: [0.45, 0.35, 0.25] },
+  const CS = [
+    { u: 0.05, c: [0.20, 0.30, 0.18] },
+    { u: 0.15, c: [0.25, 0.38, 0.20] },
+    { u: 0.30, c: [0.30, 0.42, 0.22] },
+    { u: 0.50, c: [0.38, 0.40, 0.24] },
+    { u: 0.70, c: [0.42, 0.38, 0.26] },
+    { u: 1.00, c: [0.45, 0.35, 0.25] },
   ];
-  function hc(t) {
-    for (let i = 0; i < COLORS.length; i++) if (t <= COLORS[i].up) return COLORS[i].c;
-    return COLORS[COLORS.length - 1].c;
-  }
+  function hc(t) { for (let i = 0; i < CS.length; i++) if (t <= CS[i].u) return CS[i].c; return CS[CS.length - 1].c; }
 
   for (let iy = 0; iy <= RES; iy++) {
     for (let ix = 0; ix <= RES; ix++) {
       const wx = ix * step, wy = iy * step;
-      const h = getH(wx, wy);
-      verts.push(-(wx - HALF), h, -(wy - HALF));
-      // UV: U=west→east, V=south→north
-      uvs.push(1 - ix / RES, 1 - iy / RES);
+      const h = gH(wx, wy);
+      verts.push(wx - HALF, h, wy - HALF);
+      uvs.push(ix / RES, iy / RES);
       const c = hc(Math.min(1, h / (135 * EXAG)));
       cols.push(c[0], c[1], c[2]);
     }
@@ -75,30 +80,21 @@ function buildMesh(heightImg) {
   return geo;
 }
 
-function loadSatTile() {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-    img.src = 'https://jetelain.github.io/Arma3Map/maps/stratis/0/0/0.png';
-  });
-}
-
 export default function MapView3D({ units }) {
   const ref = useRef(null);
   const st = useRef({});
   const [status, setStatus] = useState('loading');
-  const [heightImg, setHeightImg] = useState(null);
+  const [hImg, setHImg] = useState(null);
 
   useEffect(() => {
     const img = new Image();
-    img.onload = () => setHeightImg(img);
+    img.onload = () => setHImg(img);
     img.onerror = () => setStatus('no heightmap');
     img.src = 'maps/stratis_height.png';
   }, []);
 
   useEffect(() => {
-    if (!heightImg) return;
+    if (!hImg) return;
     const c = ref.current;
     if (!c || !c.clientWidth) return;
 
@@ -133,40 +129,30 @@ export default function MapView3D({ units }) {
     const grid = new THREE.GridHelper(MAP, 32, 0x333355, 0x222244);
     grid.position.set(0, -3, 0); scene.add(grid);
 
-    const geo = buildMesh(heightImg);
+    const geo = buildMesh(hImg);
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true, roughness: 0.9, metalness: 0, side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(geo, mat);
     scene.add(mesh);
 
-    // Load satellite texture and superimpose
     setStatus('loading sat');
-    loadSatTile().then(satImg => {
-      if (satImg) {
-        // Convert NPOT tile to POT canvas
-        const potCanvas = imgToPOT(satImg, 512);
-        const tex = new THREE.CanvasTexture(potCanvas);
-        tex.wrapS = THREE.ClampToEdgeWrapping;
-        tex.wrapT = THREE.ClampToEdgeWrapping;
-        tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    loadSatTiles().then(satCanvas => {
+      const tex = new THREE.CanvasTexture(satCanvas);
+      tex.wrapS = THREE.ClampToEdgeWrapping;
+      tex.wrapT = THREE.ClampToEdgeWrapping;
+      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
-        const texMat = new THREE.MeshStandardMaterial({
-          map: tex,
-          roughness: 0.9,
-          metalness: 0,
-          side: THREE.DoubleSide,
-        });
-        mesh.material = texMat;
-        mesh.material.needsUpdate = true;
-        setStatus('ready');
-      } else {
-        setStatus('ready (no sat)');
-      }
+      const texMat = new THREE.MeshStandardMaterial({
+        map: tex, roughness: 0.9, metalness: 0, side: THREE.DoubleSide,
+      });
+      mesh.material = texMat;
+      mesh.material.needsUpdate = true;
+      setStatus('ready');
     });
 
     const markers = new THREE.Group(); scene.add(markers);
-    st.current = { scene, cam, ctrl, renderer, markers, mat, mesh };
+    st.current = { scene, cam, ctrl, renderer, markers };
 
     const keys = {};
     function kd(e) { keys[e.key] = true; if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); }
@@ -216,7 +202,7 @@ export default function MapView3D({ units }) {
       renderer.dispose();
       if (c.contains(renderer.domElement)) c.removeChild(renderer.domElement);
     };
-  }, [heightImg]);
+  }, [hImg]);
 
   useEffect(() => {
     const s = st.current;
@@ -227,15 +213,15 @@ export default function MapView3D({ units }) {
     Object.values(units || {}).forEach(u => {
       const p = u.position;
       if (!p || p.x === undefined || p.y === undefined) return;
-      const tx = -(p.x - HALF);
-      const tz = -(p.y - HALF);
-      if (!heightImg) return;
+      const tx = p.x - HALF;
+      const tz = p.y - HALF;
+      if (!hImg) return;
       const c2 = document.createElement('canvas');
-      c2.width = heightImg.width; c2.height = heightImg.height;
+      c2.width = hImg.width; c2.height = hImg.height;
       const c2x = c2.getContext('2d');
-      c2x.drawImage(heightImg, 0, 0);
-      const px2 = Math.round((p.x / MAP) * (heightImg.width - 1));
-      const py2 = Math.round((p.y / MAP) * (heightImg.height - 1));
+      c2x.drawImage(hImg, 0, 0);
+      const px2 = Math.round((p.x / MAP) * (hImg.width - 1));
+      const py2 = Math.round((p.y / MAP) * (hImg.height - 1));
       const pd = c2x.getImageData(px2, py2, 1, 1).data;
       const h = Math.max(0, (-157.5 + (pd[0] / 255) * 392.4)) * 1.5;
       const dead = u.status === 'DESTROYED' || u.status === 'DEAD';
@@ -251,7 +237,7 @@ export default function MapView3D({ units }) {
         m.position.set(tx, h + 3, tz); g.add(m);
       }
     });
-  }, [units, heightImg]);
+  }, [units, hImg]);
 
   return (
     <div style={{ position:'relative', width:'100%', height:'100%', overflow:'hidden' }}>
