@@ -442,6 +442,23 @@ All exports follow the same pattern:
 5. Python converts to binary/JSON/PNG
 6. Output placed in `public/maps/` for the app to serve
 
+### 4.5 Mission File Locations
+
+Arma 3 Eden Editor saves missions to one location, but the game reads them from another. This is important for the bridge to work.
+
+| Purpose | Path | Notes |
+|---------|------|-------|
+| **Editor saves to** | `C:\Users\arpit\OneDrive\Documents\Arma 3\missions\SPECTRETEST2.Stratis\` | OneDrive-synced folder — this is where the editor writes `mission.sqm` |
+| **Game reads from** | `E:\Games\Arma 3\Missions\SPECTRETEST2.Stratis\` | Non-Steam Arma install — game loads missions from here |
+| **Bridge file** | `E:\Games\Arma 3\Missions\SPECTRETEST2.Stratis\spectre_cmds.sqf` | Written by our app, read by the DLL — lives in the game folder, NOT the editor folder |
+
+**Important:** When copying updated missions from editor to game folder, always preserve `spectre_cmds.sqf` — it's the bridge communication channel and should never be overwritten.
+
+**To sync a new mission version:**
+1. Copy `mission.sqm` from OneDrive editor folder to game Missions folder
+2. Do NOT overwrite `spectre_cmds.sqf`
+3. No Arma relaunch needed — just restart the mission
+
 ---
 
 ## 5. Version Management
