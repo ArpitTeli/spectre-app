@@ -8,6 +8,7 @@ const RES = 256;
 const EXAG = 1.5;
 const SAT_ZOOM = 3;
 const TS = 226;
+const CRS_SCALE = TS / 0.027475; // 8226.37 — matches jetelain satellite tile CRS
 
 function loadSatTiles() {
   return new Promise((resolve) => {
@@ -60,7 +61,7 @@ function buildMesh(heightImg) {
       const wx = ix * step, wy = iy * step;
       const h = gH(wx, wy);
       verts.push(wx - HALF, h, -(wy - HALF));
-      uvs.push(ix / RES, iy / RES);
+      uvs.push(wx / CRS_SCALE, wy / CRS_SCALE);
       const c = hc(Math.min(1, h / (135 * EXAG)));
       cols.push(c[0], c[1], c[2]);
     }
