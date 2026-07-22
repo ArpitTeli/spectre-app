@@ -106,14 +106,15 @@ function buildingColor(type) {
   return 0x888888;
 }
 
-function generateTrees(heightImg, count = 2000) {
+function generateTrees(heightImg, count = 3000) {
   const trees = [];
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < count * 3; i++) {
+    if (trees.length >= count) break;
     const ax = Math.random() * MAP;
     const ay = Math.random() * MAP;
     const h = getHeightAt(heightImg, ax, ay);
-    if (h < 0.5 || h > 100) continue;
-    const prob = h < 30 ? 0.3 : h < 60 ? 0.7 : 0.4;
+    if (h < 1 || h > 200) continue;
+    const prob = h < 30 ? 0.5 : h < 80 ? 0.8 : 0.5;
     if (Math.random() > prob) continue;
     trees.push([ax, ay, h]);
   }
@@ -155,8 +156,10 @@ export default function MapView3D({ units }) {
     ctrl.maxPolarAngle = Math.PI / 2.1;
     ctrl.minDistance = 5;
     ctrl.maxDistance = 20000;
-    ctrl.dampingFactor = 0.12;
-    ctrl.rotateSpeed = 0.8;
+    ctrl.enableDamping = false;
+    ctrl.panSpeed = 2.0;
+    ctrl.rotateSpeed = 1.0;
+    ctrl.zoomSpeed = 1.5;
     ctrl.keys = { LEFT: 0, RIGHT: 0, UP: 0, BOTTOM: 0 };
     ctrl.enableKeys = false;
     ctrl.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
@@ -235,10 +238,10 @@ export default function MapView3D({ units }) {
     // Trees (procedural, low-poly 3D)
     const treesGroup = new THREE.Group();
     scene.add(treesGroup);
-    const treePositions = generateTrees(hImg, 1500);
-    const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 3, 6);
+    const treePositions = generateTrees(hImg, 3000);
+    const trunkGeo = new THREE.CylinderGeometry(0.8, 1.2, 6, 6);
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3a2818, roughness: 1 });
-    const foliageGeo = new THREE.IcosahedronGeometry(1.5, 0);
+    const foliageGeo = new THREE.IcosahedronGeometry(4, 0);
     const foliageMat = new THREE.MeshStandardMaterial({ color: 0x2d5a1e, roughness: 1 });
     const treeCount = treePositions.length;
     const trunkInst = new THREE.InstancedMesh(trunkGeo, trunkMat, treeCount);
@@ -248,14 +251,14 @@ export default function MapView3D({ units }) {
     const s2 = new THREE.Vector3();
     for (let i = 0; i < treeCount; i++) {
       const [ax, ay, ah] = treePositions[i];
-      const scale = 0.8 + Math.random() * 0.6;
+      const scale = 0.8 + Math.random() * 0.8;
       s2.set(scale, scale, scale);
       // Trunk at base
-      p2.set(ax - HALF, ah + 1.5 * scale, -(ay - HALF));
+      p2.set(ax - HALF, ah + 3 * scale, -(ay - HALF));
       mat2.compose(p2, new THREE.Quaternion(), s2);
       trunkInst.setMatrixAt(i, mat2);
       // Foliage above trunk
-      p2.set(ax - HALF, ah + 4 * scale, -(ay - HALF));
+      p2.set(ax - HALF, ah + 8 * scale, -(ay - HALF));
       mat2.compose(p2, new THREE.Quaternion(), s2);
       foliageInst.setMatrixAt(i, mat2);
     }
