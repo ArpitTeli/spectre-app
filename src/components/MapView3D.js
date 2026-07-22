@@ -1,6 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader';
 
 const MAP = 8192;
 const HALF = MAP / 2;
@@ -8,7 +10,25 @@ const RES = 256;
 const EXAG = 1.5;
 const SAT_ZOOM = 3;
 const TS = 226;
-const CRS_SCALE = TS / 0.027475; // 8226.37 — matches jetelain satellite tile CRS
+const CRS_SCALE = TS / 0.027475;
+
+const MODEL_SCALE = {
+  helicopter: 0.08,
+  tank: 0.12,
+  tank_destroyer: 0.12,
+  vehicle: 0.10,
+  jeep: 0.10,
+  infantry: 1,
+};
+
+const MODEL_HEIGHT_OFFSET = {
+  helicopter: 8,
+  tank: 3,
+  tank_destroyer: 3,
+  vehicle: 3,
+  jeep: 3,
+  infantry: 3,
+};
 
 function loadSatTiles() {
   return new Promise((resolve) => {
@@ -99,17 +119,140 @@ function getHeightAt(armaX, armaY) {
   return Math.max(0, -157.5 + (v / 255) * 392.4) * EXAG;
 }
 
-export default function MapView3D({ units }) {
+function loadOBJ(url) {
+  return new Promise((resolve, reject) => {
+    const loader = new OBJLoader();
+    loader.load(url, resolve, undefined, reject);
+  });
+}
+
+function loadFBX(url) {
+  return new Promise((resolve, reject) => {
+    const loader = new FBXLoader();
+    loader.load(url, resolve, undefined, reject);
+  });
+}
+
+function loadMultiPartOBJ(baseDir, files) {
+  return Promise.all(files.map(f => loadOBJ(`${baseDir}/${f}`).catch(() => null)))
+    .then(parts => {
+      const group = new THREE.Group();
+      parts.filter(Boolean).forEach(p => group.add(p));
+      return group.children.length > 0 ? group : null;
+    });
+}
+
+function applyMaterial(model, color, emissive, emissiveIntensity) {
+  model.traverse(child => {
+    if (child.isMesh) {
+      child.material = new THREE.MeshStandardMaterial({
+        color,
+        emissive,
+        emissiveIntensity,
+        roughness: 0.7,
+        metalness: 0.3,
+        side: THREE.DoubleSide,
+      });
+    }
+  });
+}
+
+function applyFBXTextures(model, baseDir, textures) {
+  const textureLoader = new THREE.TextureLoader();
+  const loadTex = (name) => {
+    if (!textures[name]) return null;
+    const tex = textureLoader.load(`${baseDir}/${textures[name]}`);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  };
+
+  const baseColorMap = loadTex('baseColor');
+  const normalMap = loadTex('normal');
+  const roughnessMap = loadTex('roughness');
+  const metallicMap = loadTex('metallic');
+
+  model.traverse(child => {
+    if (child.isMesh) {
+      child.material = new THREE.MeshStandardMaterial({
+        map: baseColorMap,
+        normalMap,
+        roughnessMap,
+        metalnessMap: metallicMap,
+        roughness: 0.8,
+        metalness: 0.3,
+        side: THREE.DoubleSide,
+      });
+    }
+  });
+}
+
+function getUnitModelType(unit) {
+  const vt = (unit.vehicle_type || '').toUpperCase();
+  const t = (unit.type || '').toUpperCase();
+  if (t.includes('HELICOPTER') || vt.includes('HELICOPTER') || t === 'AIR') return 'helicopter';
+  if (t.includes('TANK') || vt.includes('TANK') || vt.includes('TRACKED')) return 'tank';
+  if (vt.includes('CAR') || vt.includes('WHEELED') || vt.includes('MRAP') || vt.includes('JLTV')) return 'vehicle';
+  return 'infantry';
+}
+
+function makeInfantryMesh(color, emissive, opacity) {
+  const group = new THREE.Group();
+  const bodyGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.6, 8);
+  const bodyMat = new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: 0.4, roughness: 0.7, metalness: 0.2 });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = 0.8;
+  group.add(body);
+  const headGeo = new THREE.SphereGeometry(0.25, 8, 6);
+  const head = new THREE.Mesh(headGeo, bodyMat);
+  head.position.y = 1.85;
+  group.add(head);
+  return group;
+}
+
+export default function MapView3D({ units, contacts, onUnitSelect, onContactSelect }) {
   const ref = useRef(null);
   const st = useRef({});
   const [status, setStatus] = useState('loading');
   const [hImg, setHImg] = useState(null);
+  const [models, setModels] = useState(null);
 
   useEffect(() => {
     const img = new Image();
     img.onload = () => setHImg(img);
     img.onerror = () => setStatus('no heightmap');
     img.src = 'maps/stratis_height.png';
+  }, []);
+
+  useEffect(() => {
+    const M = 'models';
+    Promise.all([
+      loadOBJ(`${M}/Attack Helicopter.obj`).catch(() => null),
+      loadOBJ(`${M}/Tank.obj`).catch(() => null),
+      loadOBJ(`${M}/Armored Vehicle.obj`).catch(() => null),
+      loadMultiPartOBJ(`${M}/jeep`, [
+        'JeepBody.obj', 'JeepLargeSeat.obj', 'JeepSmallSeat.obj',
+        'JeepSteeringWheel.obj', 'JeepTire.obj',
+      ]),
+      loadFBX(`${M}/tank_destroyer/reconTank.fbx`).catch(() => null).then(m => {
+        if (m) applyFBXTextures(m, `${M}/tank_destroyer`, {
+          baseColor: 'BaseColor.png', normal: 'Normal.png',
+          roughness: 'Roughness.png', metallic: 'Metallic.png',
+        });
+        return m;
+      }),
+      loadFBX(`${M}/Soldier.fbx`).catch(() => null),
+    ]).then(([heli, tank, armored, jeep, tankDest, soldier]) => {
+      const loaded = {
+        helicopter: heli,
+        tank,
+        vehicle: armored,
+        jeep,
+        tank_destroyer: tankDest,
+        infantry: soldier,
+      };
+      setModels(loaded);
+      console.log('[MODELS] Loaded:', Object.entries(loaded).map(([k, v]) => `${k}:${v ? 'ok' : 'fail'}`).join(', '));
+    });
   }, []);
 
   useEffect(() => {
@@ -170,7 +313,6 @@ export default function MapView3D({ units }) {
       setStatus('ready');
     });
 
-    // Buildings + all terrain objects (binary format via Web Worker)
     const buildingsGroup = new THREE.Group();
     scene.add(buildingsGroup);
 
@@ -226,7 +368,6 @@ export default function MapView3D({ units }) {
       };
     }).catch(() => {});
 
-    // Roads
     fetch('maps/stratis_roads.bin').then(r => r.arrayBuffer()).then(buf => {
       const dv = new DataView(buf);
       let off = 0;
@@ -289,7 +430,6 @@ export default function MapView3D({ units }) {
       console.log('[ROADS] Created', meshCount, 'road chain meshes');
     }).catch(() => {});
 
-    // Unit markers
     const markers = new THREE.Group();
     scene.add(markers);
 
@@ -349,8 +489,21 @@ export default function MapView3D({ units }) {
     const s = st.current;
     if (!s.markers) return;
     const g = s.markers;
-    while (g.children.length) { const ch = g.children[0]; if (ch.geometry) ch.geometry.dispose(); if (ch.material) ch.material.dispose(); g.remove(ch); }
-    const sg = new THREE.SphereGeometry(6, 6, 6);
+    while (g.children.length) {
+      const ch = g.children[0];
+      ch.traverse(child => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+          else child.material.dispose();
+        }
+      });
+      g.remove(ch);
+    }
+
+    const BLUE = 0x3b82f6;
+    const DEAD = 0x585870;
+
     Object.values(units || {}).forEach(u => {
       const p = u.position;
       if (!p || p.x === undefined || p.y === undefined) return;
@@ -359,19 +512,61 @@ export default function MapView3D({ units }) {
       if (!hImg) return;
       const h = getHeightAt(p.x, p.y);
       const dead = u.status === 'DESTROYED' || u.status === 'DEAD';
-      const op = dead ? 0.25 : 1;
-      const veh = u.vehicle_type && !['INFANTRY','MAN'].includes(u.vehicle_type);
-      const col = dead ? 0x585870 : veh ? 0x3b82f6 : 0x60a5fa;
-      const mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op });
-      if (veh) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(16, 6, 10), mat);
-        m.position.set(tx, h + 5, tz); g.add(m);
+      const color = dead ? DEAD : BLUE;
+      const emissive = dead ? 0x222233 : 0x1a4a8a;
+      const opacity = dead ? 0.4 : 1;
+
+      const modelType = getUnitModelType(u);
+      const template = models && models[modelType];
+
+      if (!template) {
+        const m = makeInfantryMesh(color, emissive, opacity);
+        m.position.set(tx, h + MODEL_HEIGHT_OFFSET.infantry, tz);
+        g.add(m);
       } else {
-        const m = new THREE.Mesh(sg.clone(), mat);
-        m.position.set(tx, h + 3, tz); g.add(m);
+        const clone = template.clone();
+        if (modelType === 'infantry' || modelType === 'tank_destroyer') {
+          applyMaterial(clone, color, emissive, 0.5);
+        } else {
+          applyMaterial(clone, color, emissive, 0.5);
+        }
+        const scale = MODEL_SCALE[modelType] || 0.1;
+        clone.scale.set(scale, scale, scale);
+        clone.position.set(tx, h + (MODEL_HEIGHT_OFFSET[modelType] || 3), tz);
+        g.add(clone);
       }
     });
-  }, [units, hImg]);
+
+    Object.values(contacts || {}).forEach(c => {
+      const p = c.position;
+      if (!p || p.x === undefined || p.y === undefined) return;
+      const tx = p.x - HALF;
+      const tz = -(p.y - HALF);
+      if (!hImg) return;
+      const h = getHeightAt(p.x, p.y);
+
+      const state = (c.state || '').toUpperCase();
+      const opacity = state === 'LAST_KNOWN' ? 0.5 : state === 'SUSPECTED' ? 0.3 : 1;
+      const color = DEAD;
+      const emissive = 0x8a1a1a;
+
+      const modelType = getUnitModelType(c);
+      const template = models && models[modelType];
+
+      if (!template) {
+        const m = makeInfantryMesh(color, emissive, opacity);
+        m.position.set(tx, h + MODEL_HEIGHT_OFFSET.infantry, tz);
+        g.add(m);
+      } else {
+        const clone = template.clone();
+        applyMaterial(clone, color, emissive, 0.6);
+        const scale = MODEL_SCALE[modelType] || 0.1;
+        clone.scale.set(scale, scale, scale);
+        clone.position.set(tx, h + (MODEL_HEIGHT_OFFSET[modelType] || 3), tz);
+        g.add(clone);
+      }
+    });
+  }, [units, contacts, models, hImg]);
 
   return (
     <div style={{ position:'relative', width:'100%', height:'100%', overflow:'hidden' }}>
