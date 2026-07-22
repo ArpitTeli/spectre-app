@@ -99,19 +99,6 @@ function getHeightAt(armaX, armaY) {
   return Math.max(0, -157.5 + (v / 255) * 392.4) * EXAG;
 }
 
-function buildingColor(type) {
-  const t = (type || '').toLowerCase();
-  if (t.includes('hangar') || t.includes('industrial')) return 0x666670;
-  if (t.includes('wall') || t.includes('fence')) return 0x8a8a82;
-  if (t.includes('tower')) return 0x4a4a52;
-  if (t.includes('bunker') || t.includes('fortress')) return 0x6a6a62;
-  if (t.includes('chapel') || t.includes('church')) return 0xc8b890;
-  if (t.includes('fuel')) return 0x808088;
-  if (t.includes('house') || t.includes('cabin')) return 0xa89070;
-  if (t.includes('rock')) return 0x707068;
-  return 0x888888;
-}
-
 export default function MapView3D({ units }) {
   const ref = useRef(null);
   const st = useRef({});
@@ -183,63 +170,58 @@ export default function MapView3D({ units }) {
       setStatus('ready');
     });
 
-    // Buildings + all terrain objects
+    // Buildings + all terrain objects (binary format via Web Worker)
     const buildingsGroup = new THREE.Group();
     scene.add(buildingsGroup);
-    fetch('maps/stratis_buildings.json').then(r => r.json()).then(data => {
-      const bs = Array.isArray(data) ? data : (data.buildings || []);
-      const typeGroups = {};
-      for (const b of bs) {
-        const type = b.type || '';
-        const w = Math.max(0.3, b.width || 1);
-        const h = Math.max(0.3, b.height || 1);
-        const d = Math.max(0.3, b.depth || 1);
-        let key;
-        if (type) {
-          key = type;
-        } else {
-          key = `_${Math.round(w)}_${Math.round(h)}_${Math.round(d)}`;
-        }
-        if (!typeGroups[key]) {
-          let color;
-          if (type) {
-            color = buildingColor(type);
-          } else {
-            const aspect = h / Math.max(w, d);
-            if (aspect > 2.0) color = 0x2d5a1e;
-            else if (h < 1.5 && w * d > 4) color = 0x606058;
-            else if (w * h * d < 3) color = 0x4a6a30;
-            else color = 0x3a6a28;
+
+    const DENSITY_OPACITY = [0.35, 0.50, 0.70, 0.90];
+
+    fetch('maps/stratis_objects.bin').then(r => r.arrayBuffer()).then(buf => {
+      const worker = new Worker('terrainWorker.js');
+      worker.postMessage(buf);
+      worker.onmessage = (e) => {
+        const groups = e.data;
+        const coneGeo = new THREE.ConeGeometry(1, 1, 6);
+        const sphereGeo = new THREE.SphereGeometry(1, 6, 6);
+        const flatGeo = new THREE.SphereGeometry(1, 8, 4);
+        const geos = [coneGeo, sphereGeo, flatGeo];
+        const baseColors = [0x2d5a1e, 0x3a6a28, 0x4a6a30];
+
+        const m4 = new THREE.Matrix4();
+        const euler = new THREE.Euler();
+        const quat = new THREE.Quaternion();
+        const scl = new THREE.Vector3();
+        const pos = new THREE.Vector3();
+
+        for (const key in groups) {
+          const g = groups[key];
+          if (g.count === 0) continue;
+          const geo = geos[g.shape];
+          const color = baseColors[g.shape];
+          const opacity = DENSITY_OPACITY[g.density];
+          const mat = new THREE.MeshStandardMaterial({
+            color, roughness: 0.9, transparent: true, opacity, side: THREE.DoubleSide,
+          });
+          const instMesh = new THREE.InstancedMesh(geo, mat, g.count);
+          for (let i = 0; i < g.count; i++) {
+            const x = g.x[i], y = g.y[i], z = g.z[i];
+            const dir = g.dir[i];
+            const w = Math.max(0.3, g.w[i]);
+            const h = Math.max(0.3, g.h[i]);
+            const d = Math.max(0.3, g.d[i]);
+            const th = getHeightAt(x, y);
+            pos.set(x - HALF, th + z + h / 2, -(y - HALF));
+            scl.set(w, h, d);
+            euler.set(0, -dir * Math.PI / 180, 0, 'YXZ');
+            quat.setFromEuler(euler);
+            m4.compose(pos, quat, scl);
+            instMesh.setMatrixAt(i, m4);
           }
-          typeGroups[key] = { mat: new THREE.MeshStandardMaterial({ color, roughness: 0.9 }), instances: [] };
+          instMesh.instanceMatrix.needsUpdate = true;
+          buildingsGroup.add(instMesh);
         }
-        typeGroups[key].instances.push({
-          x: b.x, y: b.y, z: b.z || 0,
-          dir: b.direction || 0, w, h, d,
-        });
-      }
-      const unitGeo = new THREE.BoxGeometry(1, 1, 1);
-      const m4 = new THREE.Matrix4();
-      const euler = new THREE.Euler();
-      const quat = new THREE.Quaternion();
-      const scl = new THREE.Vector3();
-      const pos = new THREE.Vector3();
-      for (const key in typeGroups) {
-        const g = typeGroups[key];
-        const instMesh = new THREE.InstancedMesh(unitGeo, g.mat, g.instances.length);
-        for (let i = 0; i < g.instances.length; i++) {
-          const inst = g.instances[i];
-          const th = getHeightAt(inst.x, inst.y);
-          pos.set(inst.x - HALF, th + inst.z + inst.h / 2, -(inst.y - HALF));
-          scl.set(inst.w, inst.h, inst.d);
-          euler.set(0, -inst.dir * Math.PI / 180, 0, 'YXZ');
-          quat.setFromEuler(euler);
-          m4.compose(pos, quat, scl);
-          instMesh.setMatrixAt(i, m4);
-        }
-        instMesh.instanceMatrix.needsUpdate = true;
-        buildingsGroup.add(instMesh);
-      }
+        worker.terminate();
+      };
     }).catch(() => {});
 
     // Unit markers
