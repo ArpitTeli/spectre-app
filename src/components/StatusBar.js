@@ -92,7 +92,7 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
         <button className="statusbar__btn" onClick={() => window.spectreAPI?.openExternal?.(webUrl)}>◎ WEB</button>
       )}
       <button className="statusbar__btn" onClick={onCommsToggle}>◈ COMMS</button>
-      <div className="statusbar__value" style={{ fontSize: '8px', letterSpacing: '1px', color: 'var(--text-muted)' }}>v1.8.0</div>
+      <div className="statusbar__value" style={{ fontSize: '8px', letterSpacing: '1px', color: 'var(--text-muted)' }}>v1.8.1</div>
     </div>
   );
 }

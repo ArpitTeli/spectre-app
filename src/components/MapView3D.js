@@ -3,21 +3,26 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 const MAP_SIZE = 8192;
-const GRID_SIZE = 512;
-const TILE_URL = 'https://jetelain.github.io/Arma3Map/maps/stratis';
+const GRID_SIZE = 1024;
+const TILE_SERVER = 'https://jetelain.github.io/Arma3Map';
+const TILE_PATTERN = '/maps/stratis/{z}/{x}/{y}.png';
+const MAX_ZOOM = 4;
+const TILE_SIZE = 226;
+const MOVE_SPEED = 200;
 
 function generateHeight(x, z) {
   const nx = x / MAP_SIZE;
   const nz = z / MAP_SIZE;
   let h = 0;
-  const ridge = Math.sin(nx * 3.0 + nz * 2.0) * 0.3 +
-                Math.sin(nx * 1.5 + nz * 4.0) * 0.2;
+  const ridge = Math.sin(nx * 3.0 + nz * 2.0) * 0.4 +
+                Math.sin(nx * 1.5 + nz * 4.0) * 0.25;
   h += Math.max(0, ridge * 80);
-  h += Math.sin(nx * 8 + nz * 6) * 12;
-  h += Math.sin(nx * 15 + nz * 10) * 6;
-  h += Math.cos(nx * 20 - nz * 25) * 3;
-  const dx = Math.min(x, MAP_SIZE - x) / 200;
-  const dz = Math.min(z, MAP_SIZE - z) / 200;
+  h += Math.sin(nx * 8 + nz * 6) * 15;
+  h += Math.sin(nx * 15 + nz * 10) * 8;
+  h += Math.cos(nx * 20 - nz * 25) * 4;
+  h += Math.sin(nx * 30 + nz * 20) * 3;
+  const dx = Math.min(x, MAP_SIZE - x, 200) / 200;
+  const dz = Math.min(z, MAP_SIZE - z, 200) / 200;
   h *= Math.min(1, Math.min(dx, dz));
   return Math.max(0, Math.min(135, h));
 }
@@ -51,81 +56,68 @@ function buildTerrainGeo() {
 
 function buildSatTexture() {
   return new Promise(resolve => {
+    const tilesPerRow = Math.pow(2, MAX_ZOOM);
+    const totalTiles = tilesPerRow * tilesPerRow;
+    const outSize = tilesPerRow * TILE_SIZE;
     const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 1024;
+    canvas.width = outSize;
+    canvas.height = outSize;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#1a2a1a';
-    ctx.fillRect(0, 0, 1024, 1024);
-    const ts = 256, tpr = 4;
+    ctx.fillRect(0, 0, outSize, outSize);
+
     let loaded = 0;
-    for (let ty = 0; ty < tpr; ty++) {
-      for (let tx = 0; tx < tpr; tx++) {
+    let hasError = false;
+
+    for (let ty = 0; ty < tilesPerRow; ty++) {
+      for (let tx = 0; tx < tilesPerRow; tx++) {
+        const url = `${TILE_SERVER}/maps/stratis/${MAX_ZOOM}/${tx}/${ty}.png`;
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => {
-          ctx.drawImage(img, tx * ts, ty * ts, ts, ts);
+          ctx.drawImage(img, tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE);
           loaded++;
-          if (loaded === tpr * tpr) resolve(canvas);
+          if (loaded === totalTiles) resolve(canvas);
         };
         img.onerror = () => {
-          ctx.fillStyle = '#2a3a2a';
-          ctx.fillRect(tx * ts, ty * ts, ts, ts);
+          hasError = true;
           loaded++;
-          if (loaded === tpr * tpr) resolve(canvas);
+          if (loaded === totalTiles) resolve(canvas);
         };
-        img.src = `${TILE_URL}/10/${tx}/${ty}.png`;
+        img.src = url;
       }
     }
-    if (tpr * tpr === 0) resolve(canvas);
   });
 }
 
 function posTo3D(x, y) {
-  return new THREE.Vector3(x - MAP_SIZE / 2, generateHeight(x, y) + 5, y - MAP_SIZE / 2);
-}
-
-function addUnitMarkers(scene, units, onSelect) {
-  const group = new THREE.Group();
-  const geo = new THREE.SphereGeometry(12, 8, 8);
-  const mat = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
-
-  Object.values(units).forEach(u => {
-    const p = u.position;
-    if (!p) return;
-    const mesh = new THREE.Mesh(geo, mat.clone());
-    const pos = posTo3D(p.x, p.y);
-    mesh.position.copy(pos);
-    mesh.userData = { id: u.id };
-    if (u.status === 'DESTROYED' || u.status === 'DEAD') {
-      mesh.material.color.setHex(0x585870);
-      mesh.material.transparent = true;
-      mesh.material.opacity = 0.3;
-    }
-    group.add(mesh);
-  });
-
-  scene.add(group);
-  return group;
+  const wx = x - MAP_SIZE / 2;
+  const wz = y - MAP_SIZE / 2;
+  return new THREE.Vector3(wx, generateHeight(x, y) + 3, wz);
 }
 
 export default function MapView3D({ units, contacts, onUnitSelect, onContactSelect }) {
   const containerRef = useRef(null);
-  const sceneObjectsRef = useRef({ scene: null, terrain: null, markers: null, controls: null, renderer: null, camera: null });
-  const [status, setStatus] = useState('initializing');
+  const stateRef = useRef({ controls: null, camera: null, scene: null, markers: null });
+  const keysRef = useRef({});
+  const [status, setStatus] = useState('init');
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || container.clientWidth === 0) return;
+    if (!container || container.clientWidth === 0) {
+      const retry = setTimeout(() => setStatus(s => s), 100);
+      return () => clearTimeout(retry);
+    }
 
     const w = container.clientWidth;
     const h = container.clientHeight;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x08080c);
+    scene.fog = new THREE.Fog(0x08080c, 8000, 15000);
 
-    const camera = new THREE.PerspectiveCamera(60, w / h, 1, 50000);
-    camera.position.set(6000, 4000, 4000);
+    const camera = new THREE.PerspectiveCamera(60, w / h, 1, 30000);
+    camera.position.set(0, 800, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(w, h);
@@ -134,57 +126,97 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0, 0);
-    controls.maxPolarAngle = Math.PI / 2.05;
-    controls.minDistance = 100;
-    controls.maxDistance = 15000;
-    controls.dampingFactor = 0.08;
+    controls.maxPolarAngle = Math.PI / 2.1;
+    controls.minDistance = 10;
+    controls.maxDistance = 20000;
+    controls.dampingFactor = 0.1;
+    controls.rotateSpeed = 0.6;
     controls.update();
 
-    const ambient = new THREE.AmbientLight(0x888888, 0.6);
+    stateRef.current = { controls, camera, scene, renderer };
+
+    const ambient = new THREE.AmbientLight(0x888888, 0.5);
     scene.add(ambient);
-    const sun = new THREE.DirectionalLight(0xffeedd, 1.2);
+    const sun = new THREE.DirectionalLight(0xffeedd, 1.0);
     sun.position.set(5000, 8000, 3000);
     scene.add(sun);
     const fill = new THREE.DirectionalLight(0x8888ff, 0.3);
     fill.position.set(-3000, 2000, -4000);
     scene.add(fill);
 
-    const grid = new THREE.GridHelper(MAP_SIZE, 20, 0x333355, 0x222244);
-    grid.position.y = -50;
+    const grid = new THREE.GridHelper(MAP_SIZE, 32, 0x333355, 0x222244);
+    grid.position.y = -2;
     scene.add(grid);
 
-    // Terrain
     const terrainGeo = buildTerrainGeo();
     const terrainMat = new THREE.MeshStandardMaterial({
       color: 0x2a3a2a,
-      roughness: 1,
+      roughness: 0.9,
       metalness: 0,
       flatShading: false,
       side: THREE.DoubleSide,
     });
     const terrain = new THREE.Mesh(terrainGeo, terrainMat);
+    terrain.receiveShadow = false;
     scene.add(terrain);
 
-    // Load satellite texture async
-    setStatus('loading sat...');
+    const markers = new THREE.Group();
+    scene.add(markers);
+
+    setStatus('loading');
+
     buildSatTexture().then(canvas => {
       const tex = new THREE.CanvasTexture(canvas);
       tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
       terrainMat.map = tex;
       terrainMat.needsUpdate = true;
       setStatus('ready');
-    });
+    }).catch(() => setStatus('ready (no sat)'));
 
-    // Unit markers
-    const markers = addUnitMarkers(scene, units || {});
+    // WASD keyboard handling
+    const keys = {};
+    keysRef.current = keys;
 
-    sceneObjectsRef.current = { scene, terrain, markers, controls, renderer, camera };
+    function onKey(e) {
+      keys[e.key.toLowerCase()] = e.type === 'keydown';
+    }
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKey);
 
     let running = true;
     function animate() {
       if (!running) return;
       requestAnimationFrame(animate);
-      controls.update();
+
+      const ctrl = stateRef.current.controls;
+      if (ctrl) {
+        const cam = ctrl.object;
+        const forward = new THREE.Vector3();
+        cam.getWorldDirection(forward);
+        forward.y = 0;
+        forward.normalize();
+
+        const right = new THREE.Vector3();
+        right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+        let moved = false;
+        const speed = MOVE_SPEED * (keys['shift'] ? 3 : 1);
+
+        if (keys['w'] || keys['arrowup']) { ctrl.target.add(forward.clone().multiplyScalar(speed)); moved = true; }
+        if (keys['s'] || keys['arrowdown']) { ctrl.target.add(forward.clone().multiplyScalar(-speed)); moved = true; }
+        if (keys['a'] || keys['arrowleft']) { ctrl.target.add(right.clone().multiplyScalar(-speed)); moved = true; }
+        if (keys['d'] || keys['arrowright']) { ctrl.target.add(right.clone().multiplyScalar(speed)); moved = true; }
+
+        if (moved) {
+          // Clamp to map bounds
+          const half = MAP_SIZE / 2;
+          ctrl.target.x = Math.max(-half, Math.min(half, ctrl.target.x));
+          ctrl.target.z = Math.max(-half, Math.min(half, ctrl.target.z));
+        }
+
+        ctrl.update();
+      }
+
       renderer.render(scene, camera);
     }
     animate();
@@ -202,31 +234,107 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
 
     return () => {
       running = false;
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKey);
       window.removeEventListener('resize', onResize);
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Update unit markers
+  useEffect(() => {
+    const st = stateRef.current;
+    if (!st.scene) return;
+
+    // Find or create markers group
+    let markers = st.markers;
+    if (!markers) {
+      markers = new THREE.Group();
+      st.scene.add(markers);
+      st.markers = markers;
+    }
+
+    // Remove old markers
+    while (markers.children.length) {
+      const c = markers.children[0];
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) c.material.dispose();
+      markers.remove(c);
+    }
+
+    const sphereGeo = new THREE.SphereGeometry(8, 8, 8);
+    const coneGeo = new THREE.ConeGeometry(6, 16, 6);
+
+    Object.values(units || {}).forEach(u => {
+      const p = u.position;
+      if (!p) return;
+      const pos = posTo3D(p.x, p.y);
+
+      const group = new THREE.Group();
+
+      if (u.vehicle_type && u.vehicle_type !== 'INFANTRY') {
+        const mat = new THREE.MeshBasicMaterial({
+          color: u.status === 'DESTROYED' || u.status === 'DEAD' ? 0x585870 : 0x3b82f6,
+          transparent: true,
+          opacity: u.status === 'DESTROYED' || u.status === 'DEAD' ? 0.3 : 1,
+        });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(20, 8, 12), mat);
+        mesh.position.copy(pos);
+        mesh.position.y += 6;
+        group.add(mesh);
+      } else {
+        const mat = new THREE.MeshBasicMaterial({
+          color: u.status === 'DESTROYED' || u.status === 'DEAD' ? 0x585870 : 0x3b82f6,
+          transparent: u.status === 'DESTROYED' || u.status === 'DEAD',
+          opacity: u.status === 'DESTROYED' ? 0.3 : 1,
+        });
+        const mesh = new THREE.Mesh(sphereGeo, mat);
+        mesh.position.copy(pos);
+        group.add(mesh);
+      }
+
+      // Direction indicator
+      if (u.hdg !== undefined) {
+        const dirMat = new THREE.MeshBasicMaterial({
+          color: 0x60a5fa,
+          transparent: true,
+          opacity: u.status === 'DESTROYED' ? 0.2 : 1,
+        });
+        const dir = new THREE.Mesh(coneGeo, dirMat);
+        dir.position.copy(pos);
+        dir.position.y += 5;
+        dir.rotation.x = Math.PI / 2;
+        dir.rotation.z = (u.hdg || 0) * Math.PI / 180;
+        group.add(dir);
+      }
+
+      markers.add(group);
+    });
+  }, [units]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
       <div style={{
         position: 'absolute', top: 12, left: 12, zIndex: 10,
-        display: 'flex', gap: 4
+        display: 'flex', gap: 4, alignItems: 'center'
       }}>
         <span className="badge badge-primary">3D</span>
-        <span className={`badge ${status === 'ready' ? 'badge-success' : ''}`}>{status}</span>
+        <span className={`badge ${status === 'ready' ? 'badge-success' : ''}`}
+          style={{ opacity: status === 'loading' ? 0.6 : 1 }}>
+          {status}
+        </span>
       </div>
       <div style={{
         position: 'absolute', bottom: 12, left: 12, zIndex: 10,
         fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)',
-        background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: 3,
+        background: 'rgba(0,0,0,0.7)', padding: '5px 10px', borderRadius: 3,
         pointerEvents: 'none'
       }}>
-        M=2D  Drag=orbit  Scroll=zoom  Right-drag=pan
+        WASD+Shift=move · Drag=orbit · Scroll=zoom · M=2D
       </div>
     </div>
   );
