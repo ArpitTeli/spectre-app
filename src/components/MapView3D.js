@@ -7,6 +7,15 @@ const HALF = MAP / 2;
 const RES = 256;
 const EXAG = 1.5;
 
+// Create a POT canvas from an image (handles NPOT textures)
+function imgToPOT(img, size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, size, size);
+  return c;
+}
+
 function buildMesh(heightImg) {
   const verts = [], uvs = [], cols = [], idx = [];
   const step = MAP / RES;
@@ -44,9 +53,9 @@ function buildMesh(heightImg) {
     for (let ix = 0; ix <= RES; ix++) {
       const wx = ix * step, wy = iy * step;
       const h = getH(wx, wy);
-      verts.push(wx - HALF, h, wy - HALF);
-      // UV: U=west→east (0→1), V=south→north (0→1)
-      uvs.push(ix / RES, iy / RES);
+      verts.push(-(wx - HALF), h, -(wy - HALF));
+      // UV: U=west→east, V=south→north
+      uvs.push(1 - ix / RES, 1 - iy / RES);
       const c = hc(Math.min(1, h / (135 * EXAG)));
       cols.push(c[0], c[1], c[2]);
     }
@@ -69,7 +78,6 @@ function buildMesh(heightImg) {
 function loadSatTile() {
   return new Promise((resolve) => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
     img.src = 'https://jetelain.github.io/Arma3Map/maps/stratis/0/0/0.png';
@@ -136,12 +144,21 @@ export default function MapView3D({ units }) {
     setStatus('loading sat');
     loadSatTile().then(satImg => {
       if (satImg) {
-        const tex = new THREE.Texture(satImg);
-        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+        // Convert NPOT tile to POT canvas
+        const potCanvas = imgToPOT(satImg, 512);
+        const tex = new THREE.CanvasTexture(potCanvas);
+        tex.wrapS = THREE.ClampToEdgeWrapping;
+        tex.wrapT = THREE.ClampToEdgeWrapping;
         tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-        mat.map = tex;
-        mat.vertexColors = false;
-        mat.needsUpdate = true;
+
+        const texMat = new THREE.MeshStandardMaterial({
+          map: tex,
+          roughness: 0.9,
+          metalness: 0,
+          side: THREE.DoubleSide,
+        });
+        mesh.material = texMat;
+        mesh.material.needsUpdate = true;
         setStatus('ready');
       } else {
         setStatus('ready (no sat)');
@@ -210,8 +227,8 @@ export default function MapView3D({ units }) {
     Object.values(units || {}).forEach(u => {
       const p = u.position;
       if (!p || p.x === undefined || p.y === undefined) return;
-      const tx = p.x - HALF;
-      const tz = p.y - HALF;
+      const tx = -(p.x - HALF);
+      const tz = -(p.y - HALF);
       if (!heightImg) return;
       const c2 = document.createElement('canvas');
       c2.width = heightImg.width; c2.height = heightImg.height;
