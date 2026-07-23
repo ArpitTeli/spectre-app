@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader';
 
 const MAP = 8192;
 const HALF = MAP / 2;
@@ -15,7 +14,6 @@ const CRS_SCALE = TS / 0.027475;
 const MODEL_WORLD_SIZE = {
   helicopter: 28,
   tank: 8,
-  tank_destroyer: 5,
   vehicle: 14,
   jeep: 5,
   infantry: 2,
@@ -24,7 +22,6 @@ const MODEL_WORLD_SIZE = {
 const MODEL_HEIGHT_OFFSET = {
   helicopter: 8,
   tank: 3,
-  tank_destroyer: 3,
   vehicle: 3,
   jeep: 3,
   infantry: 1.5,
@@ -149,32 +146,6 @@ function loadOBJ(url) {
   });
 }
 
-function loadFBX(url) {
-  return new Promise((resolve, reject) => {
-    const loader = new FBXLoader();
-    loader.load(url, (model) => {
-      const geoBox = new THREE.Box3();
-      model.traverse(child => {
-        if (child.isMesh && child.geometry) {
-          child.geometry.computeBoundingBox();
-          if (child.geometry.boundingBox) {
-            geoBox.union(child.geometry.boundingBox);
-          }
-        }
-      });
-      const size = geoBox.getSize(new THREE.Vector3());
-      const center = geoBox.getCenter(new THREE.Vector3());
-      model.traverse(child => {
-        if (child.isMesh && child.geometry) {
-          child.geometry.translate(-center.x, -center.y, -center.z);
-        }
-      });
-      model.userData.rawSize = Math.max(size.x, size.y, size.z);
-      resolve(model);
-    }, undefined, reject);
-  });
-}
-
 function loadMultiPartOBJ(baseDir, files) {
   return Promise.all(files.map(f => loadOBJ(`${baseDir}/${f}`).catch(() => null)))
     .then(parts => {
@@ -213,41 +184,12 @@ function applyMaterial(model, color, emissive, emissiveIntensity) {
   });
 }
 
-function applyFBXTextures(model, baseDir, textures) {
-  const textureLoader = new THREE.TextureLoader();
-  const loadTex = (name) => {
-    if (!textures[name]) return null;
-    const tex = textureLoader.load(`${baseDir}/${textures[name]}`);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    return tex;
-  };
-
-  const baseColorMap = loadTex('baseColor');
-  const normalMap = loadTex('normal');
-  const roughnessMap = loadTex('roughness');
-  const metallicMap = loadTex('metallic');
-
-  model.traverse(child => {
-    if (child.isMesh) {
-      child.material = new THREE.MeshStandardMaterial({
-        map: baseColorMap,
-        normalMap,
-        roughnessMap,
-        metalnessMap: metallicMap,
-        roughness: 0.8,
-        metalness: 0.3,
-        side: THREE.DoubleSide,
-      });
-    }
-  });
-}
-
 function getUnitModelType(unit) {
   const vt = (unit.vehicle_type || '').toUpperCase();
   const t = (unit.type || '').toUpperCase();
   if (t.includes('HELICOPTER') || vt === 'HELI' || t === 'AIR') return 'helicopter';
   if (vt === 'TANK' || t.includes('TANK') || vt.includes('TRACKED')) return 'tank';
-  if (vt === 'IFV') return 'tank_destroyer';
+  if (vt === 'IFV') return 'vehicle';
   if (vt === 'CAR' || vt.includes('MRAP') || vt.includes('JLTV')) return 'vehicle';
   if (vt === 'TRUCK') return 'vehicle';
   if (vt.includes('WHEELED') || vt.includes('CAR')) return 'vehicle';
@@ -292,20 +234,12 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
         'JeepBody.obj', 'JeepLargeSeat.obj', 'JeepSmallSeat.obj',
         'JeepSteeringWheel.obj', 'JeepTire.obj',
       ]),
-      loadFBX(`${M}/tank_destroyer/reconTank.fbx`).catch(() => null).then(m => {
-        if (m) applyFBXTextures(m, `${M}/tank_destroyer`, {
-          baseColor: 'BaseColor.png', normal: 'Normal.png',
-          roughness: 'Roughness.png', metallic: 'Metallic.png',
-        });
-        return m;
-      }),
-    ]).then(([heli, tank, armored, jeep, tankDest]) => {
+    ]).then(([heli, tank, armored, jeep]) => {
       const loaded = {
         helicopter: heli,
         tank,
         vehicle: armored,
         jeep,
-        tank_destroyer: tankDest,
       };
       setModels(loaded);
       Object.entries(loaded).forEach(([k, v]) => {
