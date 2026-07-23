@@ -135,10 +135,23 @@ function loadFBX(url) {
   return new Promise((resolve, reject) => {
     const loader = new FBXLoader();
     loader.load(url, (model) => {
-      const box = new THREE.Box3().setFromObject(model);
-      const size = box.getSize(new THREE.Vector3());
-      const center = box.getCenter(new THREE.Vector3());
+      model.updateMatrixWorld(true);
+      const geoBox = new THREE.Box3();
+      model.traverse(child => {
+        if (child.isMesh && child.geometry) {
+          child.geometry.computeBoundingBox();
+          const b = child.geometry.boundingBox.clone();
+          child.localToWorld(new THREE.Vector3());
+          if (child.matrixWorld) {
+            b.applyMatrix4(child.matrixWorld);
+          }
+          geoBox.union(b);
+        }
+      });
+      const size = geoBox.getSize(new THREE.Vector3());
+      const center = geoBox.getCenter(new THREE.Vector3());
       model.position.sub(center);
+      model.updateMatrixWorld(true);
       model.userData.rawSize = Math.max(size.x, size.y, size.z);
       resolve(model);
     }, undefined, reject);
