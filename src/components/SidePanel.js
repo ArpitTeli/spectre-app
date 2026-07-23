@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import VaultGraph from './VaultGraph';
 
 const TYPE_LABELS = {
   INFANTRY: 'Infantry', CAR: 'Car', RECON: 'Recon', TRUCK: 'Truck',
@@ -6,13 +7,7 @@ const TYPE_LABELS = {
   PLANE: 'Fixed-Wing', BOAT: 'Boat', VEHICLE: 'Vehicle',
 };
 
-function getUnitClassification(unit) {
-  if (unit.status === 'DESTROYED' || unit.status === 'DEAD') return 'destroyed';
-  const type = (unit.vehicle_type || '').toUpperCase();
-  if (['TANK', 'IFV', 'APC', 'HELI', 'PLANE'].includes(type)) return 'hostile';
-  if (unit.is_enemy || unit.side === 'ENEMY') return 'hostile';
-  return 'friendly';
-}
+const VEHICLE_SYMBOL = { TANK: '▲', IFV: '▲', APC: '◆', CAR: '●', RECON: '◇', HELI: '✦', TRUCK: '▪', BOAT: '◆', PLANE: '✦', INFANTRY: '●', DEFAULT: '○' };
 
 function getDistance(unit) {
   if (!unit.position) return null;
@@ -24,7 +19,7 @@ function getDistance(unit) {
 }
 
 export default function SidePanel({ state, patch, addCommsEntry, sendArmaCommand, addIntel, endMission, visibleUnits }) {
-  const [activeTab, setActiveTab] = useState('TRACKS');
+  const [activeTab, setActiveTab] = useState('UNITS');
   const [searchQuery, setSearchQuery] = useState('');
 
   const units = Object.values(visibleUnits ? visibleUnits() : state.units);
@@ -40,14 +35,19 @@ export default function SidePanel({ state, patch, addCommsEntry, sendArmaCommand
     );
   }, [units, searchQuery]);
 
-  const hostileUnits = filteredUnits.filter(u => getUnitClassification(u) === 'hostile');
-  const friendlyUnits = filteredUnits.filter(u => getUnitClassification(u) === 'friendly');
-  const destroyedUnits = filteredUnits.filter(u => getUnitClassification(u) === 'destroyed');
+  const filteredContacts = useMemo(() => {
+    if (!searchQuery.trim()) return contacts;
+    const q = searchQuery.toLowerCase();
+    return contacts.filter(c =>
+      (c.id || '').toLowerCase().includes(q) ||
+      (c.type || '').toLowerCase().includes(q)
+    );
+  }, [contacts, searchQuery]);
 
   return (
     <div className="tracks-panel">
       <div className="tracks-panel__tabs">
-        {['TRACKS', 'ASSETS', 'ENVIRONMENT'].map(t => (
+        {['UNITS', 'CONTACTS', 'INTEL', 'ORDERS', 'GRAPH'].map(t => (
           <button
             key={t}
             className={`tracks-panel__tab ${activeTab === t ? 'active' : ''}`}
@@ -62,29 +62,16 @@ export default function SidePanel({ state, patch, addCommsEntry, sendArmaCommand
         <span className="tracks-panel__search-icon">⌕</span>
         <input
           type="text"
-          placeholder="Search by x, y, z..."
+          placeholder="Search..."
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           className="tracks-panel__search-input"
         />
-        <button className="tracks-panel__filter-btn">Filters</button>
       </div>
 
       <div className="tracks-panel__content">
-        {activeTab === 'TRACKS' && (
-          <TracksTab
-            hostileUnits={hostileUnits}
-            friendlyUnits={friendlyUnits}
-            destroyedUnits={destroyedUnits}
-            contacts={contacts}
-            selectedUnit={state.selectedUnit}
-            patch={patch}
-            sendArmaCommand={sendArmaCommand}
-            addCommsEntry={addCommsEntry}
-          />
-        )}
-        {activeTab === 'ASSETS' && (
-          <AssetsTab
+        {activeTab === 'UNITS' && (
+          <UnitsTab
             units={filteredUnits}
             selectedUnit={state.selectedUnit}
             patch={patch}
@@ -92,111 +79,78 @@ export default function SidePanel({ state, patch, addCommsEntry, sendArmaCommand
             addCommsEntry={addCommsEntry}
           />
         )}
-        {activeTab === 'ENVIRONMENT' && (
-          <EnvironmentTab
-            state={state}
-            addIntel={addIntel}
+        {activeTab === 'CONTACTS' && (
+          <ContactsTab
+            contacts={filteredContacts}
+            selectedContact={state.selectedContact}
+            patch={patch}
           />
+        )}
+        {activeTab === 'INTEL' && (
+          <IntelTab intelDB={state.intelDB} addIntel={addIntel} />
+        )}
+        {activeTab === 'ORDERS' && (
+          <OrdersTab
+            state={state}
+            sendArmaCommand={sendArmaCommand}
+            addCommsEntry={addCommsEntry}
+          />
+        )}
+        {activeTab === 'GRAPH' && (
+          <div style={{ height: '100%' }}>
+            <VaultGraph
+              vaultPath={state.vaultPath}
+              units={state.units}
+              contacts={state.contacts}
+            />
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-function TracksTab({ hostileUnits, friendlyUnits, destroyedUnits, contacts, selectedUnit, patch, sendArmaCommand, addCommsEntry }) {
+function UnitsTab({ units, selectedUnit, patch, sendArmaCommand, addCommsEntry }) {
+  const list = useMemo(() => {
+    return [...units].sort((a, b) => {
+      const order = { TANK: 0, IFV: 1, APC: 2, HELI: 3, CAR: 4, TRUCK: 5, RECON: 6, INFANTRY: 10, VEHICLE: 7 };
+      const oa = order[a.vehicle_type] ?? 8;
+      const ob = order[b.vehicle_type] ?? 8;
+      if (oa !== ob) return oa - ob;
+      return (a.callsign || '').localeCompare(b.callsign || '');
+    });
+  }, [units]);
+
+  if (list.length === 0) return <div className="empty-state">No units detected.<br />Awaiting Arma link.</div>;
+
+  const vehicles = list.filter(u => !u.vehicle);
+  const embedded = list.filter(u => u.vehicle);
+
   return (
     <div className="tracks-list">
-      {hostileUnits.length > 0 && (
-        <UnitSection
-          title="Hostile"
-          color="var(--red)"
-          count={hostileUnits.length}
-          units={hostileUnits}
-          selectedUnit={selectedUnit}
-          patch={patch}
+      {vehicles.map(u => (
+        <UnitCard
+          key={u.id}
+          unit={u}
+          crew={embedded.filter(e => e.vehicle === u.id)}
+          selected={u.id === selectedUnit}
+          onSelect={() => patch({ selectedUnit: u.id })}
           sendArmaCommand={sendArmaCommand}
           addCommsEntry={addCommsEntry}
         />
-      )}
-
-      {friendlyUnits.length > 0 && (
-        <UnitSection
-          title="Friendly"
-          color="var(--accent)"
-          count={friendlyUnits.length}
-          units={friendlyUnits}
-          selectedUnit={selectedUnit}
-          patch={patch}
-          sendArmaCommand={sendArmaCommand}
-          addCommsEntry={addCommsEntry}
-        />
-      )}
-
-      {destroyedUnits.length > 0 && (
-        <UnitSection
-          title="Destroyed"
-          color="var(--text-muted)"
-          count={destroyedUnits.length}
-          units={destroyedUnits}
-          selectedUnit={selectedUnit}
-          patch={patch}
-          sendArmaCommand={sendArmaCommand}
-          addCommsEntry={addCommsEntry}
-        />
-      )}
-
-      {hostileUnits.length === 0 && friendlyUnits.length === 0 && destroyedUnits.length === 0 && (
-        <div className="empty-state">
-          <div style={{ fontSize: '24px', marginBottom: '8px', color: 'var(--text-muted)' }}>◎</div>
-          <div>No tracks detected.</div>
-          <div style={{ fontSize: '8px', color: 'var(--text-muted)' }}>Awaiting Arma connection</div>
-        </div>
-      )}
+      ))}
     </div>
   );
 }
 
-function UnitSection({ title, color, count, units, selectedUnit, patch, sendArmaCommand, addCommsEntry }) {
-  const [expanded, setExpanded] = useState(true);
-
-  return (
-    <div className="unit-section">
-      <div className="unit-section__header" onClick={() => setExpanded(!expanded)}>
-        <div className="unit-section__title">
-          <span className="unit-section__dot" style={{ background: color }} />
-          <span>{title}</span>
-        </div>
-        <div className="unit-section__count">
-          <span>{count}</span>
-          <span className="unit-section__arrow">{expanded ? '▾' : '▸'}</span>
-        </div>
-      </div>
-      {expanded && (
-        <div className="unit-section__list">
-          {units.map(u => (
-            <TrackCard
-              key={u.id}
-              unit={u}
-              selected={u.id === selectedUnit}
-              onSelect={() => patch({ selectedUnit: u.id })}
-              sendArmaCommand={sendArmaCommand}
-              addCommsEntry={addCommsEntry}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TrackCard({ unit, selected, onSelect, sendArmaCommand, addCommsEntry }) {
-  const [showActions, setShowActions] = useState(false);
-  const isSelected = unit.id === selected;
-  const isYou = isSelected;
-  const distance = getDistance(unit);
-  const label = TYPE_LABELS[unit.vehicle_type] || unit.vehicle_type || 'Unknown';
-  const order = unit.current_order;
+function UnitCard({ unit, crew = [], selected, onSelect, sendArmaCommand, addCommsEntry }) {
+  const [showOrder, setShowOrder] = useState(false);
+  const [orderText, setOrderText] = useState('');
   const dead = unit.status === 'DESTROYED' || unit.status === 'DEAD';
+  const hp = unit.health ?? 100;
+  const distance = getDistance(unit);
+  const symbol = VEHICLE_SYMBOL[unit.vehicle_type] || VEHICLE_SYMBOL.DEFAULT;
+  const label = TYPE_LABELS[unit.vehicle_type] || unit.vehicle_type || '';
 
   const send = async (type, params = {}) => {
     await sendArmaCommand({ type, unit_id: unit.id, ...params });
@@ -204,104 +158,115 @@ function TrackCard({ unit, selected, onSelect, sendArmaCommand, addCommsEntry })
   };
 
   return (
-    <div
-      className={`track-card ${isSelected ? 'selected' : ''} ${dead ? 'destroyed' : ''}`}
-      onClick={onSelect}
-    >
+    <div className={`track-card ${selected ? 'selected' : ''} ${dead ? 'destroyed' : ''}`} onClick={onSelect}>
       <div className="track-card__row">
-        <div className="track-card__icon">
-          {unit.vehicle_type === 'TANK' || unit.vehicle_type === 'IFV' ? '▲' :
-           unit.vehicle_type === 'HELI' ? '✦' :
-           unit.vehicle_type === 'CAR' || unit.vehicle_type === 'TRUCK' ? '●' :
-           unit.vehicle_type === 'INFANTRY' ? '●' : '○'}
+        <div className="track-card__icon" style={{ color: selected ? 'var(--accent)' : 'var(--text-muted)' }}>
+          {symbol}
         </div>
         <div className="track-card__info">
           <div className="track-card__name">
             <span className="track-card__callsign">{unit.callsign || unit.id}</span>
-            {isYou && <span className="track-card__you-badge">You</span>}
+            <span className="track-card__type">{label}</span>
+          </div>
+          <div className="track-card__bars">
+            <div className="unit-bar">
+              <span className="unit-bar__label">HP</span>
+              <div className="unit-bar__track">
+                <div className={`unit-bar__fill health ${hp < 30 ? 'critical' : hp < 60 ? 'low' : ''}`} style={{ width: `${hp}%` }} />
+              </div>
+              <span style={{ fontSize: '8px', color: 'var(--text-muted)', minWidth: '24px' }}>{hp}%</span>
+            </div>
           </div>
           <div className="track-card__meta">
-            <span className="track-card__type">{label}</span>
-            <span className="track-card__separator">·</span>
-            <span className="track-card__distance">{distance ? `${distance} NE of you` : ''}</span>
+            {distance && <span className="track-card__distance">{distance}</span>}
+            {unit.current_order && <span className="track-card__task-value">▸ {unit.current_order}</span>}
           </div>
         </div>
-        <div className="track-card__status">
-          <span className="track-card__live-badge">Live</span>
-          <span className="track-card__tracking-badge">Tracking</span>
-        </div>
       </div>
 
-      {order && (
-        <div className="track-card__task">
-          <span className="track-card__task-label">Task:</span>
-          <span className="track-card__task-value">{order}</span>
-        </div>
-      )}
-
-      <div className="track-card__actions-row">
-        <div className="track-card__assign">
-          <span className="track-card__assign-label">Assign to</span>
-          <span className="track-card__assign-arrow">▾</span>
-        </div>
-        <button
-          className="track-card__menu-btn"
-          onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
-        >
-          ···
-        </button>
-      </div>
-
-      {showActions && isSelected && !dead && (
+      {selected && !dead && (
         <div className="track-card__quick-actions" onClick={e => e.stopPropagation()}>
           <button className="track-card__action-btn" onClick={() => send('HOLD')}>HOLD</button>
           <button className="track-card__action-btn" onClick={() => send('RTB')}>RTB</button>
-          <button className="track-card__action-btn primary" onClick={() => send('WEAPONS_FREE')}>WEAPONS FREE</button>
+          <button className="track-card__action-btn" onClick={() => { setShowOrder(v => !v); setOrderText(''); }}>ORDER</button>
+        </div>
+      )}
+
+      {showOrder && selected && (
+        <div style={{ marginTop: '4px', padding: '0 12px 8px' }} onClick={e => e.stopPropagation()}>
+          <div style={{ display: 'flex', gap: '3px' }}>
+            <input
+              className="sidebar-input"
+              style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '9px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', padding: '3px 6px', color: 'var(--text-primary)', outline: 'none' }}
+              placeholder="order..."
+              value={orderText}
+              onChange={e => setOrderText(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && orderText.trim()) {
+                  send('CUSTOM', { instruction: orderText });
+                  setOrderText('');
+                  setShowOrder(false);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {selected && !dead && crew.length > 0 && (
+        <div className="track-card__meta" style={{ padding: '4px 12px 6px' }}>
+          <span style={{ fontSize: '8px', color: 'var(--text-muted)' }}>CREW: {crew.map(c => c.callsign || c.id).join(', ')}</span>
         </div>
       )}
     </div>
   );
 }
 
-function AssetsTab({ units, selectedUnit, patch, sendArmaCommand, addCommsEntry }) {
-  const grouped = useMemo(() => {
-    const groups = {};
-    units.forEach(u => {
-      const type = u.vehicle_type || 'UNKNOWN';
-      if (!groups[type]) groups[type] = [];
-      groups[type].push(u);
+function ContactsTab({ contacts, selectedContact, patch }) {
+  const list = useMemo(() => {
+    return [...contacts].sort((a, b) => {
+      const o = { CONFIRMED: 0, LAST_KNOWN: 1, SUSPECTED: 2 };
+      return (o[a.state] || 2) - (o[b.state] || 2);
     });
-    return groups;
-  }, [units]);
+  }, [contacts]);
+
+  if (list.length === 0) return <div className="empty-state">No contacts.</div>;
 
   return (
-    <div className="assets-tab">
-      {Object.entries(grouped).map(([type, list]) => (
-        <div key={type} className="asset-group">
-          <div className="asset-group__header">
-            <span className="asset-group__type">{TYPE_LABELS[type] || type}</span>
-            <span className="asset-group__count">{list.length}</span>
+    <div className="tracks-list">
+      {list.map(c => (
+        <div
+          key={c.id}
+          className={`track-card ${c.id === selectedContact ? 'selected' : ''}`}
+          onClick={() => patch({ selectedContact: c.id })}
+        >
+          <div className="track-card__row">
+            <div className="track-card__icon" style={{
+              color: c.state === 'CONFIRMED' ? 'var(--red)' : c.state === 'LAST_KNOWN' ? 'var(--orange)' : 'var(--yellow)'
+            }}>
+              {VEHICLE_SYMBOL[c.type] || '○'}
+            </div>
+            <div className="track-card__info">
+              <div className="track-card__name">
+                <span className="track-card__callsign">{c.id}</span>
+                <span className="track-card__type" style={{
+                  color: c.state === 'CONFIRMED' ? 'var(--red)' : c.state === 'LAST_KNOWN' ? 'var(--orange)' : 'var(--yellow)'
+                }}>{c.state}</span>
+              </div>
+              <div className="track-card__meta">
+                <span className="track-card__distance">{c.type || 'Unknown'}</span>
+                <span className="track-card__separator">·</span>
+                <span className="track-card__distance">{c.source || 'VISUAL'}</span>
+              </div>
+            </div>
           </div>
-          {list.map(u => (
-            <TrackCard
-              key={u.id}
-              unit={u}
-              selected={u.id === selectedUnit}
-              onSelect={() => patch({ selectedUnit: u.id })}
-              sendArmaCommand={sendArmaCommand}
-              addCommsEntry={addCommsEntry}
-            />
-          ))}
         </div>
       ))}
-      {Object.keys(grouped).length === 0 && (
-        <div className="empty-state">No assets.</div>
-      )}
     </div>
   );
 }
 
-function EnvironmentTab({ state, addIntel }) {
+function IntelTab({ intelDB, addIntel }) {
   const [input, setInput] = useState('');
   const [saved, setSaved] = useState(false);
 
@@ -322,47 +287,102 @@ function EnvironmentTab({ state, addIntel }) {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const intelDB = state.intelDB;
-  const contacts = Object.values(state.contacts || {});
+  const locs = intelDB?.locations || [];
 
   return (
-    <div className="environment-tab">
-      <div className="env-section">
-        <div className="env-section__header">
-          <span>CONTACTS</span>
-          <span className="env-section__count">{contacts.length}</span>
-        </div>
-        {contacts.length === 0 && (
-          <div className="empty-state" style={{ padding: '12px' }}>No contacts.</div>
-        )}
+    <div className="tracks-list">
+      <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-hairline)' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>Report Intel</div>
+        <textarea
+          className="sidebar-input"
+          rows={2}
+          placeholder='e.g. "Firna is enemy stronghold with IFVs"'
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) submit(); }}
+          style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', padding: '4px 8px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '9px', outline: 'none', resize: 'vertical' }}
+        />
+        <button className={`btn btn-sm ${saved ? 'btn-primary' : ''}`} style={{ marginTop: '4px', width: '100%' }} onClick={submit}>
+          {saved ? 'LOGGED' : 'LOG INTEL'}
+        </button>
       </div>
-
-      <div className="env-section">
-        <div className="env-section__header">
-          <span>INTEL</span>
-          <span className="env-section__count">{(intelDB?.locations || []).length}</span>
-        </div>
-        <div className="env-report-box">
-          <textarea
-            className="env-report-input"
-            rows={2}
-            placeholder='e.g. "Firna is enemy stronghold with IFVs"'
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) submit(); }}
-          />
-          <button className={`btn btn-sm ${saved ? 'btn-primary' : ''}`} onClick={submit}>
-            {saved ? 'LOGGED' : 'LOG INTEL'}
-          </button>
-        </div>
-        {(intelDB?.locations || []).map((loc, i) => (
-          <div key={i} className="intel-item">
-            <div className="intel-item__header">
-              <span className="intel-item__type">{loc.name}</span>
-              <span className="intel-item__time">{loc.threat_level || 'MED'}</span>
+      <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border-hairline)' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Database · {locs.length} locations</span>
+      </div>
+      {locs.map((loc, i) => (
+        <div key={i} className="track-card">
+          <div className="track-card__row">
+            <div className="track-card__icon" style={{ color: loc.threat_level === 'HIGH' ? 'var(--red)' : loc.threat_level === 'MEDIUM' ? 'var(--yellow)' : 'var(--accent)' }}>◆</div>
+            <div className="track-card__info">
+              <div className="track-card__name">
+                <span className="track-card__callsign">{loc.name}</span>
+                <span className="track-card__type">{loc.threat_level || 'MED'}</span>
+              </div>
+              <div className="track-card__meta">
+                <span className="track-card__distance">{(loc.observations || []).length} obs · {loc.confidence}</span>
+              </div>
             </div>
-            <div className="intel-item__content">{(loc.observations || []).length} obs</div>
           </div>
+          {loc.raw_intel && (
+            <div style={{ paddingLeft: '34px', paddingRight: '12px', paddingBottom: '6px', fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              "{loc.raw_intel}"
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OrdersTab({ state, sendArmaCommand, addCommsEntry }) {
+  const [massOrder, setMassOrder] = useState('');
+
+  const sendMass = async () => {
+    if (!massOrder.trim()) return;
+    for (const id of Object.keys(state.units)) {
+      await sendArmaCommand({ type: 'CUSTOM', unit_id: id, instruction: massOrder });
+    }
+    addCommsEntry('SPECTRE', 'ALL', massOrder, 'BLUE');
+    setMassOrder('');
+  };
+
+  const CMDS = [
+    { label: 'ALL HOLD', type: 'HOLD_ALL' },
+    { label: 'ALL RTB', type: 'RTB_ALL' },
+    { label: 'WEAPONS FREE', type: 'WEAPONS_FREE' },
+    { label: 'WEAPONS SAFE', type: 'WEAPONS_SAFE' },
+    { label: 'FORM UP', type: 'FORM_UP' },
+    { label: 'DISPERSE', type: 'DISPERSE' },
+  ];
+
+  return (
+    <div className="tracks-list">
+      <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-hairline)' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>All Units</div>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <input
+            className="sidebar-input"
+            style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '9px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', padding: '4px 8px', color: 'var(--text-primary)', outline: 'none' }}
+            placeholder="Custom order..."
+            value={massOrder}
+            onChange={e => setMassOrder(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && sendMass()}
+          />
+          <button className="btn btn-sm btn-primary" onClick={sendMass}>SEND</button>
+        </div>
+      </div>
+      <div style={{ padding: '8px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px' }}>
+        {CMDS.map(cmd => (
+          <button
+            key={cmd.type}
+            className={`order-btn ${cmd.type === 'WEAPONS_FREE' ? 'danger' : cmd.type === 'WEAPONS_SAFE' ? 'primary' : ''}`}
+            onClick={async () => {
+              await sendArmaCommand({ type: cmd.type });
+              addCommsEntry('SPECTRE', 'ALL', cmd.label, 'BLUE');
+            }}
+          >
+            {cmd.label}
+          </button>
         ))}
       </div>
     </div>
