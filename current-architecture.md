@@ -471,25 +471,37 @@ Arma 3 Eden Editor saves missions to one location, but the game reads them from 
 ### Release Process
 
 ```bash
-# 1. Build React app
+# 1. Build PBO (MUST be from mod\addons, NOT mod\ — see note below)
+python create_pbo.py "mod\addons" SPECTREBridge.pbo
+
+# 2. Build React app
 npx react-scripts build
 
-# 2. Build Electron installer
+# 3. Build Electron installer
 npx electron-builder --win
 
-# 3. Commit
+# 4. Commit
 git add -A
 git commit -m "vX.Y.Z: description"
 
-# 4. Push
+# 5. Push
 git push
 
-# 5. Create GitHub release
+# 6. Create GitHub release
 gh release create vX.Y.Z --title "vX.Y.Z" --notes "description"
 
-# 6. Upload assets
+# 7. Upload assets
 gh release upload vX.Y.Z "dist\SPECTRE.C2-X.Y.Z.exe" "dist\SPECTRE.C2-X.Y.Z.exe.blockmap" "dist\latest.yml" --clobber
 ```
+
+### PBO Build — CRITICAL
+
+**Always pack from `mod\addons`, NOT `mod\`.**
+
+The `$PBOPREFIX$` inside `mod\addons` is `z\spectre\addons\spectre_bridge`. When Arma loads the PBO, it maps files relative to this prefix. If you pack from `mod\`, the internal structure becomes `addons\functions\fn_bridgeInit.sqf`, which Arma maps to `z\spectre\addons\spectre_bridge\addons\functions\fn_bridgeInit.sqf` — but config.cpp references `z\spectre\addons\spectre_bridge\functions\fn_bridgeInit.sqf`. This causes "Script not found" errors.
+
+**Correct:** `python create_pbo.py "mod\addons" SPECTREBridge.pbo`
+**Wrong:** `python create_pbo.py mod SPECTREBridge.pbo`
 
 ### Auto-Updater
 
