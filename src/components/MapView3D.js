@@ -123,15 +123,12 @@ function loadOBJ(url) {
   return new Promise((resolve, reject) => {
     const loader = new OBJLoader();
     loader.load(url, (model) => {
-      model.updateMatrixWorld(true);
       const geoBox = new THREE.Box3();
       let hasGeo = false;
       model.traverse(child => {
         if (child.isMesh && child.geometry) {
           child.geometry.computeBoundingBox();
-          const b = child.geometry.boundingBox.clone();
-          b.applyMatrix4(child.matrixWorld);
-          geoBox.union(b);
+          geoBox.union(child.geometry.boundingBox);
           hasGeo = true;
         }
       });
@@ -143,7 +140,6 @@ function loadOBJ(url) {
             child.geometry.translate(-center.x, -center.y, -center.z);
           }
         });
-        model.updateMatrixWorld(true);
         model.userData.rawSize = Math.max(size.x, size.y, size.z);
       } else {
         model.userData.rawSize = 0;
@@ -157,14 +153,13 @@ function loadFBX(url) {
   return new Promise((resolve, reject) => {
     const loader = new FBXLoader();
     loader.load(url, (model) => {
-      model.updateMatrixWorld(true);
       const geoBox = new THREE.Box3();
       model.traverse(child => {
         if (child.isMesh && child.geometry) {
           child.geometry.computeBoundingBox();
-          const b = child.geometry.boundingBox.clone();
-          b.applyMatrix4(child.matrixWorld);
-          geoBox.union(b);
+          if (child.geometry.boundingBox) {
+            geoBox.union(child.geometry.boundingBox);
+          }
         }
       });
       const size = geoBox.getSize(new THREE.Vector3());
@@ -174,7 +169,6 @@ function loadFBX(url) {
           child.geometry.translate(-center.x, -center.y, -center.z);
         }
       });
-      model.updateMatrixWorld(true);
       model.userData.rawSize = Math.max(size.x, size.y, size.z);
       resolve(model);
     }, undefined, reject);
@@ -191,9 +185,9 @@ function loadMultiPartOBJ(baseDir, files) {
         group.traverse(child => {
           if (child.isMesh && child.geometry) {
             child.geometry.computeBoundingBox();
-            const b = child.geometry.boundingBox.clone();
-            b.applyMatrix4(child.matrixWorld);
-            geoBox.union(b);
+            if (child.geometry.boundingBox) {
+              geoBox.union(child.geometry.boundingBox);
+            }
           }
         });
         const size = geoBox.getSize(new THREE.Vector3());
@@ -259,14 +253,14 @@ function getUnitModelType(unit) {
 
 function makeInfantryMesh(color, emissive, opacity) {
   const group = new THREE.Group();
-  const bodyGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.6, 8);
-  const bodyMat = new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: 0.4, roughness: 0.7, metalness: 0.2 });
+  const bodyGeo = new THREE.CylinderGeometry(1.5, 1.5, 4, 8);
+  const bodyMat = new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: 0.6, roughness: 0.5, metalness: 0.3 });
   const body = new THREE.Mesh(bodyGeo, bodyMat);
-  body.position.y = 0.8;
+  body.position.y = 2;
   group.add(body);
-  const headGeo = new THREE.SphereGeometry(0.25, 8, 6);
+  const headGeo = new THREE.SphereGeometry(1, 8, 6);
   const head = new THREE.Mesh(headGeo, bodyMat);
-  head.position.y = 1.85;
+  head.position.y = 5;
   group.add(head);
   return group;
 }
