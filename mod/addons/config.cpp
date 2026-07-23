@@ -15,7 +15,7 @@ class CfgFunctions {
     class SPECTRE {
         tag = "SPECTRE";
         class bridge {
-            file = "functions";
+            file = "z\spectre\addons\spectre_bridge\functions";
             class bridgeInit {};
         };
     };
@@ -23,6 +23,6 @@ class CfgFunctions {
 
 class Extended_PostInit_EventHandlers {
     class SPECTRE_bridge_postInit {
-        init = "call compile preprocessFileLineNumbers 'XEH_postInit.sqf'";
+        init = "call compile preprocessFileLineNumbers '\z\spectre\addons\spectre_bridge\XEH_postInit.sqf'";
     };
 };
