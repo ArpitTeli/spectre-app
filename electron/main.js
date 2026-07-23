@@ -1106,18 +1106,24 @@ function parseArmaLog(chunk) {
 }
 
 function expandUnit(raw) {
+  const vtype = raw.vehicle_type || raw.vtype || 'INFANTRY';
+  const isVehicle = ['MBT','TANK','IFV','APC','RECON','HELI','TRUCK','PLANE','BOAT','CAR','VEHICLE'].includes(vtype);
   return {
     id: raw.id,
     callsign: raw.callsign || raw.id,
-    type: raw.type || (['MBT','IFV','APC','RECON','HELI','TRUCK','PLANE'].includes(raw.vtype) ? 'VEHICLE' : 'INFANTRY'),
-    vehicle_type: raw.vehicle_type || raw.vtype || 'INFANTRY',
+    type: raw.type || (isVehicle ? 'VEHICLE' : 'INFANTRY'),
+    vehicle_type: vtype,
     position: raw.position || raw.pos || { x: 0, y: 0, lat: 0, lng: 0 },
     heading: raw.heading ?? raw.hdg ?? 0,
     health: raw.health ?? raw.hp ?? 100,
     fuel: raw.fuel ?? 100,
-    ammo: raw.ammo ?? 100,
+    speed: raw.speed ?? 0,
+    ammo: raw.ammo ?? 0,
     status: raw.status || raw.st || 'UNKNOWN',
-    current_order: raw.current_order || raw.order || ''
+    current_order: raw.current_order || raw.order || '',
+    vehicle: raw.vehicle || null,
+    vehicle_role: raw.vehicle_role || null,
+    crew: raw.crew || [],
   };
 }
 

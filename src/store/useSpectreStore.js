@@ -105,7 +105,7 @@ export function useSpectreStore() {
       const crew = units.filter(u => u.type === 'INFANTRY');
       const activeVehicles = vehicles.filter(u => u.status !== 'DESTROYED' && u.status !== 'DEAD');
       const activeCrew = crew.filter(u => u.status !== 'DEAD');
-      const fpW = { MBT: 30, IFV: 20, APC: 12, RECON: 8, HELI: 25, TRUCK: 2 };
+      const fpW = { TANK: 30, IFV: 20, APC: 12, RECON: 8, HELI: 25, TRUCK: 2, CAR: 5, PLANE: 35, BOAT: 8 };
       const maxFP = vehicles.reduce((s, v) => s + (fpW[v.vehicle_type] || 10), 0) || 100;
       const curFP = activeVehicles.reduce((s, v) => s + (fpW[v.vehicle_type] || 10), 0);
       const firepower_index = Math.round((curFP / maxFP) * 100);
@@ -256,7 +256,38 @@ export function useSpectreStore() {
     }
   }, [patch]);
 
-  return { state, patch, addCommsEntry, sendArmaCommand, addIntel, endMission, recalcForceMetrics, generateMissionVault, setCommandMode };
+  // ── Vehicle-infantry grouping ──────────────────────────────────────────────
+  const visibleUnits = useCallback(() => {
+    const all = Object.values(state.units);
+    const filtered = all.filter(u => !u.vehicle);
+    const map = {};
+    filtered.forEach(u => { map[u.id] = u; });
+    return map;
+  }, [state.units]);
+
+  const getUnitCrew = useCallback((vehicleId) => {
+    const all = Object.values(state.units);
+    return all.filter(u => u.vehicle === vehicleId);
+  }, [state.units]);
+
+  const getUnitTypeLabel = useCallback((unit) => {
+    const labels = {
+      INFANTRY: 'Infantry',
+      CAR: 'Car',
+      RECON: 'Recon Vehicle',
+      TRUCK: 'Truck',
+      APC: 'APC',
+      IFV: 'IFV',
+      TANK: 'Tank',
+      HELI: 'Helicopter',
+      PLANE: 'Fixed-Wing',
+      BOAT: 'Boat',
+      VEHICLE: 'Vehicle',
+    };
+    return labels[unit?.vehicle_type] || 'Unit';
+  }, []);
+
+  return { state, patch, addCommsEntry, sendArmaCommand, addIntel, endMission, recalcForceMetrics, generateMissionVault, setCommandMode, visibleUnits, getUnitCrew, getUnitTypeLabel };
 }
 
 // ─── Process Arma state update ────────────────────────────────────────────────

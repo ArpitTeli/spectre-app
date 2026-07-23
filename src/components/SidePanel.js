@@ -78,19 +78,47 @@ function ForceMetrics({ forceMetrics, missionPhase, rewardData, patch, addCommsE
 }
 
 function UnitsTab({ units, selectedUnit, patch, sendArmaCommand, addCommsEntry }) {
-  const list = Object.values(units).sort((a, b) => (a.callsign || '').localeCompare(b.callsign || ''));
+  const list = Object.values(units).sort((a, b) => {
+    const order = { TANK: 0, IFV: 1, APC: 2, HELI: 3, CAR: 4, TRUCK: 5, RECON: 6, INFANTRY: 10, VEHICLE: 7 };
+    const oa = order[a.vehicle_type] ?? 8;
+    const ob = order[b.vehicle_type] ?? 8;
+    if (oa !== ob) return oa - ob;
+    return (a.callsign || '').localeCompare(b.callsign || '');
+  });
   if (list.length === 0) return <div className="empty-state">No units detected.<br />Awaiting Arma link.</div>;
+
+  const vehicles = list.filter(u => !u.vehicle);
+  const embedded = list.filter(u => u.vehicle);
+
   return (
     <div className="unit-list">
-      {list.map(u => <UnitCard key={u.id} unit={u} selected={u.id === selectedUnit} onSelect={() => patch({ selectedUnit: u.id })} sendArmaCommand={sendArmaCommand} addCommsEntry={addCommsEntry} />)}
+      {vehicles.map(u => (
+        <UnitCard
+          key={u.id}
+          unit={u}
+          crew={embedded.filter(e => e.vehicle === u.id)}
+          selected={u.id === selectedUnit}
+          onSelect={() => patch({ selectedUnit: u.id })}
+          sendArmaCommand={sendArmaCommand}
+          addCommsEntry={addCommsEntry}
+        />
+      ))}
     </div>
   );
 }
 
-function UnitCard({ unit, selected, onSelect, sendArmaCommand, addCommsEntry }) {
+const TYPE_LABELS = {
+  INFANTRY: 'Infantry', CAR: 'Car', RECON: 'Recon', TRUCK: 'Truck',
+  APC: 'APC', IFV: 'IFV', TANK: 'Tank', HELI: 'Helicopter',
+  PLANE: 'Fixed-Wing', BOAT: 'Boat', VEHICLE: 'Vehicle',
+};
+
+function UnitCard({ unit, crew = [], selected, onSelect, sendArmaCommand, addCommsEntry }) {
   const [showOrder, setShowOrder] = useState(false);
   const [orderText, setOrderText] = useState('');
   const dead = unit.status === 'DESTROYED' || unit.status === 'DEAD';
+  const isVehicle = unit.type === 'VEHICLE';
+  const isInfantry = unit.type === 'INFANTRY';
 
   const send = async (type, params = {}) => {
     await sendArmaCommand({ type, unit_id: unit.id, ...params });
@@ -101,14 +129,25 @@ function UnitCard({ unit, selected, onSelect, sendArmaCommand, addCommsEntry }) 
     <div className={`unit-card ${selected ? 'selected' : ''} ${dead ? 'destroyed' : ''}`} onClick={onSelect}>
       <div className="unit-card__header">
         <span className="unit-card__callsign">{unit.callsign}</span>
-        <span className="unit-card__type">{unit.vehicle_type || unit.type}</span>
+        <span className="unit-card__type">{TYPE_LABELS[unit.vehicle_type] || unit.vehicle_type}</span>
       </div>
       <div className="unit-card__bars">
-        <Bar label="HP"   value={unit.health ?? 100} type="health" />
-        <Bar label="FUEL" value={unit.fuel   ?? 100} type="fuel" />
-        <Bar label="AMMO" value={unit.ammo   ?? 100} type="ammo" />
+        <Bar label="HP" value={unit.health ?? 100} type="health" />
+        {isVehicle && <Bar label="FUEL" value={unit.fuel ?? 100} type="fuel" />}
+        {isVehicle && unit.speed > 0 && <div className="unit-card__stat"><span style={{fontSize:9,color:'var(--text-muted)'}}>SPD</span><span style={{fontSize:9,color:'var(--text-primary)'}}>{unit.speed} km/h</span></div>}
       </div>
       {unit.current_order && <div className="unit-card__status">▶ {unit.current_order}</div>}
+      {isInfantry && unit.vehicle && (
+        <div className="unit-card__status" style={{fontSize:9,color:'var(--text-muted)'}}>Inside: {unit.vehicle} ({unit.vehicle_role || 'CARGO'})</div>
+      )}
+      {isVehicle && crew.length > 0 && (
+        <div className="unit-card__crew">
+          <span className="unit-card__crew-label">CREW ({crew.length})</span>
+          {crew.map(c => (
+            <span key={c.id} className="unit-card__crew-member">{c.callsign}</span>
+          ))}
+        </div>
+      )}
       {selected && !dead && (
         <div style={{ marginTop: '6px', display: 'flex', gap: '3px', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
           <button className="btn btn-sm" onClick={() => send('HOLD')}>HOLD</button>

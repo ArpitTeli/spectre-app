@@ -18,7 +18,8 @@ import './styles/global.css';
 export default function App() {
   const {
     state, patch, addCommsEntry, sendArmaCommand,
-    addIntel, endMission, generateMissionVault, setCommandMode
+    addIntel, endMission, generateMissionVault, setCommandMode,
+    visibleUnits
   } = useSpectreStore();
 
   const stateRef = useRef(state);
@@ -211,7 +212,7 @@ export default function App() {
       <div className="app-body">
         {viewMode === '2d' ? (
           <MapView
-            units={state.units}
+            units={visibleUnits()}
             contacts={state.contacts}
             zones={state.zones}
             selectedUnit={state.selectedUnit}
@@ -225,7 +226,7 @@ export default function App() {
           />
         ) : (
           <MapView3D
-            units={state.units}
+            units={visibleUnits()}
             contacts={state.contacts}
             onUnitSelect={id => patch({ selectedUnit: id })}
             onContactSelect={id => patch({ selectedContact: id })}

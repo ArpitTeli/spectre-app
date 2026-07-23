@@ -36,14 +36,27 @@ SPECTRE_initialized    = false;
 private _mapName = toLowerANSI worldName;
 SPECTRE_mapData = SPECTRE_mapCoords getOrDefault [_mapName, [0, 0, 111000, 85000]];
 
-// ─── Collect friendly units ───────────────────────────────────────────────────
-SPECTRE_blufor = allUnits select { side _x == west || side _x == blufor };
+// ─── Collect friendly units and vehicles ──────────────────────────────────────
+SPECTRE_blufor = [];
 
-if (SPECTRE_blufor isEqualTo []) then {
-    SPECTRE_blufor = allUnits select {
+// Infantry
+private _infantry = allUnits select { side _x == west || side _x == blufor };
+if (_infantry isEqualTo []) then {
+    _infantry = allUnits select {
         isPlayer _x || (!(vehicle _x isEqualTo _x) && side _x == west)
     };
 };
+SPECTRE_blufor append _infantry;
+
+// Vehicles (only crewed or player-owned)
+private _vehicles = vehicles select {
+    side _x == west || side _x == blufor
+};
+{
+    if !(_x in SPECTRE_blufor) then {
+        SPECTRE_blufor pushBack _x;
+    };
+} forEach _vehicles;
 
 // Assign variable names to units that don't have one (for command targeting)
 {
@@ -65,19 +78,20 @@ diag_log format ["SPECTRE: Initialized — tracking %1 blufor assets on %2", cou
 // ─── Vehicle type classifier ──────────────────────────────────────────────────
 SPECTRE_fnc_vehicleType = {
     params ["_v"];
-    if (_v isKindOf "Tank")       exitWith { "MBT"      };
-    if (_v isKindOf "Helicopter") exitWith { "HELI"     };
-    if (_v isKindOf "Plane")      exitWith { "PLANE"    };
-    if (_v isKindOf "APC_Wheeled_01_base_F") exitWith { "APC" };
-    if (_v isKindOf "IFV_01_base_F"         ||
-        _v isKindOf "IFV_02_base_F"         ||
-        _v isKindOf "IFV_03_base_F"         ||
-        _v isKindOf "APC_Tracked_01_base_F" ||
-        _v isKindOf "APC_Tracked_02_base_F" ||
-        _v isKindOf "APC_Tracked_03_base_F") exitWith { "IFV" };
-    if (_v isKindOf "Car")   exitWith { "RECON"    };
-    if (_v isKindOf "Truck_F") exitWith { "TRUCK"  };
-    if (_v isKindOf "Man")   exitWith { "INFANTRY" };
+    if (_v isKindOf "Helicopter") exitWith { "HELI" };
+    if (_v isKindOf "Plane")      exitWith { "PLANE" };
+    if (_v isKindOf "Ship")       exitWith { "BOAT" };
+    if (_v isKindOf "Tank")       exitWith { "TANK" };
+    if (_v isKindOf "IFV_01_base_F" || _v isKindOf "IFV_02_base_F" ||
+        _v isKindOf "IFV_03_base_F" || _v isKindOf "APC_Tracked_01_base_F" ||
+        _v isKindOf "APC_Tracked_02_base_F" || _v isKindOf "APC_Tracked_03_base_F")
+        exitWith { "IFV" };
+    if (_v isKindOf "APC_Wheeled_01_base_F" || _v isKindOf "APC_Wheeled_02_base_F" ||
+        _v isKindOf "APC_Wheeled_03_base_F")
+        exitWith { "APC" };
+    if (_v isKindOf "Truck_F") exitWith { "TRUCK" };
+    if (_v isKindOf "Car")      exitWith { "CAR" };
+    if (_v isKindOf "Man")      exitWith { "INFANTRY" };
     "VEHICLE"
 };
 
@@ -107,25 +121,79 @@ SPECTRE_fnc_serializeUnit = {
     private _lat = _originLat + (_py / _mPerLat);
     private _lng = _originLng + (_px / _mPerLng);
 
-    // Compact JSON: skip type (redundant with vehicle_type), ammo (always 100)
-    // Only include current_order if non-empty, only include fuel if vehicle
+    // Fuel (vehicles only)
     private _fuelStr = "";
     if !(_unit isKindOf "Man") then {
         _fuelStr = format [",""fuel"":%1", round (fuel _unit * 100)];
     };
+
+    // Speed in km/h (vehicles only)
+    private _speedStr = "";
+    if !(_unit isKindOf "Man") then {
+        _speedStr = format [",""speed"":%1", round (speed _unit)];
+    };
+
+    // Ammo count (total magazines)
+    private _ammoCount = 0;
+    {
+        _ammoCount = _ammoCount + ({_x select 0 == _x select 0} count magazines _unit);
+    } forEach magazines _unit;
+    private _ammoStr = format [",""ammo"":%1", count magazines _unit];
+
+    // Vehicle membership (for infantry inside vehicles)
+    private _vehicleStr = "";
+    private _roleStr = "";
+    if (_unit isKindOf "Man") then {
+        private _veh = vehicle _unit;
+        if !(_veh isEqualTo _unit) then {
+            private _vcs = _veh getVariable ["SPECTRE_callsign", vehicleVarName _veh];
+            if (_vcs isEqualTo "") then {
+                _vcs = format ["UNIT_%1", SPECTRE_blufor find _veh];
+            };
+            _vehicleStr = format [",""vehicle"":""%1""", _vcs regexReplace ["""", ""]];
+            private _role = assignedVehicleRole _unit;
+            if (count _role > 0) then {
+                _roleStr = format [",""vehicle_role"":""%1""", _role select 0];
+            };
+        };
+    };
+
+    // Crew list (for vehicles)
+    private _crewStr = "";
+    if !(_unit isKindOf "Man") then {
+        private _crewArr = [];
+        {
+            private _ccs = _x getVariable ["SPECTRE_callsign", vehicleVarName _x];
+            if (_ccs isEqualTo "") then {
+                _ccs = format ["UNIT_%1", SPECTRE_blufor find _x];
+            };
+            private _crole = assignedVehicleRole _x;
+            private _croleStr = if (count _crole > 0) then { _crole select 0 } else { "CARGO" };
+            _crewArr pushBack format ["""%1""", _ccs regexReplace ["""", ""]];
+        } forEach (crew _unit);
+        if (count _crewArr > 0) then {
+            _crewStr = format [",""crew"":[%1]", _crewArr joinString ","];
+        };
+    };
+
     private _orderStr = "";
     if !(_order isEqualTo "") then {
         _orderStr = format [",""order"":""%1""", _order];
     };
 
     format [
-        "{""id"":""%1"",""vtype"":""%2"",""pos"":{""x"":%3,""y"":%4,""lat"":%5,""lng"":%6},""hdg"":%7,""hp"":%8%9%10,""st"":""%11""}",
+        "{""id"":""%1"",""vtype"":""%2"",""pos"":{""x"":%3,""y"":%4,""lat"":%5,""lng"":%6},""hdg"":%7,""hp"":%8%9%10%11%12%13%14%15,""st"":""%16""}",
         _cs, _vtype,
         round _px, round _py,
         _lat, _lng,
         round getDir _unit,
         _hp,
         _fuelStr,
+        _speedStr,
+        _ammoStr,
+        _vehicleStr,
+        _roleStr,
+        _crewStr,
         _orderStr,
         _status
     ]

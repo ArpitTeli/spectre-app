@@ -384,6 +384,38 @@ body {
   text-overflow: ellipsis;
 }
 
+.unit-card__stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.unit-card__crew {
+  margin-top: 4px;
+  padding: 4px 6px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 3px;
+}
+
+.unit-card__crew-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.unit-card__crew-member {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-secondary);
+  margin-right: 6px;
+}
+
 .force-metrics {
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--border-hairline);
