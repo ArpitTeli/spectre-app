@@ -102,6 +102,7 @@ SPECTRE_fnc_serializeUnit = {
     private _pos   = getPos _unit;
     private _px    = _pos select 0;
     private _py    = _pos select 1;
+    private _pz    = _pos select 2;
     private _hp    = round ((1 - getDammage _unit) * 100);
     private _vtype = [_unit] call SPECTRE_fnc_vehicleType;
     private _order = (_unit getVariable ["SPECTRE_currentOrder", ""]) regexReplace ["""", ""];
@@ -172,9 +173,10 @@ SPECTRE_fnc_serializeUnit = {
     };
 
     format [
-        "{""id"":""%1"",""vtype"":""%2"",""pos"":{""x"":%3,""y"":%4,""lat"":%5,""lng"":%6},""hdg"":%7,""hp"":%8%9%10%11%12%13%14%15,""st"":""%16""}",
+        "{""id"":""%1"",""vtype"":""%2"",""pos"":{""x"":%3,""y"":%4,""z"":%5,""lat"":%6,""lng"":%7},""hdg"":%8,""hp"":%9%10%11%12%13%14%15%16,""st"":""%17""}",
         _cs, _vtype,
         round _px, round _py,
+        round _pz,
         _lat, _lng,
         round getDir _unit,
         _hp,

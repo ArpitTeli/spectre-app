@@ -1041,7 +1041,7 @@ function parseArmaLog(chunk) {
         pendingState.contacts[raw.id] = {
           id: raw.id,
           type: raw.type || raw.vtype || 'UNKNOWN',
-          position: raw.position || raw.pos || { x: 0, y: 0, lat: 0, lng: 0 },
+    position: raw.position || raw.pos || { x: 0, y: 0, z: 0, lat: 0, lng: 0 },
           state: raw.state || 'CONFIRMED',
           source: raw.source || 'VISUAL',
           confidence: raw.confidence || 'HIGH'
@@ -1116,7 +1116,7 @@ function expandUnit(raw) {
     callsign: raw.callsign || raw.id,
     type: raw.type || (isVehicle ? 'VEHICLE' : 'INFANTRY'),
     vehicle_type: vtype,
-    position: raw.position || raw.pos || { x: 0, y: 0, lat: 0, lng: 0 },
+    position: raw.position || raw.pos || { x: 0, y: 0, z: 0, lat: 0, lng: 0 },
     heading: raw.heading ?? raw.hdg ?? 0,
     health: raw.health ?? raw.hp ?? 100,
     fuel: raw.fuel ?? 100,

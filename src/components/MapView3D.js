@@ -526,7 +526,9 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
       const tx = p.x - HALF;
       const tz = -(p.y - HALF);
       if (!hImg) return;
-      const h = getHeightAt(p.x, p.y);
+      const terrainH = getHeightAt(p.x, p.y);
+      const altAGL = p.z || 0;
+      const h = terrainH + altAGL;
       const dead = u.status === 'DESTROYED' || u.status === 'DEAD';
       const color = dead ? DEAD : BLUE;
       const emissive = dead ? 0x222233 : 0x1a4a8a;
@@ -557,7 +559,9 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
       const tx = p.x - HALF;
       const tz = -(p.y - HALF);
       if (!hImg) return;
-      const h = getHeightAt(p.x, p.y);
+      const terrainH = getHeightAt(p.x, p.y);
+      const altAGL = p.z || 0;
+      const h = terrainH + altAGL;
 
       const state = (c.state || '').toUpperCase();
       const opacity = state === 'LAST_KNOWN' ? 0.5 : state === 'SUSPECTED' ? 0.3 : 1;
