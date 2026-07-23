@@ -338,16 +338,27 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
     const ctrl = new OrbitControls(cam, renderer.domElement);
     ctrl.target.set(0, 0, 0);
     ctrl.maxPolarAngle = Math.PI / 2.1;
-    ctrl.minDistance = 5;
-    ctrl.maxDistance = 20000;
     ctrl.enableDamping = false;
     ctrl.panSpeed = 2.0;
     ctrl.rotateSpeed = 1.0;
-    ctrl.zoomSpeed = 1.5;
+    ctrl.zoomSpeed = 2.0;
+    ctrl.screenSpacePanning = true;
+    ctrl.enableZoom = false;
     ctrl.keys = { LEFT: 0, RIGHT: 0, UP: 0, BOTTOM: 0 };
     ctrl.enableKeys = false;
-    ctrl.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+    ctrl.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.ROTATE };
     ctrl.update();
+
+    const ZOOM_STEP = 40;
+    renderer.domElement.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const dir = new THREE.Vector3();
+      cam.getWorldDirection(dir);
+      const step = e.deltaY > 0 ? ZOOM_STEP : -ZOOM_STEP;
+      const mul = e.shiftKey ? 3 : 1;
+      cam.position.addScaledVector(dir, -step * mul);
+      ctrl.target.addScaledVector(dir, -step * mul);
+    }, { passive: false });
 
     scene.add(new THREE.AmbientLight(0x888888, 0.6));
     const sun = new THREE.DirectionalLight(0xffeedd, 1.0);
@@ -644,7 +655,7 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
         <span className={`badge ${status.startsWith('ready')?'badge-success':''}`}>{status}</span>
       </div>
       <div style={{ position:'absolute', bottom:12, left:12, zIndex:10, fontFamily:'var(--font-mono)', fontSize:9, color:'var(--text-muted)', background:'rgba(0,0,0,0.7)', padding:'5px 10px', borderRadius:3, pointerEvents:'none' }}>
-        WASD+Shift=fly · Left-drag=pan · Right-drag=orbit · Scroll=zoom · M=2D
+        WASD+Shift=fly · Scroll=zoom · Left-drag=pan · Right/Mid-drag=orbit · M=2D
       </div>
     </div>
   );
