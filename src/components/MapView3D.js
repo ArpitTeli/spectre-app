@@ -13,10 +13,10 @@ const TS = 226;
 const CRS_SCALE = TS / 0.027475;
 
 const MODEL_WORLD_SIZE = {
-  helicopter: 14,
+  helicopter: 28,
   tank: 8,
   tank_destroyer: 5,
-  vehicle: 7,
+  vehicle: 14,
   jeep: 5,
   infantry: 2,
 };
