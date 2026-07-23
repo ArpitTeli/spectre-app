@@ -12,13 +12,13 @@ const SAT_ZOOM = 3;
 const TS = 226;
 const CRS_SCALE = TS / 0.027475;
 
-const MODEL_SCALE = {
-  helicopter: 0.08,
-  tank: 0.12,
-  tank_destroyer: 0.12,
-  vehicle: 0.10,
-  jeep: 0.10,
-  infantry: 1,
+const MODEL_WORLD_SIZE = {
+  helicopter: 14,
+  tank: 8,
+  tank_destroyer: 8,
+  vehicle: 7,
+  jeep: 5,
+  infantry: 2,
 };
 
 const MODEL_HEIGHT_OFFSET = {
@@ -122,7 +122,12 @@ function getHeightAt(armaX, armaY) {
 function loadOBJ(url) {
   return new Promise((resolve, reject) => {
     const loader = new OBJLoader();
-    loader.load(url, resolve, undefined, reject);
+    loader.load(url, (model) => {
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      model.userData.rawSize = Math.max(size.x, size.y, size.z);
+      resolve(model);
+    }, undefined, reject);
   });
 }
 
@@ -132,13 +137,9 @@ function loadFBX(url) {
     loader.load(url, (model) => {
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const targetSize = 2;
-      const autoScale = targetSize / maxDim;
-      model.scale.set(autoScale, autoScale, autoScale);
-      const box2 = new THREE.Box3().setFromObject(model);
-      const center = box2.getCenter(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
       model.position.sub(center);
+      model.userData.rawSize = Math.max(size.x, size.y, size.z);
       resolve(model);
     }, undefined, reject);
   });
@@ -149,7 +150,15 @@ function loadMultiPartOBJ(baseDir, files) {
     .then(parts => {
       const group = new THREE.Group();
       parts.filter(Boolean).forEach(p => group.add(p));
-      return group.children.length > 0 ? group : null;
+      if (group.children.length > 0) {
+        const box = new THREE.Box3().setFromObject(group);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        group.position.sub(center);
+        group.userData.rawSize = Math.max(size.x, size.y, size.z);
+        return group;
+      }
+      return null;
     });
 }
 
@@ -253,6 +262,12 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
       }),
       loadFBX(`${M}/Soldier.fbx`).catch(() => null),
     ]).then(([heli, tank, armored, jeep, tankDest, soldier]) => {
+      [heli, tank, armored].forEach(m => {
+        if (!m) return;
+        const box = new THREE.Box3().setFromObject(m);
+        const center = box.getCenter(new THREE.Vector3());
+        m.position.sub(center);
+      });
       const loaded = {
         helicopter: heli,
         tank,
@@ -264,9 +279,10 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
       setModels(loaded);
       Object.entries(loaded).forEach(([k, v]) => {
         if (v) {
-          const box = new THREE.Box3().setFromObject(v);
-          const size = box.getSize(new THREE.Vector3());
-          console.log(`[MODELS] ${k}: size ${size.x.toFixed(1)} x ${size.y.toFixed(1)} x ${size.z.toFixed(1)}`);
+          const raw = v.userData.rawSize || 0;
+          const worldSize = MODEL_WORLD_SIZE[k] || 2;
+          const scale = worldSize / raw;
+          console.log(`[MODELS] ${k}: rawSize=${raw.toFixed(1)} worldSize=${worldSize} scale=${scale.toFixed(6)}`);
         } else {
           console.log(`[MODELS] ${k}: FAILED to load`);
         }
@@ -544,12 +560,10 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
         g.add(m);
       } else {
         const clone = template.clone();
-        if (modelType === 'infantry' || modelType === 'tank_destroyer') {
-          applyMaterial(clone, color, emissive, 0.5);
-        } else {
-          applyMaterial(clone, color, emissive, 0.5);
-        }
-        const scale = MODEL_SCALE[modelType] || 0.1;
+        applyMaterial(clone, color, emissive, 0.5);
+        const raw = template.userData.rawSize || 1;
+        const worldSize = MODEL_WORLD_SIZE[modelType] || 2;
+        const scale = worldSize / raw;
         clone.scale.set(scale, scale, scale);
         clone.position.set(tx, h + (MODEL_HEIGHT_OFFSET[modelType] || 3), tz);
         g.add(clone);
@@ -579,7 +593,9 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
       } else {
         const clone = template.clone();
         applyMaterial(clone, color, emissive, 0.6);
-        const scale = MODEL_SCALE[modelType] || 0.1;
+        const raw = template.userData.rawSize || 1;
+        const worldSize = MODEL_WORLD_SIZE[modelType] || 2;
+        const scale = worldSize / raw;
         clone.scale.set(scale, scale, scale);
         clone.position.set(tx, h + (MODEL_HEIGHT_OFFSET[modelType] || 3), tz);
         g.add(clone);
