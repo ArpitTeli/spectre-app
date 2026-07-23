@@ -397,7 +397,7 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
         const flatGeo = new THREE.SphereGeometry(0.5, 8, 4);
         const boxGeo = new THREE.BoxGeometry(1, 1, 1);
         const geos = [coneGeo, sphereGeo, flatGeo, boxGeo];
-        const baseColors = [0x2d5a1e, 0x3a6a28, 0x4a6a30, 0x888888];
+        const baseColors = [0x2d5a1e, 0x3a6a28, 0x4a6a30, 0x7a7568];
 
         const m4 = new THREE.Matrix4();
         const euler = new THREE.Euler();
@@ -568,6 +568,11 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
         }
       });
       g.remove(ch);
+    }
+
+    const unitList = Object.values(units || {});
+    if (unitList.length > 0) {
+      console.log(`[3D] Rendering ${unitList.length} units, models: ${models ? Object.keys(models).join(',') : 'none'}`);
     }
 
     const BLUE = 0x3b82f6;
