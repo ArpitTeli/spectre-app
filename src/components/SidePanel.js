@@ -27,7 +27,7 @@ export default function SidePanel({ state, patch, addCommsEntry, sendArmaCommand
   const [activeTab, setActiveTab] = useState('TRACKS');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const units = visibleUnits ? visibleUnits() : Object.values(state.units);
+  const units = Object.values(visibleUnits ? visibleUnits() : state.units);
   const contacts = Object.values(state.contacts || {});
 
   const filteredUnits = useMemo(() => {
