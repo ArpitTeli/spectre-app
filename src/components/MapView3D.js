@@ -273,8 +273,7 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
         });
         return m;
       }),
-      loadFBX(`${M}/Soldier.fbx`).catch(() => null),
-    ]).then(([heli, tank, armored, jeep, tankDest, soldier]) => {
+    ]).then(([heli, tank, armored, jeep, tankDest]) => {
       [heli, tank, armored].forEach(m => {
         if (!m) return;
         const box = new THREE.Box3().setFromObject(m);
@@ -287,7 +286,6 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
         vehicle: armored,
         jeep,
         tank_destroyer: tankDest,
-        infantry: soldier,
       };
       setModels(loaded);
       Object.entries(loaded).forEach(([k, v]) => {
