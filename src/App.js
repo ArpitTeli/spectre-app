@@ -5,6 +5,7 @@ import TitleBar from './components/TitleBar';
 import MapView from './components/MapView';
 import MapView3D from './components/MapView3D';
 import SidePanel from './components/SidePanel';
+import RightPanel from './components/RightPanel';
 import { CommsLog, StatusBar, SettingsModal } from './components/StatusBar';
 import PlanningModal from './components/PlanningModal';
 import COAPanel from './components/COAPanel';
@@ -210,42 +211,6 @@ export default function App() {
       )}
 
       <div className="app-body">
-        {viewMode === '2d' ? (
-          <MapView
-            units={visibleUnits()}
-            contacts={state.contacts}
-            zones={state.zones}
-            selectedUnit={state.selectedUnit}
-            selectedContact={state.selectedContact}
-            currentCOAs={state.currentCOAs}
-            selectedCOA={state.selectedCOA}
-            showCOAOverlay={state.showCOAOverlay}
-            mapName={state.mapName}
-            onUnitSelect={id => patch({ selectedUnit: id })}
-            onContactSelect={id => patch({ selectedContact: id })}
-          />
-        ) : (
-          <MapView3D
-            units={visibleUnits()}
-            contacts={state.contacts}
-            onUnitSelect={id => patch({ selectedUnit: id })}
-            onContactSelect={id => patch({ selectedContact: id })}
-          />
-        )}
-
-        {/* 3D toggle button */}
-        <button
-          onClick={() => setViewMode(v => v === '2d' ? '3d' : '2d')}
-          className="btn btn-sm"
-          style={{
-            position: 'absolute', bottom: 'calc(var(--statusbar-height) + 12px)',
-            left: 12, zIndex: 1000, fontSize: 9
-          }}
-          title="Press M to toggle 2D/3D"
-        >
-          {viewMode === '2d' ? '◈ 3D' : '◈ 2D'}
-        </button>
-
         <SidePanel
           state={state}
           patch={patch}
@@ -253,6 +218,48 @@ export default function App() {
           sendArmaCommand={sendArmaCommand}
           addIntel={addIntel}
           endMission={endMission}
+          visibleUnits={visibleUnits}
+        />
+
+        <div className="app-center">
+          {viewMode === '2d' ? (
+            <MapView
+              units={visibleUnits()}
+              contacts={state.contacts}
+              zones={state.zones}
+              selectedUnit={state.selectedUnit}
+              selectedContact={state.selectedContact}
+              currentCOAs={state.currentCOAs}
+              selectedCOA={state.selectedCOA}
+              showCOAOverlay={state.showCOAOverlay}
+              mapName={state.mapName}
+              onUnitSelect={id => patch({ selectedUnit: id })}
+              onContactSelect={id => patch({ selectedContact: id })}
+            />
+          ) : (
+            <MapView3D
+              units={visibleUnits()}
+              contacts={state.contacts}
+              onUnitSelect={id => patch({ selectedUnit: id })}
+              onContactSelect={id => patch({ selectedContact: id })}
+            />
+          )}
+
+          <button
+            onClick={() => setViewMode(v => v === '2d' ? '3d' : '2d')}
+            className="btn btn-sm view-toggle"
+            title="Press M to toggle 2D/3D"
+          >
+            {viewMode === '2d' ? '3D' : '2D'}
+          </button>
+        </div>
+
+        <RightPanel
+          state={state}
+          patch={patch}
+          sendArmaCommand={sendArmaCommand}
+          addCommsEntry={addCommsEntry}
+          selectedUnit={state.selectedUnit ? state.units[state.selectedUnit] : null}
         />
       </div>
 

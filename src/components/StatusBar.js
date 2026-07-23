@@ -41,23 +41,23 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
           {mode === 'client' ? (armaConnected ? 'ON' : 'OFF') : (armaConnected ? 'ON' : 'OFF')}
         </span>
       </div>
-      <div className="statusbar__divider" style={{ width: '1px', height: '12px', background: 'var(--border-hairline)' }} />
+      <div className="statusbar__divider" />
       <div className="statusbar__item">
         <span className="statusbar__value">{clock}</span>
       </div>
-      <div className="statusbar__divider" style={{ width: '1px', height: '12px', background: 'var(--border-hairline)' }} />
+      <div className="statusbar__divider" />
       <div className="statusbar__item">
         <span className={`statusbar__value ${missionPhase === 'ABORTING' ? 'danger' : ''}`}>{missionPhase}</span>
       </div>
       {missionPhase === 'ACTIVE' && (
         <>
-          <div className="statusbar__divider" style={{ width: '1px', height: '12px', background: 'var(--border-hairline)' }} />
+          <div className="statusbar__divider" />
           <div className="statusbar__item">
             <span className="statusbar__value" style={{ color: 'var(--accent)' }}>T+{formatElapsed(missionElapsedSec)}</span>
           </div>
         </>
       )}
-      <div className="statusbar__divider" style={{ width: '1px', height: '12px', background: 'var(--border-hairline)' }} />
+      <div className="statusbar__divider" />
       <div className="statusbar__item">
         <span className={`statusbar__value ${fpColor}`}>FP {forceMetrics.firepower_index}%</span>
       </div>
@@ -66,7 +66,7 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
       </div>
       {rewardData && (
         <>
-          <div className="statusbar__divider" style={{ width: '1px', height: '12px', background: 'var(--border-hairline)' }} />
+          <div className="statusbar__divider" />
           <div className="statusbar__item">
             <span className={`statusbar__value ${rewardData.score >= 0 ? '' : 'danger'}`}>{rewardData.score.toFixed(0)}</span>
           </div>
