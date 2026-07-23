@@ -245,9 +245,12 @@ function applyFBXTextures(model, baseDir, textures) {
 function getUnitModelType(unit) {
   const vt = (unit.vehicle_type || '').toUpperCase();
   const t = (unit.type || '').toUpperCase();
-  if (t.includes('HELICOPTER') || vt.includes('HELICOPTER') || t === 'AIR') return 'helicopter';
-  if (t.includes('TANK') || vt.includes('TANK') || vt.includes('TRACKED')) return 'tank';
-  if (vt.includes('CAR') || vt.includes('WHEELED') || vt.includes('MRAP') || vt.includes('JLTV')) return 'vehicle';
+  if (t.includes('HELICOPTER') || vt === 'HELI' || t === 'AIR') return 'helicopter';
+  if (vt === 'TANK' || t.includes('TANK') || vt.includes('TRACKED')) return 'tank';
+  if (vt === 'IFV') return 'tank_destroyer';
+  if (vt === 'CAR' || vt.includes('MRAP') || vt.includes('JLTV')) return 'vehicle';
+  if (vt === 'TRUCK') return 'vehicle';
+  if (vt.includes('WHEELED') || vt.includes('CAR')) return 'vehicle';
   return 'infantry';
 }
 

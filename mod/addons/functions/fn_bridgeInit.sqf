@@ -78,20 +78,14 @@ diag_log format ["SPECTRE: Initialized — tracking %1 blufor assets on %2", cou
 // ─── Vehicle type classifier ──────────────────────────────────────────────────
 SPECTRE_fnc_vehicleType = {
     params ["_v"];
-    if (_v isKindOf "Helicopter") exitWith { "HELI" };
-    if (_v isKindOf "Plane")      exitWith { "PLANE" };
-    if (_v isKindOf "Ship")       exitWith { "BOAT" };
-    if (_v isKindOf "Tank")       exitWith { "TANK" };
-    if (_v isKindOf "IFV_01_base_F" || _v isKindOf "IFV_02_base_F" ||
-        _v isKindOf "IFV_03_base_F" || _v isKindOf "APC_Tracked_01_base_F" ||
-        _v isKindOf "APC_Tracked_02_base_F" || _v isKindOf "APC_Tracked_03_base_F")
-        exitWith { "IFV" };
-    if (_v isKindOf "APC_Wheeled_01_base_F" || _v isKindOf "APC_Wheeled_02_base_F" ||
-        _v isKindOf "APC_Wheeled_03_base_F")
-        exitWith { "APC" };
-    if (_v isKindOf "Truck_F") exitWith { "TRUCK" };
-    if (_v isKindOf "Car")      exitWith { "CAR" };
-    if (_v isKindOf "Man")      exitWith { "INFANTRY" };
+    if (_v isKindOf "Helicopter")  exitWith { "HELI" };
+    if (_v isKindOf "Plane")       exitWith { "PLANE" };
+    if (_v isKindOf "Ship")        exitWith { "BOAT" };
+    if (_v isKindOf "Truck_F")     exitWith { "TRUCK" };
+    if (_v isKindOf "Tank")        exitWith { "TANK" };
+    if (_v isKindOf "Wheeled_APC_F") exitWith { "IFV" };
+    if (_v isKindOf "Car")         exitWith { "CAR" };
+    if (_v isKindOf "Man")         exitWith { "INFANTRY" };
     "VEHICLE"
 };
 
@@ -134,10 +128,6 @@ SPECTRE_fnc_serializeUnit = {
     };
 
     // Ammo count (total magazines)
-    private _ammoCount = 0;
-    {
-        _ammoCount = _ammoCount + ({_x select 0 == _x select 0} count magazines _unit);
-    } forEach magazines _unit;
     private _ammoStr = format [",""ammo"":%1", count magazines _unit];
 
     // Vehicle membership (for infantry inside vehicles)
