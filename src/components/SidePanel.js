@@ -22,7 +22,7 @@ export default function SidePanel({ state, patch, addCommsEntry, sendArmaCommand
       </div>
       <div className="side-panel__content">
         {activeTab === 'UNITS'    && <UnitsTab    units={state.units}    selectedUnit={state.selectedUnit} patch={patch} sendArmaCommand={sendArmaCommand} addCommsEntry={addCommsEntry} />}
-        {activeTab === 'CONTACTS' && <ContactsTab contacts={state.contacts} patch={patch} />}
+        {activeTab === 'CONTACTS' && <ContactsTab contacts={state.contacts} selectedContact={state.selectedContact} patch={patch} />}
         {activeTab === 'INTEL'    && <IntelTab    intelDB={state.intelDB} addIntel={addIntel} />}
         {activeTab === 'ORDERS'   && <OrdersTab   state={state} sendArmaCommand={sendArmaCommand} addCommsEntry={addCommsEntry} />}
         {activeTab === 'GRAPH'    && <VaultGraph  vaultPath={state.vaultPath} units={state.units} contacts={state.contacts} />}
@@ -182,7 +182,7 @@ function Bar({ label, value, type }) {
   );
 }
 
-function ContactsTab({ contacts, patch }) {
+function ContactsTab({ contacts, selectedContact, patch }) {
   const list = Object.values(contacts).sort((a, b) => {
     const o = { CONFIRMED: 0, LAST_KNOWN: 1, SUSPECTED: 2 };
     return (o[a.state] || 2) - (o[b.state] || 2);
@@ -191,7 +191,7 @@ function ContactsTab({ contacts, patch }) {
   return (
     <div className="contact-list">
       {list.map(c => (
-        <div key={c.id} className={`contact-card ${c.id === patch.selectedContact ? 'selected' : ''}`} data-confidence={c.state} onClick={() => patch({ selectedContact: c.id })}>
+        <div key={c.id} className={`contact-card ${c.id === selectedContact ? 'selected' : ''}`} data-confidence={c.state} onClick={() => patch({ selectedContact: c.id })}>
           <div className="contact-card__header">
             <span className="contact-card__type">{c.type || c.id}</span>
             <span className={`contact-card__confidence ${(c.state || '').toLowerCase()}`}>{c.state}</span>

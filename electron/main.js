@@ -365,7 +365,7 @@ const unitMarkers = {};
 const contactMarkers = {};
 let connected = false;
 
-const VEHICLE_SYMBOL = { MBT: '▲', IFV: '■', APC: '◆', RECON: '◇', HELI: '✦', TRUCK: '▪', INFANTRY: '●', DEFAULT: '○' };
+const VEHICLE_SYMBOL = { MBT: '▲', TANK: '▲', IFV: '■', APC: '◆', CAR: '●', RECON: '◇', HELI: '✦', TRUCK: '▪', BOAT: '◆', PLANE: '✦', INFANTRY: '●', DEFAULT: '○' };
 
 function makeUnitIcon(unit) {
   const symbol = VEHICLE_SYMBOL[unit.vehicle_type || unit.vtype] || VEHICLE_SYMBOL.DEFAULT;
@@ -653,10 +653,13 @@ ipcMain.handle('install-mod', async (_, modType) => {
 
       const zipPath = path.join(ARMA_INSTALL, 'cba_a3_temp.zip');
       await new Promise((resolve, reject) => {
+        let redirectCount = 0;
         const download = (url) => {
+          if (redirectCount++ > 10) { reject(new Error('Too many redirects')); return; }
           https.get(url, { headers: { 'User-Agent': 'SPECTRE-C2' } }, (res) => {
             if (res.statusCode === 302 || res.statusCode === 301) {
               console.log('SPECTRE: Following redirect to:', res.headers.location);
+              res.resume();
               download(res.headers.location);
             } else if (res.statusCode === 200) {
               const file = fs.createWriteStream(zipPath);

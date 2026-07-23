@@ -284,7 +284,8 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
               </div>
             </div>
             {armaPath && (
-              <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                <div style={{ display: 'flex', gap: '4px' }}>
                 <button className={`btn btn-sm flex-1 ${modStatus.spectre ? 'btn-primary' : ''}`}
                   onClick={() => handleInstallMod('spectre')} disabled={installing === 'spectre' || modStatus.spectre}>
                   {installing === 'spectre' ? '...' : modStatus.spectre ? '@SPECTRE ✓' : 'Install @SPECTRE'}
@@ -293,6 +294,10 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
                   onClick={() => handleInstallMod('cba')} disabled={installing === 'cba' || modStatus.cba}>
                   {installing === 'cba' ? '...' : modStatus.cba ? '@CBA_A3 ✓' : 'Install @CBA_A3'}
                 </button>
+                </div>
+                {armaPathStatus && (
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--accent)' }}>{armaPathStatus}</div>
+                )}
               </div>
             )}
             <div className="settings-field" style={{ marginTop: '8px' }}>
