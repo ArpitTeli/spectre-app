@@ -297,8 +297,8 @@ function processArmaUpdate(data, stateRef, patch) {
   const now = Date.now();
   const current = stateRef.current;
 
-  const unitsMap = {};
-  units.forEach(u => { unitsMap[u.id] = { ...current.units[u.id], ...u, last_updated: timestamp }; });
+  const unitsMap = { ...current.units };
+  units.forEach(u => { unitsMap[u.id] = { ...unitsMap[u.id], ...u, last_updated: timestamp }; });
 
   const contactsMap = { ...current.contacts };
   contacts.forEach(c => { contactsMap[c.id] = { ...contactsMap[c.id], ...c, state: 'CONFIRMED', last_seen: now }; });
