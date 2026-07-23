@@ -216,6 +216,8 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
   const [status, setStatus] = useState('loading');
   const [hImg, setHImg] = useState(null);
   const [models, setModels] = useState(null);
+  const onUnitSelectRef = useRef(onUnitSelect);
+  onUnitSelectRef.current = onUnitSelect;
 
   useEffect(() => {
     const img = new Image();
@@ -285,6 +287,37 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
     ctrl.enableKeys = false;
     ctrl.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.ROTATE };
     ctrl.update();
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let mouseDownPos = { x: 0, y: 0 };
+
+    renderer.domElement.addEventListener('mousedown', (e) => {
+      mouseDownPos.x = e.clientX;
+      mouseDownPos.y = e.clientY;
+    });
+
+    renderer.domElement.addEventListener('mouseup', (e) => {
+      const dx = e.clientX - mouseDownPos.x;
+      const dy = e.clientY - mouseDownPos.y;
+      if (Math.sqrt(dx * dx + dy * dy) > 5) return;
+
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, cam);
+
+      const s = st.current;
+      if (!s.markers) return;
+      const hits = raycaster.intersectObjects(s.markers.children, true);
+      if (hits.length > 0) {
+        let obj = hits[0].object;
+        while (obj && !obj.userData?.unitId) obj = obj.parent;
+        if (obj?.userData?.unitId) {
+          onUnitSelectRef.current(obj.userData.unitId);
+        }
+      }
+    });
 
     const ZOOM_STEP = 40;
     renderer.domElement.addEventListener('wheel', (e) => {
@@ -519,6 +552,9 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
 
     const BLUE = 0x3b82f6;
     const DEAD = 0x585870;
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.4 });
+    const groundDotGeo = new THREE.RingGeometry(2, 4, 16);
+    const groundDotMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
 
     Object.values(units || {}).forEach(u => {
       const p = u.position;
@@ -537,11 +573,14 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
       const modelType = getUnitModelType(u);
       const template = models && models[modelType];
       const raw = template && template.userData.rawSize;
+      let markerObj;
 
       if (!template || !raw || raw < 1) {
         const m = makeInfantryMesh(color, emissive, opacity);
         m.position.set(tx, h + MODEL_HEIGHT_OFFSET.infantry, tz);
+        m.userData = { unitId: u.id };
         g.add(m);
+        markerObj = m;
       } else {
         const clone = template.clone();
         applyMaterial(clone, color, emissive, 0.5);
@@ -549,7 +588,25 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
         const scale = worldSize / raw;
         clone.scale.set(scale, scale, scale);
         clone.position.set(tx, h + (MODEL_HEIGHT_OFFSET[modelType] || 3), tz);
+        clone.userData = { unitId: u.id };
         g.add(clone);
+        markerObj = clone;
+      }
+
+      if (altAGL > 1 && !dead) {
+        const lineGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(tx, h, tz),
+          new THREE.Vector3(tx, terrainH, tz)
+        ]);
+        const line = new THREE.Line(lineGeo, lineMat);
+        line.userData = { unitId: u.id };
+        g.add(line);
+
+        const dot = new THREE.Mesh(groundDotGeo, groundDotMat);
+        dot.rotation.x = -Math.PI / 2;
+        dot.position.set(tx, terrainH + 0.5, tz);
+        dot.userData = { unitId: u.id };
+        g.add(dot);
       }
     });
 
@@ -575,6 +632,7 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
       if (!template || !raw || raw < 1) {
         const m = makeInfantryMesh(color, emissive, opacity);
         m.position.set(tx, h + MODEL_HEIGHT_OFFSET.infantry, tz);
+        m.userData = { contactId: c.id };
         g.add(m);
       } else {
         const clone = template.clone();
@@ -583,7 +641,17 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
         const scale = worldSize / raw;
         clone.scale.set(scale, scale, scale);
         clone.position.set(tx, h + (MODEL_HEIGHT_OFFSET[modelType] || 3), tz);
+        clone.userData = { contactId: c.id };
         g.add(clone);
+      }
+
+      if (altAGL > 1) {
+        const lineGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(tx, h, tz),
+          new THREE.Vector3(tx, terrainH, tz)
+        ]);
+        const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0x8a1a1a, transparent: true, opacity: 0.3 }));
+        g.add(line);
       }
     });
   }, [units, contacts, models, hImg]);
