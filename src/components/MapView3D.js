@@ -123,9 +123,31 @@ function loadOBJ(url) {
   return new Promise((resolve, reject) => {
     const loader = new OBJLoader();
     loader.load(url, (model) => {
-      const box = new THREE.Box3().setFromObject(model);
-      const size = box.getSize(new THREE.Vector3());
-      model.userData.rawSize = Math.max(size.x, size.y, size.z);
+      model.updateMatrixWorld(true);
+      const geoBox = new THREE.Box3();
+      let hasGeo = false;
+      model.traverse(child => {
+        if (child.isMesh && child.geometry) {
+          child.geometry.computeBoundingBox();
+          const b = child.geometry.boundingBox.clone();
+          b.applyMatrix4(child.matrixWorld);
+          geoBox.union(b);
+          hasGeo = true;
+        }
+      });
+      if (hasGeo) {
+        const size = geoBox.getSize(new THREE.Vector3());
+        const center = geoBox.getCenter(new THREE.Vector3());
+        model.traverse(child => {
+          if (child.isMesh && child.geometry) {
+            child.geometry.translate(-center.x, -center.y, -center.z);
+          }
+        });
+        model.updateMatrixWorld(true);
+        model.userData.rawSize = Math.max(size.x, size.y, size.z);
+      } else {
+        model.userData.rawSize = 0;
+      }
       resolve(model);
     }, undefined, reject);
   });
@@ -141,16 +163,17 @@ function loadFBX(url) {
         if (child.isMesh && child.geometry) {
           child.geometry.computeBoundingBox();
           const b = child.geometry.boundingBox.clone();
-          child.localToWorld(new THREE.Vector3());
-          if (child.matrixWorld) {
-            b.applyMatrix4(child.matrixWorld);
-          }
+          b.applyMatrix4(child.matrixWorld);
           geoBox.union(b);
         }
       });
       const size = geoBox.getSize(new THREE.Vector3());
       const center = geoBox.getCenter(new THREE.Vector3());
-      model.position.sub(center);
+      model.traverse(child => {
+        if (child.isMesh && child.geometry) {
+          child.geometry.translate(-center.x, -center.y, -center.z);
+        }
+      });
       model.updateMatrixWorld(true);
       model.userData.rawSize = Math.max(size.x, size.y, size.z);
       resolve(model);
@@ -164,10 +187,16 @@ function loadMultiPartOBJ(baseDir, files) {
       const group = new THREE.Group();
       parts.filter(Boolean).forEach(p => group.add(p));
       if (group.children.length > 0) {
-        const box = new THREE.Box3().setFromObject(group);
-        const size = box.getSize(new THREE.Vector3());
-        const center = box.getCenter(new THREE.Vector3());
-        group.position.sub(center);
+        const geoBox = new THREE.Box3();
+        group.traverse(child => {
+          if (child.isMesh && child.geometry) {
+            child.geometry.computeBoundingBox();
+            const b = child.geometry.boundingBox.clone();
+            b.applyMatrix4(child.matrixWorld);
+            geoBox.union(b);
+          }
+        });
+        const size = geoBox.getSize(new THREE.Vector3());
         group.userData.rawSize = Math.max(size.x, size.y, size.z);
         return group;
       }
@@ -274,12 +303,6 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
         return m;
       }),
     ]).then(([heli, tank, armored, jeep, tankDest]) => {
-      [heli, tank, armored].forEach(m => {
-        if (!m) return;
-        const box = new THREE.Box3().setFromObject(m);
-        const center = box.getCenter(new THREE.Vector3());
-        m.position.sub(center);
-      });
       const loaded = {
         helicopter: heli,
         tank,
@@ -564,15 +587,15 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
 
       const modelType = getUnitModelType(u);
       const template = models && models[modelType];
+      const raw = template && template.userData.rawSize;
 
-      if (!template) {
+      if (!template || !raw || raw < 1) {
         const m = makeInfantryMesh(color, emissive, opacity);
         m.position.set(tx, h + MODEL_HEIGHT_OFFSET.infantry, tz);
         g.add(m);
       } else {
         const clone = template.clone();
         applyMaterial(clone, color, emissive, 0.5);
-        const raw = template.userData.rawSize || 1;
         const worldSize = MODEL_WORLD_SIZE[modelType] || 2;
         const scale = worldSize / raw;
         clone.scale.set(scale, scale, scale);
@@ -596,15 +619,15 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
 
       const modelType = getUnitModelType(c);
       const template = models && models[modelType];
+      const raw = template && template.userData.rawSize;
 
-      if (!template) {
+      if (!template || !raw || raw < 1) {
         const m = makeInfantryMesh(color, emissive, opacity);
         m.position.set(tx, h + MODEL_HEIGHT_OFFSET.infantry, tz);
         g.add(m);
       } else {
         const clone = template.clone();
         applyMaterial(clone, color, emissive, 0.6);
-        const raw = template.userData.rawSize || 1;
         const worldSize = MODEL_WORLD_SIZE[modelType] || 2;
         const scale = worldSize / raw;
         clone.scale.set(scale, scale, scale);
