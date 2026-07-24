@@ -59,7 +59,18 @@ if (ARMA_INSTALL && !_configData.arma_path) {
 const DEBUG_LOG = path.join(USER_DATA, 'debug.log');
 function dbg(msg) {
   const line = `[${new Date().toISOString()}] ${msg}\n`;
-  try { fs.appendFileSync(DEBUG_LOG, line); } catch (_) {}
+  try {
+    // Rotate debug log if > 10 MB to prevent unbounded growth
+    try {
+      const st = fs.statSync(DEBUG_LOG);
+      if (st.size > 10 * 1024 * 1024) {
+        const backup = DEBUG_LOG + '.1';
+        try { fs.unlinkSync(backup); } catch (_) {}
+        fs.renameSync(DEBUG_LOG, backup);
+      }
+    } catch (_) {}
+    fs.appendFileSync(DEBUG_LOG, line);
+  } catch (_) {}
   console.log(line.trimEnd());
 }
 
@@ -212,11 +223,14 @@ let relayRoomCode = '';
 let relayMode = 'host'; // 'host' or 'client'
 let relayReconnectTimer = null;
 let relayFatalError = false; // true when server rejects (don't reconnect)
+let relayReconnectAttempts = 0;
+const RELAY_MAX_RECONNECTS = 10; // stop after 10 failures (~30s)
 
 function connectToRelay(mode, roomCode, url) {
   relayMode = mode;
   relayRoomCode = roomCode;
   relayFatalError = false;
+  relayReconnectAttempts = 0;
   if (relayWs) { relayWs.close(); relayWs = null; }
   if (relayReconnectTimer) { clearTimeout(relayReconnectTimer); relayReconnectTimer = null; }
 
@@ -234,6 +248,7 @@ function connectToRelay(mode, roomCode, url) {
 
   relayWs.on('open', () => {
     relayConnected = true;
+    relayReconnectAttempts = 0; // reset on successful connect
     dbg('SPECTRE: Relay connected, joining room...');
     relayWs.send(JSON.stringify({ type: 'join', room: roomCode, role: mode }));
   });
@@ -288,18 +303,30 @@ function connectToRelay(mode, roomCode, url) {
 
   relayWs.on('error', (e) => {
     dbg(`SPECTRE: Relay WebSocket error: ${e.message}`);
+    // HTTP 404 means server is gone — treat as fatal
+    if (e.message && e.message.includes('404')) {
+      relayFatalError = true;
+      dbg('SPECTRE: relay server returned 404 — server may be offline');
+    }
   });
 }
 
 function scheduleReconnect(mode, roomCode, url) {
   if (relayReconnectTimer) return;
+  relayReconnectAttempts++;
+  if (relayReconnectAttempts > RELAY_MAX_RECONNECTS) {
+    dbg(`SPECTRE: relay reconnect gave up after ${RELAY_MAX_RECONNECTS} attempts`);
+    sendToRenderer('relay-status', { connected: false, mode, room: roomCode, error: 'Relay unreachable', fatal: true });
+    return;
+  }
+  const delay = Math.min(3000 * relayReconnectAttempts, 30000); // backoff up to 30s
   relayReconnectTimer = setTimeout(() => {
     relayReconnectTimer = null;
     if (!relayConnected) {
-      dbg('SPECTRE: Attempting relay reconnect...');
+      dbg(`SPECTRE: Attempting relay reconnect (${relayReconnectAttempts}/${RELAY_MAX_RECONNECTS})...`);
       connectToRelay(mode, roomCode, url);
     }
-  }, 3000);
+  }, delay);
 }
 
 function sendStateToRelay(data) {
@@ -981,19 +1008,21 @@ app.on('window-all-closed', () => {
 
 // ─── Bridge Watchers ─────────────────────────────────────────────────────────
 function startBridgeWatcher() {
-  // Tail Arma RPT log using fs.watchFile (more reliable than chokidar for this)
-  watchArmaLog();
+  // Tail Arma RPT log using fs.watchFile + polling fallback
+  initWatchArmaLog();
 
-  // Periodic: check for newer RPT files (log rotation)
+  // Periodic: check for newer RPT files (log rotation) + polling fallback
   setInterval(() => {
     const newer = findLatestRptLog(ARMA_DOCS);
     if (newer && newer !== currentLogPath) {
-      console.log('SPECTRE: newer RPT detected, switching:', newer);
-      watchArmaLog(); // will pick up the new path
+      dbg('SPECTRE: newer RPT detected, switching: ' + newer);
+      initWatchArmaLog();
     }
-  }, 10000);
+    // Polling fallback: even if fs.watchFile misses events, we catch changes here
+    readNewLogData();
+  }, 1000);
 
-  console.log('SPECTRE: bridge watching Arma log files');
+  dbg('SPECTRE: bridge watching Arma log files');
 }
 
 function readNewLogData() {
@@ -1023,32 +1052,37 @@ function readNewLogData() {
   }
 }
 
-function watchArmaLog() {
+// Track which path the fs.watchFile is currently registered on
+let watchFileRegisteredPath = null;
+
+function initWatchArmaLog() {
   const logPath = findLatestRptLog(ARMA_DOCS);
 
   if (!logPath) {
-    dbg('SPECTRE: no RPT log found, retrying in 5s...');
-    setTimeout(watchArmaLog, 5000);
+    dbg('SPECTRE: no RPT log found, will retry via polling');
     return;
   }
 
   if (logPath !== currentLogPath) {
     // Stop watching old file
-    if (currentLogPath) {
+    if (currentLogPath && watchFileRegisteredPath === currentLogPath) {
       try { fs.unwatchFile(currentLogPath); } catch (_) {}
+      watchFileRegisteredPath = null;
     }
     currentLogPath = logPath;
     try { logFilePos = fs.statSync(logPath).size; } catch (_) { logFilePos = 0; }
     dbg('SPECTRE: tailing Arma log: ' + logPath + ' at offset ' + logFilePos);
   }
 
-  // Use fs.watchFile with 250ms interval — works reliably even when
-  // Arma writes to the file slowly (backgrounded game).
-  // chokidar's usePolling can miss events; fs.watchFile is more direct.
-  fs.watchFile(logPath, { interval: 250 }, (curr, prev) => {
-    if (curr.size === prev.size) return;
-    readNewLogData();
-  });
+  // Only register fs.watchFile once per path to avoid stacking watchers
+  if (watchFileRegisteredPath !== logPath) {
+    watchFileRegisteredPath = logPath;
+    fs.watchFile(logPath, { interval: 500 }, (curr, prev) => {
+      if (curr.size === prev.size) return;
+      readNewLogData();
+    });
+    dbg('SPECTRE: registered fs.watchFile on ' + logPath);
+  }
 }
 
 // Accumulator for multi-line state
