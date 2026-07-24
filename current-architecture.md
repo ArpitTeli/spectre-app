@@ -17,178 +17,144 @@ SPECTRE C2 is an Electron desktop application that controls Arma 3 units in real
 │  └────────────────────┬───────────────────────┘  │
 │                       │                          │
 │  ┌────────────────────┴───────────────────────┐  │
-│  │         IPC Layer (ipcMain/ipcRenderer)     │  │
+│  │  IPC Layer (ipcMain/ipcRenderer)            │  │
 │  └────────────────────┬───────────────────────┘  │
 │                       │                          │
 │  ┌────────────────────┴───────────────────────┐  │
-│  │    writeCommandToFile() → spectre_cmds.sqf  │  │
+│  │  writeCommandToFile() → spectre_cmds.sqf   │  │
+│  └────────────────────┬───────────────────────┘  │
+│                       │                          │
+│  ┌────────────────────┴───────────────────────┐  │
+│  │  watchArmaLog() ← RPT tailing (fs.watchFile │  │
+│  │  + 1s polling fallback)                     │  │
 │  └────────────────────┬───────────────────────┘  │
 └───────────────────────┼──────────────────────────┘
-                        │ file write
-                        ▼
-              ┌─────────────────┐
-              │ spectre_ext_x64 │  (DLL)
-              │    .dll         │
-              │  callExtension  │
-              └────────┬────────┘
-                       │ SQF execution
-                       ▼
-              ┌─────────────────┐
-              │    Arma 3       │
-              │  (game engine)  │
-              └─────────────────┘
+          file write    │              ▲ file read
+          (cmds.sqf)    ▼              │ (RPT log)
+┌─────────────────┐          ┌─────────────────┐
+│ spectre_ext_x64 │          │    Arma 3       │
+│    .dll         │◄─────────│  (game engine)  │
+│  (file reader)  │ callExt  │  SQF scripts    │
+└─────────────────┘          └─────────────────┘
 ```
+
+**Two independent data channels:**
+- **App → Arma:** Electron writes `spectre_cmds.sqf` → DLL reads file via `callExtension` → SQF parses and executes
+- **Arma → App:** SQF writes to Arma RPT via `diag_log` → Electron tails RPT file → parses unit data → sends to React renderer
 
 ---
 
 ## 1. Arma ↔ Electron Bridge Pipeline
 
-This is the most critical and fragile part of the system. Getting reliable command execution from the app into Arma required extensive debugging.
-
 ### 1.1 Command Flow (App → Arma)
 
 **Step 1: User triggers command in UI**
-- User clicks a button (HOLD, RTB, WEAPONS_FREE, etc.) in the SidePanel
-- React component calls `sendCommand(unitId, commandType)` via the preload bridge
+- User clicks a button (HOLD, RTB, WEAPONS_FREE, etc.) or uses radial menu / target mode
+- React component calls `sendCommand(cmd)` via the preload bridge
 
 **Step 2: IPC sends command to main process**
-- `preload.js` exposes `window.electron.sendCommand(unitId, command)` via `ipcRenderer.send('send-command', { unitId, command })`
+- `preload.js` exposes `window.spectreAPI.sendCommand(cmd)` via `ipcRenderer.send('send-command', cmd)`
 - Note: uses `ipcRenderer.send` (async), NOT `ipcRenderer.invoke` (async/await). This is intentional — fire-and-forget.
+- `cmd` is an object like `{ type: 'MOVE_TO', unit_id: 'SPECTRE_0', x: 5000, y: 6000 }`
 
 **Step 3: Main process writes SQF file**
 - `electron/main.js` `ipcMain.on('send-command')` handler receives the command
-- Calls `writeCommandToFile(unitId, command)` which:
-  1. Builds SQF content via `buildSQFContent(unitId, command)`
-  2. Writes to `addons\spectre_cmds.sqf` on disk
-  3. Also updates `SPECTRE_lastSQF` for content-based dedup
+- Calls `writeCommandToFile(cmd)` which:
+  1. Builds SQF content via `buildSQFContent([cmd])`
+  2. Writes to `@SPECTRE\addons\spectre_cmds.sqf` on disk
+  3. Logs to `cmdlog.txt` for debugging
 
-**Step 4: DLL reads and executes SQF**
-- `spectre_ext_x64.dll` polls `addons\spectre_cmds.sqf` for changes
-- When file content changes, it reads and executes the SQF
-- Uses `callExtension` to pass the SQF string to Arma's engine
+**Step 4: SQF reads file via DLL (every 0.3s)**
+- `SPECTRE_fnc_readCommands` in `fn_bridgeInit.sqf` runs every 0.3s
+- Calls `"spectre_ext" callExtension ["READ", ["addons\spectre_cmds.sqf"]]`
+- The DLL resolves the path relative to its own location (`@SPECTRE\`) and returns the file content as a string
+- Content-based dedup: skips if file content hasn't changed since last read (`SPECTRE_lastSQF`)
 
-**Step 5: Arma executes SQF**
-- The SQF runs in Arma's scripting environment
-- Commands like `SPECTRE_fnc_execCmd` are called with the parsed arguments
+**Step 5: SQF parses and executes**
+- Extracts the argument array from the string (everything before ` call SPECTRE_fnc_execCmd;`)
+- Uses `call compile` on the argument array ONLY (safe — it's just numbers, strings, and nested arrays)
+- Calls `SPECTRE_fnc_execCmd` directly with the parsed array
 - Units receive orders (move, hold, engage, etc.)
 
-### 1.2 What We Changed (Critical Fixes)
+### 1.2 SQF File Format
 
-#### Problem 1: `call compile` was unreliable
+The file `spectre_cmds.sqf` contains SQF code that calls `SPECTRE_fnc_execCmd` directly:
 
-**Original code (BROKEN):**
 ```sqf
-// In fn_bridgeInit.sqf
-_sqf = ...; // read from file
-call compile _sqf;  // THIS WAS THE PROBLEM
+// Simple commands (HOLD, RTB, WEAPONS_FREE, etc.)
+[1784891871132, "HOLD", "SPECTRE_0"] call SPECTRE_fnc_execCmd;
+
+// Positional commands (MOVE_TO, ATTACK_POS, LAND_AT, SMOKE_AT, ADJUST_FIRE)
+[1784891871132, "MOVE_TO", "SPECTRE_0", [[5000,6000]]] call SPECTRE_fnc_execCmd;
+
+// Complex commands (EXECUTE_ORDER with waypoints, ROE, action)
+[1784891871132, "EXECUTE_ORDER", "SPECTRE_0", [[5000,6000],[6000,7000]], "ENGAGE IF FIRED", "Assault OBJ Alpha"] call SPECTRE_fnc_execCmd;
 ```
 
-`call compile` in Arma is unreliable for dynamic SQF strings, especially when the string contains:
-- Variable references that don't exist at compile time
-- Nested quotes
-- Complex array syntax
+**`buildSQFContent` generates this format in `electron/main.js`.**
 
-**Fix: Manual SQF parsing + direct function call**
-```sqf
-// In fn_bridgeInit.sqf — REPLACED call compile
-_command = ...; // parsed command name
-_args = ...;   // parsed argument array
-_args call SPECTRE_fnc_execCmd;  // Direct function call
-```
+### 1.3 Command Types
 
-The DLL now parses the SQF file manually:
-1. Reads the file content
-2. Splits by newline to get individual commands
-3. For each line, extracts command name and arguments
-4. Calls `SPECTRE_fnc_execCmd` directly with the arguments array
-
-This eliminated all `call compile` errors.
-
-#### Problem 2: ID-based dedup caused stale commands
-
-**Original approach:**
-```javascript
-// Each command got a unique ID
-const cmdId = Date.now();
-// File content: SPECTRE_CMD:1721234567890:HOLD:alpha_1
-```
-
-The DLL tracked which IDs it had seen and skipped duplicates. But:
-- If Arma was slow to process, the DLL might skip a valid command
-- If the file was rewritten before the DLL read it, commands got lost
-- Race conditions between write and read
-
-**Fix: Content-based dedup**
-```javascript
-// In main.js
-const SPECTRE_lastSQF = { current: '' };
-
-function writeCommandToFile(unitId, command) {
-  const content = buildSQFContent(unitId, command);
-  if (content === SPECTRE_lastSQF.current) return; // skip if identical
-  SPECTRE_lastSQF.current = content;
-  fs.writeFileSync(spectreCmdsPath, content);
-}
-```
-
-The DLL also compares full file content string, not IDs. If the file content hasn't changed, it skips execution. This is simpler and eliminates race conditions.
-
-### 1.3 Reading Data from Arma (Arma → App)
-
-The app also reads data from Arma, but through a different mechanism:
-
-**Bridge Initialization:**
-1. DLL writes marker file when Arma loads the mod
-2. App detects marker → starts polling for unit data
-3. Unit positions are written by Arma's `SPECTRE_fnc_bridgeInit` SQF
-4. App reads the file and updates the Redux store
-5. React components re-render with new positions
-
-**Key SQF functions:**
-- `SPECTRE_fnc_bridgeInit` — Main bridge loop, runs every tick
-- `SPECTRE_fnc_execCmd` — Executes commands received from app
-- `SPECTRE_fnc_readCommands` — Reads commands file, parses, dispatches
-
-### 1.4 The `addons\spectre_cmds.sqf` File Format
-
-This is the communication channel between the app and Arma. Every command goes through this file.
-
-**Current format (v2 — content-based):**
-```sqf
-SPECTRE_EXEC:unit_id:command_name:arg1:arg2:...
-```
-
-Example:
-```sqf
-SPECTRE_EXEC:alpha_1:HOLD
-SPECTRE_EXEC:alpha_1:RTB
-SPECTRE_EXEC:alpha_1:WEAPONS_FREE
-SPECTRE_EXEC:alpha_1:FORM_UP:formation_name
-```
-
-**Command types implemented:**
 | Command | Arguments | Description |
 |---------|-----------|-------------|
-| HOLD | unit_id | Unit holds position |
-| RTB | unit_id | Unit returns to base |
+| HOLD | unit_id | Unit holds position (doStop) |
+| RTB | unit_id | Unit returns to spawn position |
 | HOLD_ALL | (none) | All units hold |
 | RTB_ALL | (none) | All units RTB |
-| WEAPONS_FREE | unit_id | Unit engages freely |
-| WEAPONS_SAFE | unit_id | Unit holds fire |
-| FORM_UP | unit_id, formation | Unit forms up |
-| DISPERSE | unit_id | Unit disperses |
-| EXECUTE_ORDER | unit_id, order | Execute specific order |
-| CUSTOM | unit_id, custom_data | Custom command |
+| WEAPONS_FREE | unit_id | All units: RED combat, COMBAT behavior |
+| WEAPONS_SAFE | unit_id | All units: BLUE combat, AWARE behavior |
+| FORM_UP | unit_id | All alive units move to first unit's position |
+| DISPERSE | unit_id | All units move to random offset ±40m |
+| EXECUTE_ORDER | unit_id, waypoints[], roe, action | Set waypoints + ROE + order label |
+| CUSTOM | unit_id, instruction | Set custom order label |
+| MOVE_TO | unit_id, x, y | Unit moves to position (driver doMove) |
+| ATTACK | unit_id, target_id | Unit attacks named target object |
+| ATTACK_POS | unit_id, x, y | Creates temp target object, unit fires at it |
+| ARTILLERY_STRIKE | unit_id, x, y, rounds, ammoType | Unit fires at position |
+| LAND_AT | unit_id, x, y | Helicopter lands at position |
+| SMOKE_AT | unit_id, x, y | Creates smoke grenade at position |
+| ADJUST_FIRE | unit_id, x, y | Unit targets temp object (no fire) |
+| HOVER | unit_id | Helicopter hovers at 50m |
+
+### 1.4 Reading Data from Arma (Arma → App)
+
+Unit positions and state are sent from Arma to the Electron app via the RPT log file.
+
+**How it works:**
+1. `SPECTRE_fnc_broadcastState` runs every 0.5s in Arma (via `diag_tickTime` wall-clock loop)
+2. It calls `diag_log` to write structured JSON lines to the Arma RPT log:
+   - `SPECTRE_META:{...}` — map name, mission folder, timestamp
+   - `SPECTRE_UNIT:{...}` — one line per unit (id, position, health, heading, etc.)
+   - `SPECTRE_CONTACT:{...}` — one line per spotted enemy
+   - `SPECTRE_EVENTS:[...]` — death/spotted events
+3. Electron's `watchArmaLog()` tails the RPT file:
+   - `fs.watchFile` with 500ms interval detects file size changes
+   - 1s polling fallback catches any missed events
+   - `readNewLogData()` reads new bytes from the file
+   - `parseArmaLog()` matches regex patterns for SPECTRE_UNIT, SPECTRE_CONTACT, etc.
+   - Accumulates units in `pendingState`, flushes to renderer every chunk
+4. `sendToRenderer('arma-state-update', data)` sends data to React
+5. `processArmaUpdate()` in the Zustand store merges units and sets `armaConnected: true`
+
+**Key SQF functions:**
+- `SPECTRE_fnc_bridgeInit` — Main bridge init (runs once via CBA PostInit)
+- `SPECTRE_fnc_broadcastState` — Serializes all units and writes to RPT
+- `SPECTRE_fnc_serializeUnit` — Converts one unit to JSON string
+- `SPECTRE_fnc_execCmd` — Executes commands received from app
+- `SPECTRE_fnc_readCommands` — Reads commands file via DLL, parses, dispatches
+- `SPECTRE_fnc_detectEvents` — Detects unit deaths and enemy contacts
+- `SPECTRE_fnc_vehicleType` — Classifies unit as HELI, TANK, IFV, CAR, INFANTRY, etc.
 
 ### 1.5 File Paths
 
 | File | Location | Purpose |
 |------|----------|---------|
-| `spectre_cmds.sqf` | `addons\` (Arma mission folder) | Commands from app to Arma |
-| `SPECTRE_lastSQF` | In-memory (main.js) | Content dedup cache |
+| `spectre_cmds.sqf` | `E:\Games\Arma 3\@SPECTRE\addons\` | Commands from app to Arma (written by Electron, read by DLL) |
+| `SPECTRE_lastSQF` | In-memory (SQF global) | Content dedup cache (prevents re-executing same command) |
 | `stratis_height.png` | `public\maps\` | 512×512 heightmap |
-| `stratis_roads.bin` | `public\maps\` | Road network binary |
+| `stratis_roads.bin` | `public\maps\` | Road network binary (5,202 segments) |
 | `stratis_objects.bin` | `public\maps\` | 92K terrain objects binary |
+| Arma RPT log | `%LOCALAPPDATA%\Arma 3\Arma3_x64_*.rpt` | Contains SPECTRE_UNIT/META/CONTACT lines |
 
 ---
 
@@ -321,7 +287,7 @@ Chain lengths: totalChains × uint32
 Segments: totalSegments × (x:f32, y:f32, dir:f32, w:f32)
 ```
 
-**Rendering approach (v1.11.15 — independent quads):**
+**Rendering approach (independent quads):**
 Each pair of consecutive road points creates an independent quad:
 ```javascript
 // Per segment (p1 → p2):
@@ -359,53 +325,45 @@ Positioned at terrain height + small offset above ground.
 - Left drag: pan, Right drag: orbit, Scroll: zoom
 - No damping (enableDamping: false) for constant-speed movement
 - Pan speed: 2.0, Zoom speed: 1.5, Rotate speed: 1.0
-- Max polar angle: π/2.1 (slightly above horizontal)
+- Max polar angle: π/2.1 (lightly above horizontal)
 - Min distance: 5, Max distance: 20000
 
 ---
 
-## 3. DLL Bridge Details
+## 3. DLL Details
 
 ### 3.1 `spectre_ext_x64.dll`
 
-The DLL is a native C++ plugin loaded by Arma 3. It handles:
-- Reading `spectre_cmds.sqf` file for commands from the app
-- Writing unit position data for the app to read
-- Executing SQF via `callExtension`
+The DLL is a native C++ plugin loaded by Arma 3. Its role is minimal — it is a **file reader only**. It does NOT write unit data and does NOT execute SQF.
 
-### 3.2 Key Functions in `spectre_ext.c`
+The DLL provides:
+- `RVExtension` / `RVExtensionArgs` — exported functions callable via `callExtension`
+- `READ` function — reads a file relative to `@SPECTRE\` directory and returns content as string
 
-```
-// Main bridge initialization
-SPECTRE_fnc_bridgeInit.sqf:
-  - Runs every tick in Arma
-  - Calls callExtension to read commands
-  - Dispatches to SPECTRE_fnc_execCmd
+### 3.2 How `callExtension` Works
 
-// Command execution
-SPECTRE_fnc_execCmd:
-  - Takes [unit_id, command, args] array
-  - Calls appropriate SQF function per command type
-  - Returns success/failure
-
-// Command reading (direct parsing, no call compile)
-SPECTRE_fnc_readCommands:
-  - Reads addons/spectre_cmds.sqf
-  - Parses each line manually
-  - Extracts command name + arguments
-  - Calls SPECTRE_fnc_execCmd with parsed args
+```sqf
+// In fn_bridgeInit.sqf
+private _result = "spectre_ext" callExtension ["READ", ["addons\spectre_cmds.sqf"]];
 ```
 
-### 3.3 Why `call compile` Was Removed
+1. Arma passes the function name `"READ"` and args `["addons\spectre_cmds.sqf"]` to the DLL
+2. DLL resolves path relative to its own location: `@SPECTRE\addons\spectre_cmds.sqf`
+3. DLL reads file content via `fopen_s` / `fread` / `fclose`
+4. Returns content as a string in the `_result` array
 
-`call compile` in Arma is a function that parses and executes a string as SQF code. It was the original approach but caused repeated failures:
+### 3.3 The `call compile` Situation
 
-1. **Variable scoping:** `call compile` creates a new scope. Variables from the outer scope aren't accessible unless passed explicitly.
-2. **String escaping:** SQF strings within strings (nested quotes) required triple-quoting, which was fragile.
-3. **Error handling:** `call compile` failures were silent — no error message, just no execution.
-4. **Timing:** Arma's scheduler could interrupt `call compile` mid-execution, leaving partial commands.
+`call compile` is **still used** in `SPECTRE_fnc_readCommands`, but only for parsing the argument array (not the full SQF command):
 
-The fix: parse the file content manually (split by delimiters, extract fields) and call functions directly with pre-built argument arrays. This is deterministic and doesn't depend on Arma's parser.
+```sqf
+// Extract the [...] portion from the SQF string
+private _argsStr = _sqf select [0, _callIdx];
+private _args = call compile _argsStr;  // Parses "[123, "MOVE_TO", "uid", [[x,y]]]"
+_args call SPECTRE_fnc_execCmd;         // Direct function call
+```
+
+This is safe because `_argsStr` contains only a literal array (numbers, strings, nested arrays) — no variable references or complex SQF. The `call compile` risk described in older docs was about compiling the ENTIRE file content as SQF code, which is no longer done.
 
 ---
 
@@ -450,20 +408,13 @@ Arma 3 Eden Editor saves missions to one location, but the game reads them from 
 |---------|------|-------|
 | **Editor saves to** | `C:\Users\arpit\OneDrive\Documents\Arma 3\missions\SPECTRETEST2.Stratis\` | OneDrive-synced folder — this is where the editor writes `mission.sqm` |
 | **Game reads from** | `E:\Games\Arma 3\Missions\SPECTRETEST2.Stratis\` | Non-Steam Arma install — game loads missions from here |
-| **Bridge file** | `E:\Games\Arma 3\Missions\SPECTRETEST2.Stratis\spectre_cmds.sqf` | Written by our app, read by the DLL — lives in the game folder, NOT the editor folder |
-
-**Important:** When copying updated missions from editor to game folder, always preserve `spectre_cmds.sqf` — it's the bridge communication channel and should never be overwritten.
-
-**To sync a new mission version:**
-1. Copy `mission.sqm` from OneDrive editor folder to game Missions folder
-2. Do NOT overwrite `spectre_cmds.sqf`
-3. No Arma relaunch needed — just restart the mission
+| **Bridge file** | `E:\Games\Arma 3\@SPECTRE\addons\spectre_cmds.sqf` | Written by Electron app, read by DLL via `callExtension` |
 
 ---
 
 ## 5. Version Management
 
-- **Current version:** 1.11.15 (in `package.json`)
+- **Current version:** 1.11.46 (in `package.json`)
 - **NEVER reuse a version number** — always bump
 - Use `npm version patch --no-git-tag-version` for fixes
 - Use `npm version minor --no-git-tag-version` for features
@@ -474,11 +425,11 @@ Arma 3 Eden Editor saves missions to one location, but the game reads them from 
 # 1. Build PBO (MUST be from mod\addons, NOT mod\ — see note below)
 python create_pbo.py "mod\addons" SPECTREBridge.pbo
 
-# 2. Build React app
-npx react-scripts build
+# 2. Copy PBO to Arma mod folder
+copy /Y SPECTREBridge.pbo "E:\Games\Arma 3\@SPECTRE\addons\spectre_bridge.pbo"
 
-# 3. Build Electron installer
-npx electron-builder --win
+# 3. Build React + Electron
+npm run build
 
 # 4. Commit
 git add -A
@@ -490,7 +441,7 @@ git push
 # 6. Create GitHub release
 gh release create vX.Y.Z --title "vX.Y.Z" --notes "description"
 
-# 7. Upload assets
+# 7. Upload assets (MUST include latest.yml for auto-updater)
 gh release upload vX.Y.Z "dist\SPECTRE.C2-X.Y.Z.exe" "dist\SPECTRE.C2-X.Y.Z.exe.blockmap" "dist\latest.yml" --clobber
 ```
 
@@ -506,5 +457,5 @@ The `$PBOPREFIX$` inside `mod\addons` is `z\spectre\addons\spectre_bridge`. When
 ### Auto-Updater
 
 - Uses `electron-updater` with GitHub releases provider
-- `dist/latest.yml` must include `releaseDate` field
-- Format: flat YAML (not nested)
+- `dist/latest.yml` MUST be included in the GitHub release for auto-update to work
+- Format: flat YAML with `version`, `files`, `path`, `sha512`, `releaseDate` fields
