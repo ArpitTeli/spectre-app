@@ -179,7 +179,7 @@ export default function MapView({
   selectedUnit, selectedContact,
   selectedCOA, showCOAOverlay,
   mapName,
-  onUnitSelect, onContactSelect
+  onUnitSelect, onUnitRightClick, onContactSelect, onMapRightClick
 }) {
   const mapRef      = useRef(null);
   const mapInst     = useRef(null);
@@ -189,6 +189,15 @@ export default function MapView({
   const [dismissOverlay, setDismissOverlay] = useState(false);
   const currentMapRef = useRef(null);
   const prevUnitCountRef = useRef(0);
+  const qHeldRef = useRef(false);
+
+  useEffect(() => {
+    const kd = (e) => { if (e.key === 'q' || e.key === 'Q') qHeldRef.current = true; };
+    const ku = (e) => { if (e.key === 'q' || e.key === 'Q') qHeldRef.current = false; };
+    window.addEventListener('keydown', kd);
+    window.addEventListener('keyup', ku);
+    return () => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); };
+  }, []);
 
   // ── Create/recreate map when mapName changes ────────────────────────────────
   useEffect(() => {
@@ -242,6 +251,10 @@ export default function MapView({
 
     L.control.zoom({ position: 'topright' }).addTo(map);
 
+    map.on('contextmenu', (e) => {
+      if (onMapRightClick) onMapRightClick(e.latlng, e.originalEvent.clientX, e.originalEvent.clientY);
+    });
+
     unitLayer.current    = L.layerGroup().addTo(map);
     contactLayer.current = L.layerGroup().addTo(map);
     coaLayer.current     = L.layerGroup().addTo(map);
@@ -261,7 +274,19 @@ export default function MapView({
 
       const marker = L.marker(latlng, { icon: makeUnitIcon(unit, unit.id === selectedUnit) });
 
-      marker.on('click', () => onUnitSelect(unit.id));
+      marker.on('click', (e) => {
+        if (qHeldRef.current) {
+          onUnitRightClick && onUnitRightClick(unit.id, e.originalEvent.clientX, e.originalEvent.clientY);
+        } else {
+          onUnitSelect(unit.id);
+        }
+      });
+      if (onUnitRightClick) {
+        marker.on('contextmenu', (e) => {
+          L.DomEvent.stopPropagation(e);
+          onUnitRightClick(unit.id, e.originalEvent.clientX, e.originalEvent.clientY);
+        });
+      }
 
       marker.bindTooltip(
         `<div style="font-family:monospace;font-size:11px;background:var(--bg-primary);border:1px solid var(--border-default);padding:6px;border-radius:0">

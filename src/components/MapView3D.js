@@ -210,7 +210,7 @@ function makeInfantryMesh(color, emissive, opacity) {
   return group;
 }
 
-export default function MapView3D({ units, contacts, onUnitSelect, onContactSelect }) {
+export default function MapView3D({ units, contacts, onUnitSelect, onUnitRightClick, onContactSelect }) {
   const ref = useRef(null);
   const st = useRef({});
   const [status, setStatus] = useState('loading');
@@ -218,6 +218,9 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
   const [models, setModels] = useState(null);
   const onUnitSelectRef = useRef(onUnitSelect);
   onUnitSelectRef.current = onUnitSelect;
+  const onUnitRightClickRef = useRef(onUnitRightClick);
+  onUnitRightClickRef.current = onUnitRightClick;
+  const qHeldRef = useRef(false);
 
   useEffect(() => {
     const img = new Image();
@@ -314,10 +317,16 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
         let obj = hits[0].object;
         while (obj && !obj.userData?.unitId) obj = obj.parent;
         if (obj?.userData?.unitId) {
-          onUnitSelectRef.current(obj.userData.unitId);
+          if ((e.button === 2 || qHeldRef.current) && onUnitRightClickRef.current) {
+            onUnitRightClickRef.current(obj.userData.unitId, e.clientX, e.clientY);
+          } else {
+            onUnitSelectRef.current(obj.userData.unitId);
+          }
         }
       }
     });
+
+    renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 
     const ZOOM_STEP = 40;
     renderer.domElement.addEventListener('wheel', (e) => {
@@ -480,8 +489,8 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
     st.current = { scene, cam, ctrl, renderer, markers };
 
     const keys = {};
-    function kd(e) { keys[e.key] = true; if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); }
-    function ku(e) { keys[e.key] = false; }
+    function kd(e) { keys[e.key] = true; if (e.key === 'q' || e.key === 'Q') qHeldRef.current = true; if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); }
+    function ku(e) { keys[e.key] = false; if (e.key === 'q' || e.key === 'Q') qHeldRef.current = false; }
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
 
     let running = true;

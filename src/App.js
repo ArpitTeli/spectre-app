@@ -14,6 +14,7 @@ import AdaptationModal from './components/AdaptationModal';
 import AARPanel from './components/AARPanel';
 import ModeSelect from './components/ModeSelect';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import RadialMenu from './components/RadialMenu';
 import './styles/global.css';
 
 export default function App() {
@@ -30,6 +31,8 @@ export default function App() {
   const [roomCode, setRoomCode] = useState('');
   const [relayStatus, setRelayStatus] = useState({ connected: false, clients: 0 });
   const [viewMode, setViewMode] = useState('2d'); // '2d' | '3d'
+  const [radialMenu, setRadialMenu] = useState(null); // { x, y, unitId }
+  const qHeldRef = useRef(false);
 
   // Keyboard shortcut: M to toggle 2D/3D map
   useEffect(() => {
@@ -37,9 +40,21 @@ export default function App() {
       if (e.key === 'm' || e.key === 'M') {
         setViewMode(v => v === '2d' ? '3d' : '2d');
       }
+      if (e.key === 'q' || e.key === 'Q') {
+        qHeldRef.current = true;
+      }
+    }
+    function onKeyUp(e) {
+      if (e.key === 'q' || e.key === 'Q') {
+        qHeldRef.current = false;
+      }
     }
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKeyUp);
+    };
   }, []);
 
   // Sync AI config
@@ -234,6 +249,7 @@ export default function App() {
               showCOAOverlay={state.showCOAOverlay}
               mapName={state.mapName}
               onUnitSelect={id => patch({ selectedUnit: id })}
+              onUnitRightClick={(id, x, y) => setRadialMenu({ x, y, unitId: id })}
               onContactSelect={id => patch({ selectedContact: id })}
             />
           ) : (
@@ -241,6 +257,7 @@ export default function App() {
               units={visibleUnits()}
               contacts={state.contacts}
               onUnitSelect={id => patch({ selectedUnit: id })}
+              onUnitRightClick={(id, x, y) => setRadialMenu({ x, y, unitId: id })}
               onContactSelect={id => patch({ selectedContact: id })}
             />
           )}
@@ -345,6 +362,51 @@ export default function App() {
             }
           }}
           onClose={() => patch({ showSettings: false })}
+        />
+      )}
+
+      {radialMenu && (
+        <RadialMenu
+          x={radialMenu.x}
+          y={radialMenu.y}
+          unit={Object.values(visibleUnits()).find(u => u.id === radialMenu.unitId)}
+          multiSelect={false}
+          onSelect={(action) => {
+            const unitId = radialMenu.unitId;
+            const units = visibleUnits();
+            const unit = units[unitId];
+            setRadialMenu(null);
+
+            if (action.complex) {
+              patch({ [`show${action.id}Panel`]: true, selectedUnit: unitId });
+              return;
+            }
+
+            switch (action.id) {
+              case 'HOLD':
+              case 'RTB':
+              case 'WEAPONS_FREE':
+              case 'WEAPONS_SAFE':
+              case 'FORM_UP':
+              case 'DISPERSE':
+                sendArmaCommand({ type: action.id, unit_id: unitId });
+                addCommsEntry('SPECTRE', unit?.callsign || unitId, action.id, 'BLUE');
+                break;
+              case 'MOVE_TO':
+              case 'LAND_AT':
+              case 'SMOKE_AT':
+              case 'ARTILLERY_STRIKE':
+                patch({ pendingAction: { ...action, unitId }, selectedUnit: unitId });
+                break;
+              case 'ATTACK':
+                patch({ pendingAction: { ...action, unitId }, selectedUnit: unitId });
+                break;
+              default:
+                sendArmaCommand({ type: action.id, unit_id: unitId });
+                addCommsEntry('SPECTRE', unit?.callsign || unitId, action.id, 'BLUE');
+            }
+          }}
+          onClose={() => setRadialMenu(null)}
         />
       )}
     </div>
