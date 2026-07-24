@@ -504,6 +504,8 @@ export default function MapView3D({ units, contacts, onUnitSelect, onContactSele
         if (mx || mz) {
           s.ctrl.target.x = Math.max(-HALF, Math.min(HALF, s.ctrl.target.x + mx));
           s.ctrl.target.z = Math.max(-HALF, Math.min(HALF, s.ctrl.target.z + mz));
+          s.cam.position.x += mx;
+          s.cam.position.z += mz;
         }
         s.ctrl.update();
       }
