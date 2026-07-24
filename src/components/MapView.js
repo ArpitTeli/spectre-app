@@ -179,7 +179,8 @@ export default function MapView({
   selectedUnit, selectedContact,
   selectedCOA, showCOAOverlay,
   mapName,
-  onUnitSelect, onUnitRightClick, onContactSelect, onMapRightClick
+  pendingAction,
+  onUnitSelect, onUnitRightClick, onContactSelect, onMapRightClick, onMapClick
 }) {
   const mapRef      = useRef(null);
   const mapInst     = useRef(null);
@@ -255,6 +256,12 @@ export default function MapView({
       if (onMapRightClick) onMapRightClick(e.latlng, e.originalEvent.clientX, e.originalEvent.clientY);
     });
 
+    map.on('click', (e) => {
+      if (onMapClick) {
+        onMapClick(e.latlng.lng, e.latlng.lat);
+      }
+    });
+
     unitLayer.current    = L.layerGroup().addTo(map);
     contactLayer.current = L.layerGroup().addTo(map);
     coaLayer.current     = L.layerGroup().addTo(map);
@@ -275,6 +282,7 @@ export default function MapView({
       const marker = L.marker(latlng, { icon: makeUnitIcon(unit, unit.id === selectedUnit) });
 
       marker.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
         if (qHeldRef.current) {
           onUnitRightClick && onUnitRightClick(unit.id, e.originalEvent.clientX, e.originalEvent.clientY);
         } else {
@@ -328,7 +336,10 @@ export default function MapView({
 
       const marker = L.marker(latlng, { icon: makeContactIcon(contact, contact.id === selectedContact) });
 
-      marker.on('click', () => onContactSelect(contact.id));
+      marker.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        onContactSelect(contact.id);
+      });
 
       const ageMin = contact.last_seen ? Math.floor((Date.now() - contact.last_seen) / 60000) : 0;
       marker.bindTooltip(

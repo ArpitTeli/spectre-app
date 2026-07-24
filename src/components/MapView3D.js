@@ -210,7 +210,7 @@ function makeInfantryMesh(color, emissive, opacity) {
   return group;
 }
 
-export default function MapView3D({ units, contacts, onUnitSelect, onUnitRightClick, onContactSelect }) {
+export default function MapView3D({ units, contacts, pendingAction, onUnitSelect, onUnitRightClick, onContactSelect, onMapClick }) {
   const ref = useRef(null);
   const st = useRef({});
   const [status, setStatus] = useState('loading');
@@ -220,6 +220,8 @@ export default function MapView3D({ units, contacts, onUnitSelect, onUnitRightCl
   onUnitSelectRef.current = onUnitSelect;
   const onUnitRightClickRef = useRef(onUnitRightClick);
   onUnitRightClickRef.current = onUnitRightClick;
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
   const qHeldRef = useRef(false);
 
   useEffect(() => {
@@ -322,6 +324,12 @@ export default function MapView3D({ units, contacts, onUnitSelect, onUnitRightCl
           } else {
             onUnitSelectRef.current(obj.userData.unitId);
           }
+        }
+      } else if (onMapClickRef.current) {
+        const terrainHits = raycaster.intersectObject(s.terrainMesh, false);
+        if (terrainHits.length > 0) {
+          const p = terrainHits[0].point;
+          onMapClickRef.current(p.x + HALF, -(p.z) + HALF);
         }
       }
     });
@@ -486,7 +494,7 @@ export default function MapView3D({ units, contacts, onUnitSelect, onUnitRightCl
     const markers = new THREE.Group();
     scene.add(markers);
 
-    st.current = { scene, cam, ctrl, renderer, markers };
+    st.current = { scene, cam, ctrl, renderer, markers, terrainMesh: mesh };
 
     const keys = {};
     function kd(e) { keys[e.key] = true; if (e.key === 'q' || e.key === 'Q') qHeldRef.current = true; if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); }

@@ -32,7 +32,44 @@ export default function App() {
   const [relayStatus, setRelayStatus] = useState({ connected: false, clients: 0 });
   const [viewMode, setViewMode] = useState('2d'); // '2d' | '3d'
   const [radialMenu, setRadialMenu] = useState(null); // { x, y, unitId }
+  const [pendingAction, setPendingAction] = useState(null); // { id, unitId, label }
+  const pendingActionRef = useRef(null);
+  pendingActionRef.current = pendingAction;
   const qHeldRef = useRef(false);
+
+  const handleMapClick = useCallback((x, y) => {
+    const action = pendingActionRef.current;
+    if (!action) return;
+    const unitId = action.unitId;
+    const units = visibleUnits();
+    const unit = units[unitId];
+
+    switch (action.id) {
+      case 'MOVE_TO':
+        sendArmaCommand({ type: 'MOVE_TO', unit_id: unitId, x, y });
+        addCommsEntry('SPECTRE', unit?.callsign || unitId, `MOVE TO ${Math.round(x)},${Math.round(y)}`, 'BLUE');
+        break;
+      case 'LAND_AT':
+        sendArmaCommand({ type: 'LAND_AT', unit_id: unitId, x, y });
+        addCommsEntry('SPECTRE', unit?.callsign || unitId, `LAND AT ${Math.round(x)},${Math.round(y)}`, 'BLUE');
+        break;
+      case 'SMOKE_AT':
+        sendArmaCommand({ type: 'SMOKE_AT', unit_id: unitId, x, y });
+        addCommsEntry('SPECTRE', unit?.callsign || unitId, `SMOKE AT ${Math.round(x)},${Math.round(y)}`, 'BLUE');
+        break;
+      case 'ARTILLERY_STRIKE':
+        sendArmaCommand({ type: 'ARTILLERY_STRIKE', unit_id: unitId, x, y, rounds: 6, ammoType: 'HE' });
+        addCommsEntry('SPECTRE', unit?.callsign || unitId, `ARTILLERY STRIKE ${Math.round(x)},${Math.round(y)}`, 'BLUE');
+        break;
+      case 'ATTACK':
+        sendArmaCommand({ type: 'ATTACK', unit_id: unitId, x, y });
+        addCommsEntry('SPECTRE', unit?.callsign || unitId, `ATTACK POSITION ${Math.round(x)},${Math.round(y)}`, 'BLUE');
+        break;
+      default:
+        break;
+    }
+    setPendingAction(null);
+  }, [sendArmaCommand, addCommsEntry, visibleUnits]);
 
   // Keyboard shortcut: M to toggle 2D/3D map
   useEffect(() => {
@@ -42,6 +79,11 @@ export default function App() {
       }
       if (e.key === 'q' || e.key === 'Q') {
         qHeldRef.current = true;
+      }
+      if (e.key === 'Escape') {
+        if (pendingActionRef.current) {
+          setPendingAction(null);
+        }
       }
     }
     function onKeyUp(e) {
@@ -236,7 +278,12 @@ export default function App() {
           visibleUnits={visibleUnits}
         />
 
-        <div className="app-center">
+        <div className={`app-center ${pendingAction ? 'target-mode' : ''}`}>
+          {pendingAction && (
+            <div className="target-mode-indicator">
+              Click map to set target — {pendingAction.label} — ESC to cancel
+            </div>
+          )}
           {viewMode === '2d' ? (
             <MapView
               units={visibleUnits()}
@@ -248,17 +295,21 @@ export default function App() {
               selectedCOA={state.selectedCOA}
               showCOAOverlay={state.showCOAOverlay}
               mapName={state.mapName}
+              pendingAction={pendingAction}
               onUnitSelect={id => patch({ selectedUnit: id })}
               onUnitRightClick={(id, x, y) => setRadialMenu({ x, y, unitId: id })}
               onContactSelect={id => patch({ selectedContact: id })}
+              onMapClick={handleMapClick}
             />
           ) : (
             <MapView3D
               units={visibleUnits()}
               contacts={state.contacts}
+              pendingAction={pendingAction}
               onUnitSelect={id => patch({ selectedUnit: id })}
               onUnitRightClick={(id, x, y) => setRadialMenu({ x, y, unitId: id })}
               onContactSelect={id => patch({ selectedContact: id })}
+              onMapClick={handleMapClick}
             />
           )}
 
@@ -396,10 +447,8 @@ export default function App() {
               case 'LAND_AT':
               case 'SMOKE_AT':
               case 'ARTILLERY_STRIKE':
-                patch({ pendingAction: { ...action, unitId }, selectedUnit: unitId });
-                break;
               case 'ATTACK':
-                patch({ pendingAction: { ...action, unitId }, selectedUnit: unitId });
+                setPendingAction({ id: action.id, unitId, label: action.label });
                 break;
               default:
                 sendArmaCommand({ type: action.id, unit_id: unitId });
