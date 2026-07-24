@@ -215,6 +215,22 @@ SPECTRE_fnc_serializeContact = {
     ]
 };
 
+// ─── Artillery strike helper ──────────────────────────────────────────────────
+SPECTRE_fnc_artilleryStrike = {
+    params ["_unit", "_targetPos", "_rounds", "_ammoType"];
+    private _veh = vehicle _unit;
+
+    for "_i" from 1 to _rounds do {
+        [_veh, [_targetPos select 0, _targetPos select 1, 0]] spawn {
+            params ["_v", "_tp"];
+            private _delay = random 2;
+            sleep _delay;
+            _v doFire _tp;
+        };
+    };
+    diag_log format ["SPECTRE: Artillery %1x %2 fired at %3", _rounds, _ammoType, _targetPos];
+};
+
 // ─── Command executor ─────────────────────────────────────────────────────────
 SPECTRE_fnc_execCmd = {
     params [
@@ -342,6 +358,104 @@ SPECTRE_fnc_execCmd = {
             if (!isNull _unit) then {
                 _unit setVariable ["SPECTRE_currentOrder", _action, false];
                 diag_log format ["SPECTRE CUSTOM [%1]: %2", _unitId, _action];
+            };
+        };
+
+        case "MOVE_TO": {
+            if (!isNull _unit && count _waypoints > 0) then {
+                private _wp = _waypoints select 0;
+                private _pos = [_wp select 0, _wp select 1, 0];
+                private _veh = vehicle _unit;
+                if (_veh != _unit) then {
+                    driver _veh doMove _pos;
+                } else {
+                    _unit doMove _pos;
+                };
+                _unit setVariable ["SPECTRE_currentOrder", "MOVE TO", false];
+                diag_log format ["SPECTRE MOVE_TO [%1]: %2", _unitId, _pos];
+            };
+        };
+
+        case "ATTACK": {
+            if (!isNull _unit) then {
+                private _target = missionNamespace getVariable [_roe, objNull];
+                if (!isNull _target) then {
+                    private _veh = vehicle _unit;
+                    if (_veh != _unit) then {
+                        gunner _veh doTarget _target;
+                        gunner _veh doFire _target;
+                    } else {
+                        _unit doTarget _target;
+                        _unit doFire _target;
+                    };
+                    _unit setVariable ["SPECTRE_currentOrder", "ATTACK", false];
+                    diag_log format ["SPECTRE ATTACK [%1] -> %2", _unitId, _roe];
+                };
+            };
+        };
+
+        case "ATTACK_POS": {
+            if (!isNull _unit && count _waypoints > 0) then {
+                private _wp = _waypoints select 0;
+                private _pos = [_wp select 0, _wp select 1, 0];
+                private _veh = vehicle _unit;
+                if (_veh != _unit) then {
+                    gunner _veh doTarget _pos;
+                    gunner _veh doFire _pos;
+                } else {
+                    _unit doTarget _pos;
+                    _unit doFire _pos;
+                };
+                _unit setVariable ["SPECTRE_currentOrder", "FIRE AT POSITION", false];
+                diag_log format ["SPECTRE ATTACK_POS [%1]: %2", _unitId, _pos];
+            };
+        };
+
+        case "ARTILLERY_STRIKE": {
+            if (!isNull _unit && count _waypoints > 0) then {
+                private _wp = _waypoints select 0;
+                private _targetPos = [_wp select 0, _wp select 1, 0];
+                private _rounds = parseNumber _roe;
+                if (_rounds <= 0) then { _rounds = 6; };
+                private _ammo = _action;
+                if (_ammo isEqualTo "") then { _ammo = "HE"; };
+
+                private _veh = vehicle _unit;
+                if (_veh != _unit) then {
+                    [_veh, _targetPos, _rounds, _ammo] call SPECTRE_fnc_artilleryStrike;
+                } else {
+                    [_unit, _targetPos, _rounds, _ammo] call SPECTRE_fnc_artilleryStrike;
+                };
+                _unit setVariable ["SPECTRE_currentOrder", format ["ARTILLERY %1x %2", _rounds, _ammo], false];
+                diag_log format ["SPECTRE ARTILLERY [%1]: %2 rounds %3 at %4", _unitId, _rounds, _ammo, _targetPos];
+            };
+        };
+
+        case "LAND_AT": {
+            if (!isNull _unit && count _waypoints > 0) then {
+                private _wp = _waypoints select 0;
+                private _pos = [_wp select 0, _wp select 1, 0];
+                private _veh = vehicle _unit;
+                if (_veh != _unit && {_veh isKindOf "Air"}) then {
+                    _veh landAt _pos;
+                } else {
+                    _unit doMove _pos;
+                };
+                _unit setVariable ["SPECTRE_currentOrder", "LAND AT", false];
+                diag_log format ["SPECTRE LAND_AT [%1]: %2", _unitId, _pos];
+            };
+        };
+
+        case "SMOKE_AT": {
+            if (!isNull _unit) then {
+                private _veh = vehicle _unit;
+                if (_veh != _unit) then {
+                    _veh smokeScreen true;
+                } else {
+                    [_unit, "SmokeShell"] createVehicle (getPos _unit);
+                };
+                _unit setVariable ["SPECTRE_currentOrder", "SMOKE", false];
+                diag_log format ["SPECTRE SMOKE_AT [%1]", _unitId];
             };
         };
     };

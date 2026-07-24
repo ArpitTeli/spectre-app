@@ -521,6 +521,48 @@ function buildSQFContent(commands) {
         break;
       }
 
+      case 'MOVE_TO': {
+        const x = Math.round(cmd.x || 0);
+        const y = Math.round(cmd.y || 0);
+        lines.push(`[${id}, "MOVE_TO", "${uid}", [${x},${y}]] call SPECTRE_fnc_execCmd;`);
+        break;
+      }
+
+      case 'ATTACK': {
+        const targetId = (cmd.target_id || '').replace(/["'\n\r]/g, '');
+        const ax = cmd.x !== undefined ? Math.round(cmd.x) : '';
+        const ay = cmd.y !== undefined ? Math.round(cmd.y) : '';
+        if (targetId) {
+          lines.push(`[${id}, "ATTACK", "${uid}", [], "${targetId}"] call SPECTRE_fnc_execCmd;`);
+        } else if (ax || ay) {
+          lines.push(`[${id}, "ATTACK_POS", "${uid}", [${ax},${ay}]] call SPECTRE_fnc_execCmd;`);
+        }
+        break;
+      }
+
+      case 'ARTILLERY_STRIKE': {
+        const rx = Math.round(cmd.x || 0);
+        const ry = Math.round(cmd.y || 0);
+        const rounds = Math.min(12, Math.max(1, Math.round(cmd.rounds || 6)));
+        const ammo = (cmd.ammoType || 'HE').replace(/["'\n\r]/g, '').substring(0, 20);
+        lines.push(`[${id}, "ARTILLERY_STRIKE", "${uid}", [${rx},${ry}], "${rounds}", "${ammo}"] call SPECTRE_fnc_execCmd;`);
+        break;
+      }
+
+      case 'LAND_AT': {
+        const lx = Math.round(cmd.x || 0);
+        const ly = Math.round(cmd.y || 0);
+        lines.push(`[${id}, "LAND_AT", "${uid}", [${lx},${ly}]] call SPECTRE_fnc_execCmd;`);
+        break;
+      }
+
+      case 'SMOKE_AT': {
+        const sx = Math.round(cmd.x || 0);
+        const sy = Math.round(cmd.y || 0);
+        lines.push(`[${id}, "SMOKE_AT", "${uid}", [${sx},${sy}]] call SPECTRE_fnc_execCmd;`);
+        break;
+      }
+
       default:
         lines.push(`// (skipped unknown command type: ${cmd.type})`);
     }
