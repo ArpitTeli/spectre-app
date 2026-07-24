@@ -399,13 +399,15 @@ SPECTRE_fnc_execCmd = {
                 private _wp = _waypoints select 0;
                 private _pos = [_wp select 0, _wp select 1, 0];
                 private _veh = vehicle _unit;
+                private _tgt = "Sign_Arrow_Red_F" createVehicle _pos;
                 if (_veh != _unit) then {
-                    gunner _veh doTarget _pos;
-                    gunner _veh doFire _pos;
+                    gunner _veh doTarget _tgt;
+                    gunner _veh doFire _tgt;
                 } else {
-                    _unit doTarget _pos;
-                    _unit doFire _pos;
+                    _unit doTarget _tgt;
+                    _unit doFire _tgt;
                 };
+                [_tgt] spawn { sleep 10; deleteVehicle (_this select 0); };
                 _unit setVariable ["SPECTRE_currentOrder", "FIRE AT POSITION", false];
                 diag_log format ["SPECTRE ATTACK_POS [%1]: %2", _unitId, _pos];
             };
@@ -461,11 +463,13 @@ SPECTRE_fnc_execCmd = {
                 private _wp = _waypoints select 0;
                 private _pos = [_wp select 0, _wp select 1, 0];
                 private _veh = vehicle _unit;
+                private _tgt = "Sign_Arrow_Red_F" createVehicle _pos;
                 if (_veh != _unit) then {
-                    gunner _veh doTarget _pos;
+                    gunner _veh doTarget _tgt;
                 } else {
-                    _unit doTarget _pos;
+                    _unit doTarget _tgt;
                 };
+                [_tgt] spawn { sleep 10; deleteVehicle (_this select 0); };
                 _unit setVariable ["SPECTRE_currentOrder", "ADJUST FIRE", false];
                 diag_log format ["SPECTRE ADJUST_FIRE [%1]: %2", _unitId, _pos];
             };
