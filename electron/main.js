@@ -563,6 +563,18 @@ function buildSQFContent(commands) {
         break;
       }
 
+      case 'ADJUST_FIRE': {
+        const dx = Math.round(cmd.x || 0);
+        const dy = Math.round(cmd.y || 0);
+        lines.push(`[${id}, "ADJUST_FIRE", "${uid}", [${dx},${dy}]] call SPECTRE_fnc_execCmd;`);
+        break;
+      }
+
+      case 'HOVER': {
+        lines.push(`[${id}, "HOVER", "${uid}"] call SPECTRE_fnc_execCmd;`);
+        break;
+      }
+
       default:
         lines.push(`// (skipped unknown command type: ${cmd.type})`);
     }

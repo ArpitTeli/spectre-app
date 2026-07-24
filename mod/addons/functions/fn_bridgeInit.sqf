@@ -447,15 +447,38 @@ SPECTRE_fnc_execCmd = {
         };
 
         case "SMOKE_AT": {
-            if (!isNull _unit) then {
+            if (!isNull _unit && count _waypoints > 0) then {
+                private _wp = _waypoints select 0;
+                private _pos = [_wp select 0, _wp select 1, 0];
+                "SmokeShell" createVehicle _pos;
+                _unit setVariable ["SPECTRE_currentOrder", "SMOKE", false];
+                diag_log format ["SPECTRE SMOKE_AT [%1]: %2", _unitId, _pos];
+            };
+        };
+
+        case "ADJUST_FIRE": {
+            if (!isNull _unit && count _waypoints > 0) then {
+                private _wp = _waypoints select 0;
+                private _pos = [_wp select 0, _wp select 1, 0];
                 private _veh = vehicle _unit;
                 if (_veh != _unit) then {
-                    _veh smokeScreen true;
+                    gunner _veh doTarget _pos;
                 } else {
-                    [_unit, "SmokeShell"] createVehicle (getPos _unit);
+                    _unit doTarget _pos;
                 };
-                _unit setVariable ["SPECTRE_currentOrder", "SMOKE", false];
-                diag_log format ["SPECTRE SMOKE_AT [%1]", _unitId];
+                _unit setVariable ["SPECTRE_currentOrder", "ADJUST FIRE", false];
+                diag_log format ["SPECTRE ADJUST_FIRE [%1]: %2", _unitId, _pos];
+            };
+        };
+
+        case "HOVER": {
+            if (!isNull _unit) then {
+                private _veh = vehicle _unit;
+                if (_veh != _unit && {_veh isKindOf "Air"}) then {
+                    _veh flyInHeight 50;
+                    _unit setVariable ["SPECTRE_currentOrder", "HOVER", false];
+                };
+                diag_log format ["SPECTRE HOVER [%1]", _unitId];
             };
         };
     };

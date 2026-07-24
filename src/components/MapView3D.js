@@ -584,14 +584,12 @@ export default function MapView3D({ units, contacts, onUnitSelect, onUnitRightCl
       const modelType = getUnitModelType(u);
       const template = models && models[modelType];
       const raw = template && template.userData.rawSize;
-      let markerObj;
 
       if (!template || !raw || raw < 1) {
         const m = makeInfantryMesh(color, emissive, opacity);
         m.position.set(tx, h + MODEL_HEIGHT_OFFSET.infantry, tz);
         m.userData = { unitId: u.id };
         g.add(m);
-        markerObj = m;
       } else {
         const clone = template.clone();
         applyMaterial(clone, color, emissive, 0.5);
@@ -601,7 +599,6 @@ export default function MapView3D({ units, contacts, onUnitSelect, onUnitRightCl
         clone.position.set(tx, h + (MODEL_HEIGHT_OFFSET[modelType] || 3), tz);
         clone.userData = { unitId: u.id };
         g.add(clone);
-        markerObj = clone;
       }
 
       if (altAGL > 1 && !dead) {

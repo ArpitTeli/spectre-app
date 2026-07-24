@@ -337,9 +337,6 @@ async function handleArmaEvents(events, stateRef, patch) {
   const { aiService } = await import('../ai/aiService');
 
   for (const event of events) {
-    // Always read the latest state for each event to avoid stale closures
-    const state = stateRef.current;
-
     // Update reward data
     if (event.type === 'VEHICLE_DESTROYED') {
       patch(prev => ({ ...prev, rewardData: { ...prev.rewardData, vehicles_lost: prev.rewardData.vehicles_lost + 1, score: prev.rewardData.score + REWARD.VEHICLE_LOST } }));

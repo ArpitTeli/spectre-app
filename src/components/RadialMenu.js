@@ -49,11 +49,12 @@ const ACTIONS = {
 function getUnitActions(unit) {
   if (!unit) return ACTIONS.INFANTRY;
   const type = (unit.type || '').toUpperCase();
-  const vehicleType = (unit.vehicle_type || '').toUpperCase();
-  if (type === 'HELICOPTER' || type === 'PLANE') return ACTIONS.HELICOPTER;
-  if (type === 'ARTILLERY' || vehicleType === 'ARTILLERY') return ACTIONS.ARTILLERY;
-  if (type === 'TANK' || type === 'APC' || type === 'ARMED_CAR' || vehicleType.includes('TANK') || vehicleType.includes('APC')) return ACTIONS.ARMORED;
-  if (type === 'CAR' || type === 'TRUCK' || type === 'VEHICLE') return ACTIONS.VEHICLE;
+  const vt = (unit.vehicle_type || '').toUpperCase();
+  if (vt === 'HELI' || vt === 'PLANE') return ACTIONS.HELICOPTER;
+  if (vt === 'ARTILLERY') return ACTIONS.ARTILLERY;
+  if (vt === 'TANK' || vt === 'IFV' || vt.includes('TRACKED')) return ACTIONS.ARMORED;
+  if (vt === 'CAR' || vt === 'TRUCK' || vt === 'RECON' || vt.includes('MRAP')) return ACTIONS.VEHICLE;
+  if (type === 'VEHICLE') return ACTIONS.VEHICLE;
   return ACTIONS.INFANTRY;
 }
 

@@ -71,12 +71,12 @@
   background: rgba(0, 212, 255, 0.15);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  transform: translate(var(--tx, 0), var(--ty, 0)) scale(1.15) !important;
   box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+  filter: brightness(1.2);
 }
 
 .radial-item:active {
-  transform: translate(var(--tx, 0), var(--ty, 0)) scale(0.95) !important;
+  filter: brightness(0.8);
 }
 
 .radial-icon {
