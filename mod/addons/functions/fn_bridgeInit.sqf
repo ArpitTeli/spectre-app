@@ -388,9 +388,10 @@ SPECTRE_fnc_execCmd = {
                         private _wpData = _x;
                         private _pos = [_wpData select 0, _wpData select 1, 0];
                         private _alt = if (count _wpData > 2) then { _wpData select 2 } else { -1 };
-                        private _newWp = _grp addWaypoint [_pos, 0];
+                        private _newWp = _grp addWaypoint [_pos, 80];
                         _newWp setWaypointType "MOVE";
                         _newWp setWaypointSpeed _spd;
+                        _newWp setWaypointStatements ["true", ""];
                         if (_alt >= 0) then {
                             _newWp setWaypointAltitude _alt;
                         };
