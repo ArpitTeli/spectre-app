@@ -176,7 +176,8 @@ function makeContactIcon(contact, selected) {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function MapView({
   units, contacts, zones,
-  selectedUnit, selectedContact,
+  selectedUnit, selectedUnits,
+  selectedContact,
   selectedCOA, showCOAOverlay,
   mapName,
   pendingAction,
@@ -279,14 +280,15 @@ export default function MapView({
       const latlng = getUnitLatLng(unit.position);
       if (!latlng) return;
 
-      const marker = L.marker(latlng, { icon: makeUnitIcon(unit, unit.id === selectedUnit) });
+      const isSelected = unit.id === selectedUnit || (selectedUnits && selectedUnits.includes(unit.id));
+      const marker = L.marker(latlng, { icon: makeUnitIcon(unit, isSelected) });
 
       marker.on('click', (e) => {
         L.DomEvent.stopPropagation(e);
         if (qHeldRef.current) {
           onUnitRightClick && onUnitRightClick(unit.id, e.originalEvent.clientX, e.originalEvent.clientY);
         } else {
-          onUnitSelect(unit.id);
+          onUnitSelect(unit.id, e.originalEvent.ctrlKey || e.originalEvent.metaKey);
         }
       });
       if (onUnitRightClick) {
@@ -323,7 +325,7 @@ export default function MapView({
         }
       }
     }
-  }, [units, selectedUnit, onUnitSelect, mapName]);
+  }, [units, selectedUnit, selectedUnits, onUnitSelect, mapName]);
 
   // ── Update contact markers ─────────────────────────────────────────────────
   useEffect(() => {

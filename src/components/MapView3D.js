@@ -210,7 +210,7 @@ function makeInfantryMesh(color, emissive, opacity) {
   return group;
 }
 
-export default function MapView3D({ units, contacts, pendingAction, onUnitSelect, onUnitRightClick, onContactSelect, onMapClick }) {
+export default function MapView3D({ units, contacts, selectedUnits, pendingAction, onUnitSelect, onUnitRightClick, onContactSelect, onMapClick }) {
   const ref = useRef(null);
   const st = useRef({});
   const [status, setStatus] = useState('loading');
@@ -315,14 +315,14 @@ export default function MapView3D({ units, contacts, pendingAction, onUnitSelect
       const s = st.current;
       if (!s.markers) return;
       const hits = raycaster.intersectObjects(s.markers.children, true);
-      if (hits.length > 0) {
+        if (hits.length > 0) {
         let obj = hits[0].object;
         while (obj && !obj.userData?.unitId) obj = obj.parent;
         if (obj?.userData?.unitId) {
           if ((e.button === 2 || qHeldRef.current) && onUnitRightClickRef.current) {
             onUnitRightClickRef.current(obj.userData.unitId, e.clientX, e.clientY);
           } else {
-            onUnitSelectRef.current(obj.userData.unitId);
+            onUnitSelectRef.current(obj.userData.unitId, e.ctrlKey || e.metaKey);
           }
         }
       } else if (onMapClickRef.current) {
@@ -570,10 +570,13 @@ export default function MapView3D({ units, contacts, pendingAction, onUnitSelect
     }
 
     const BLUE = 0x3b82f6;
+    const SELECTED = 0x00d4ff;
     const DEAD = 0x585870;
     const lineMat = new THREE.LineBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.4 });
     const groundDotGeo = new THREE.RingGeometry(2, 4, 16);
     const groundDotMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+    const selectionRingGeo = new THREE.RingGeometry(6, 8, 24);
+    const selectionRingMat = new THREE.MeshBasicMaterial({ color: SELECTED, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
 
     Object.values(units || {}).forEach(u => {
       const p = u.position;
@@ -585,8 +588,9 @@ export default function MapView3D({ units, contacts, pendingAction, onUnitSelect
       const altAGL = p.z || 0;
       const h = terrainH + altAGL;
       const dead = u.status === 'DESTROYED' || u.status === 'DEAD';
-      const color = dead ? DEAD : BLUE;
-      const emissive = dead ? 0x222233 : 0x1a4a8a;
+      const isSelected = selectedUnits && selectedUnits.includes(u.id);
+      const color = dead ? DEAD : (isSelected ? SELECTED : BLUE);
+      const emissive = dead ? 0x222233 : (isSelected ? 0x00d4ff : 0x1a4a8a);
       const opacity = dead ? 0.4 : 1;
 
       const modelType = getUnitModelType(u);
@@ -607,6 +611,14 @@ export default function MapView3D({ units, contacts, pendingAction, onUnitSelect
         clone.position.set(tx, h + (MODEL_HEIGHT_OFFSET[modelType] || 3), tz);
         clone.userData = { unitId: u.id };
         g.add(clone);
+      }
+
+      if (isSelected && !dead) {
+        const ring = new THREE.Mesh(selectionRingGeo, selectionRingMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(tx, terrainH + 0.5, tz);
+        ring.userData = { unitId: u.id };
+        g.add(ring);
       }
 
       if (altAGL > 1 && !dead) {
@@ -670,7 +682,7 @@ export default function MapView3D({ units, contacts, pendingAction, onUnitSelect
         g.add(line);
       }
     });
-  }, [units, contacts, models, hImg]);
+  }, [units, contacts, selectedUnits, models, hImg]);
 
   return (
     <div style={{ position:'relative', width:'100%', height:'100%', overflow:'hidden' }}>

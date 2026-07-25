@@ -5,9 +5,11 @@
 - ✅ Enemy Tracking — implemented
 - ✅ Unit Identity System — mostly done (HP, fuel, crew, vehicle grouping)
 - ✅ Basic Commands (HOLD, RTB, WEAPONS_FREE, WEAPONS_SAFE, DISPERSE, FORM_UP, EXECUTE_ORDER, CUSTOM) — implemented
-- 🔲 Command System (Tier 2) — next
-- 🔲 Radial Menu — after commands
-- 🔲 Full-Screen Action Panels — after radial
+- ✅ Command System (Tier 2) — implemented (MOVE_TO, ATTACK, ATTACK_POS, ARTILLERY_STRIKE, LAND_AT, SMOKE_AT, ADJUST_FIRE, HOVER)
+- ✅ Radial Menu — implemented (glassmorphism, right-click/Q+click, per-unit-type actions)
+- ✅ Target Mode — implemented (MOVE_TO/ATTACK/LAND_AT/SMOKE_AT/ARTILLERY_STRIKE via map click)
+- 🔲 Contacts rendering issues — to fix (visible but has problems)
+- 🔲 Full-Screen Action Panels — next
 - 🔲 Multi-Select — after panels
 - ⏳ Map Annotations — deferred
 - ⏳ Pathfinding Micro-Model — deferred (much later)

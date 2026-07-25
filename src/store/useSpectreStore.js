@@ -50,6 +50,7 @@ const INITIAL_STATE = {
   showAAR: false,
   pendingAdaptation: null,
   selectedUnit: null,
+  selectedUnits: [],
   selectedContact: null,
   showSettings: false,
   bridgePaths: null
@@ -265,6 +266,32 @@ export function useSpectreStore() {
     return map;
   }, [state.units]);
 
+  // ── Multi-select helpers ───────────────────────────────────────────────────
+  const toggleUnitSelection = useCallback((id) => {
+    setState(prev => {
+      const units = prev.selectedUnits;
+      const idx = units.indexOf(id);
+      if (idx >= 0) {
+        return { ...prev, selectedUnits: units.filter(u => u !== id) };
+      } else {
+        return { ...prev, selectedUnits: [...units, id] };
+      }
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setState(prev => ({ ...prev, selectedUnits: [], selectedUnit: null }));
+  }, []);
+
+  const selectAllUnits = useCallback(() => {
+    setState(prev => {
+      const allIds = Object.values(prev.units)
+        .filter(u => !u.vehicle)
+        .map(u => u.id);
+      return { ...prev, selectedUnits: allIds };
+    });
+  }, []);
+
   const getUnitCrew = useCallback((vehicleId) => {
     const all = Object.values(state.units);
     return all.filter(u => u.vehicle === vehicleId);
@@ -287,7 +314,7 @@ export function useSpectreStore() {
     return labels[unit?.vehicle_type] || 'Unit';
   }, []);
 
-  return { state, patch, addCommsEntry, sendArmaCommand, addIntel, endMission, recalcForceMetrics, generateMissionVault, setCommandMode, visibleUnits, getUnitCrew, getUnitTypeLabel };
+  return { state, patch, addCommsEntry, sendArmaCommand, addIntel, endMission, recalcForceMetrics, generateMissionVault, setCommandMode, visibleUnits, toggleUnitSelection, clearSelection, selectAllUnits, getUnitCrew, getUnitTypeLabel };
 }
 
 // ─── Process Arma state update ────────────────────────────────────────────────

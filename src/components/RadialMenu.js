@@ -35,7 +35,7 @@ const ACTIONS = {
   HELICOPTER: [
     { id: 'MOVE_TO',     label: 'Move To',     icon: '↗', color: '#3b82f6' },
     { id: 'LAND_AT',     label: 'Land',        icon: '⬇', color: '#22c55e' },
-    { id: 'HOVER',       label: 'Hover',       icon: '◎', color: '#eab308' },
+    { id: 'HOVER',       label: 'Flight Plan', icon: '◎', color: '#eab308', complex: true },
     { id: 'ATTACK',      label: 'Attack',      icon: '⚔', color: '#ef4444' },
     { id: 'SMOKE_AT',    label: 'Smoke',       icon: '☁', color: '#94a3b8' },
   ],

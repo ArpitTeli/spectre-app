@@ -15,13 +15,15 @@ import AARPanel from './components/AARPanel';
 import ModeSelect from './components/ModeSelect';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import RadialMenu from './components/RadialMenu';
+import FireMissionPanel from './components/FireMissionPanel';
+import FlightPlanPanel from './components/FlightPlanPanel';
 import './styles/global.css';
 
 export default function App() {
   const {
     state, patch, addCommsEntry, sendArmaCommand,
     addIntel, endMission, generateMissionVault, setCommandMode,
-    visibleUnits
+    visibleUnits, toggleUnitSelection, clearSelection
   } = useSpectreStore();
 
   const stateRef = useRef(state);
@@ -35,41 +37,53 @@ export default function App() {
   const [pendingAction, setPendingAction] = useState(null); // { id, unitId, label }
   const pendingActionRef = useRef(null);
   pendingActionRef.current = pendingAction;
+  const [fireMissionUnit, setFireMissionUnit] = useState(null);
+  const [flightPlanUnit, setFlightPlanUnit] = useState(null);
+  const [panelClickHandler, setPanelClickHandler] = useState(null);
   const qHeldRef = useRef(false);
+  const ctrlHeldRef = useRef(false);
 
   const handleMapClick = useCallback((x, y) => {
+    if (panelClickHandler) {
+      panelClickHandler(x, y);
+      return;
+    }
+
     const action = pendingActionRef.current;
     if (!action) return;
-    const unitId = action.unitId;
-    const units = visibleUnits();
-    const unit = units[unitId];
 
-    switch (action.id) {
-      case 'MOVE_TO':
-        sendArmaCommand({ type: 'MOVE_TO', unit_id: unitId, x, y });
-        addCommsEntry('SPECTRE', unit?.callsign || unitId, `MOVE TO ${Math.round(x)},${Math.round(y)}`, 'BLUE');
-        break;
-      case 'LAND_AT':
-        sendArmaCommand({ type: 'LAND_AT', unit_id: unitId, x, y });
-        addCommsEntry('SPECTRE', unit?.callsign || unitId, `LAND AT ${Math.round(x)},${Math.round(y)}`, 'BLUE');
-        break;
-      case 'SMOKE_AT':
-        sendArmaCommand({ type: 'SMOKE_AT', unit_id: unitId, x, y });
-        addCommsEntry('SPECTRE', unit?.callsign || unitId, `SMOKE AT ${Math.round(x)},${Math.round(y)}`, 'BLUE');
-        break;
-      case 'ARTILLERY_STRIKE':
-        sendArmaCommand({ type: 'ARTILLERY_STRIKE', unit_id: unitId, x, y, rounds: 6, ammoType: 'HE' });
-        addCommsEntry('SPECTRE', unit?.callsign || unitId, `ARTILLERY STRIKE ${Math.round(x)},${Math.round(y)}`, 'BLUE');
-        break;
-      case 'ATTACK':
-        sendArmaCommand({ type: 'ATTACK', unit_id: unitId, x, y });
-        addCommsEntry('SPECTRE', unit?.callsign || unitId, `ATTACK POSITION ${Math.round(x)},${Math.round(y)}`, 'BLUE');
-        break;
-      default:
-        break;
-    }
+    const targets = action.unitId ? [action.unitId] : state.selectedUnits;
+    const units = visibleUnits();
+
+    targets.forEach(unitId => {
+      const unit = units[unitId];
+      switch (action.id) {
+        case 'MOVE_TO':
+          sendArmaCommand({ type: 'MOVE_TO', unit_id: unitId, x, y });
+          addCommsEntry('SPECTRE', unit?.callsign || unitId, `MOVE TO ${Math.round(x)},${Math.round(y)}`, 'BLUE');
+          break;
+        case 'LAND_AT':
+          sendArmaCommand({ type: 'LAND_AT', unit_id: unitId, x, y });
+          addCommsEntry('SPECTRE', unit?.callsign || unitId, `LAND AT ${Math.round(x)},${Math.round(y)}`, 'BLUE');
+          break;
+        case 'SMOKE_AT':
+          sendArmaCommand({ type: 'SMOKE_AT', unit_id: unitId, x, y });
+          addCommsEntry('SPECTRE', unit?.callsign || unitId, `SMOKE AT ${Math.round(x)},${Math.round(y)}`, 'BLUE');
+          break;
+        case 'ARTILLERY_STRIKE':
+          sendArmaCommand({ type: 'ARTILLERY_STRIKE', unit_id: unitId, x, y, rounds: 6, ammoType: 'HE' });
+          addCommsEntry('SPECTRE', unit?.callsign || unitId, `ARTILLERY STRIKE ${Math.round(x)},${Math.round(y)}`, 'BLUE');
+          break;
+        case 'ATTACK':
+          sendArmaCommand({ type: 'ATTACK', unit_id: unitId, x, y });
+          addCommsEntry('SPECTRE', unit?.callsign || unitId, `ATTACK POSITION ${Math.round(x)},${Math.round(y)}`, 'BLUE');
+          break;
+        default:
+          break;
+      }
+    });
     setPendingAction(null);
-  }, [sendArmaCommand, addCommsEntry, visibleUnits]);
+  }, [sendArmaCommand, addCommsEntry, visibleUnits, state.selectedUnits, panelClickHandler]);
 
   // Keyboard shortcut: M to toggle 2D/3D map
   useEffect(() => {
@@ -80,15 +94,23 @@ export default function App() {
       if (e.key === 'q' || e.key === 'Q') {
         qHeldRef.current = true;
       }
+      if (e.ctrlKey || e.metaKey) {
+        ctrlHeldRef.current = true;
+      }
       if (e.key === 'Escape') {
         if (pendingActionRef.current) {
           setPendingAction(null);
+        } else if (state.selectedUnits.length > 0) {
+          clearSelection();
         }
       }
     }
     function onKeyUp(e) {
       if (e.key === 'q' || e.key === 'Q') {
         qHeldRef.current = false;
+      }
+      if (!e.ctrlKey && !e.metaKey) {
+        ctrlHeldRef.current = false;
       }
     }
     window.addEventListener('keydown', onKey);
@@ -97,7 +119,7 @@ export default function App() {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, []);
+  }, [clearSelection, state.selectedUnits.length]);
 
   // Sync AI config
   useEffect(() => {
@@ -284,19 +306,46 @@ export default function App() {
               Click map to set target — {pendingAction.label} — ESC to cancel
             </div>
           )}
+          {state.selectedUnits.length > 1 && !pendingAction && (
+            <div className="selection-indicator">
+              <span className="selection-count">{state.selectedUnits.length} UNITS SELECTED</span>
+              <div className="selection-actions">
+                <button className="selection-action-btn" onClick={() => {
+                  state.selectedUnits.forEach(id => sendArmaCommand({ type: 'HOLD', unit_id: id }));
+                  addCommsEntry('SPECTRE', 'SELECTED', 'HOLD', 'BLUE');
+                }}>HOLD</button>
+                <button className="selection-action-btn" onClick={() => {
+                  setPendingAction({ id: 'MOVE_TO', unitId: null, label: 'MOVE TO (ALL)' });
+                }}>MOVE TO</button>
+                <button className="selection-action-btn" onClick={() => {
+                  state.selectedUnits.forEach(id => sendArmaCommand({ type: 'ATTACK', unit_id: id }));
+                  addCommsEntry('SPECTRE', 'SELECTED', 'ATTACK', 'BLUE');
+                }}>ATTACK</button>
+              </div>
+              <button className="selection-clear-btn" onClick={clearSelection}>✕</button>
+            </div>
+          )}
           {viewMode === '2d' ? (
             <MapView
               units={visibleUnits()}
               contacts={state.contacts}
               zones={state.zones}
               selectedUnit={state.selectedUnit}
+              selectedUnits={state.selectedUnits}
               selectedContact={state.selectedContact}
               currentCOAs={state.currentCOAs}
               selectedCOA={state.selectedCOA}
               showCOAOverlay={state.showCOAOverlay}
               mapName={state.mapName}
               pendingAction={pendingAction}
-              onUnitSelect={id => patch({ selectedUnit: id })}
+              onUnitSelect={(id, ctrlKey) => {
+                if (ctrlKey || ctrlHeldRef.current) {
+                  toggleUnitSelection(id);
+                } else {
+                  clearSelection();
+                  patch({ selectedUnit: id });
+                }
+              }}
               onUnitRightClick={(id, x, y) => setRadialMenu({ x, y, unitId: id })}
               onContactSelect={id => patch({ selectedContact: id })}
               onMapClick={handleMapClick}
@@ -305,8 +354,16 @@ export default function App() {
             <MapView3D
               units={visibleUnits()}
               contacts={state.contacts}
+              selectedUnits={state.selectedUnits}
               pendingAction={pendingAction}
-              onUnitSelect={id => patch({ selectedUnit: id })}
+              onUnitSelect={(id, ctrlKey) => {
+                if (ctrlKey || ctrlHeldRef.current) {
+                  toggleUnitSelection(id);
+                } else {
+                  clearSelection();
+                  patch({ selectedUnit: id });
+                }
+              }}
               onUnitRightClick={(id, x, y) => setRadialMenu({ x, y, unitId: id })}
               onContactSelect={id => patch({ selectedContact: id })}
               onMapClick={handleMapClick}
@@ -391,6 +448,30 @@ export default function App() {
         />
       )}
 
+      {fireMissionUnit && (
+        <FireMissionPanel
+          unit={fireMissionUnit}
+          onClose={() => { setFireMissionUnit(null); setPanelClickHandler(null); }}
+          onSubmit={(cmd) => {
+            sendArmaCommand(cmd);
+            addCommsEntry('SPECTRE', fireMissionUnit?.callsign || fireMissionUnit?.id, `ARTILLERY STRIKE ${cmd.x},${cmd.y} (${cmd.rounds}x ${cmd.ammoType})`, 'BLUE');
+          }}
+          onMapClick={(handler) => setPanelClickHandler(() => handler)}
+        />
+      )}
+
+      {flightPlanUnit && (
+        <FlightPlanPanel
+          unit={flightPlanUnit}
+          onClose={() => { setFlightPlanUnit(null); setPanelClickHandler(null); }}
+          onSubmit={(cmd) => {
+            sendArmaCommand(cmd);
+            addCommsEntry('SPECTRE', flightPlanUnit?.callsign || flightPlanUnit?.id, `FLIGHT PLAN (${cmd.waypoints.length} WPs)`, 'BLUE');
+          }}
+          onMapClick={(handler) => setPanelClickHandler(() => handler)}
+        />
+      )}
+
       {state.showAAR && state.aarData && (
         <AARPanel
           aar={state.aarData}
@@ -421,39 +502,51 @@ export default function App() {
           x={radialMenu.x}
           y={radialMenu.y}
           unit={Object.values(visibleUnits()).find(u => u.id === radialMenu.unitId)}
-          multiSelect={false}
+          multiSelect={state.selectedUnits.length > 1 && state.selectedUnits.includes(radialMenu.unitId)}
           onSelect={(action) => {
             const unitId = radialMenu.unitId;
             const units = visibleUnits();
-            const unit = units[unitId];
             setRadialMenu(null);
 
             if (action.complex) {
-              patch({ [`show${action.id}Panel`]: true, selectedUnit: unitId });
+              if (action.id === 'ARTILLERY_STRIKE') {
+                setFireMissionUnit(units[unitId]);
+              } else if (action.id === 'HOVER' || action.id === 'LAND_AT') {
+                setFlightPlanUnit(units[unitId]);
+              }
               return;
             }
 
-            switch (action.id) {
-              case 'HOLD':
-              case 'RTB':
-              case 'WEAPONS_FREE':
-              case 'WEAPONS_SAFE':
-              case 'FORM_UP':
-              case 'DISPERSE':
-                sendArmaCommand({ type: action.id, unit_id: unitId });
-                addCommsEntry('SPECTRE', unit?.callsign || unitId, action.id, 'BLUE');
-                break;
-              case 'MOVE_TO':
-              case 'LAND_AT':
-              case 'SMOKE_AT':
-              case 'ARTILLERY_STRIKE':
-              case 'ATTACK':
-                setPendingAction({ id: action.id, unitId, label: action.label });
-                break;
-              default:
-                sendArmaCommand({ type: action.id, unit_id: unitId });
-                addCommsEntry('SPECTRE', unit?.callsign || unitId, action.id, 'BLUE');
-            }
+            const targets = (state.selectedUnits.length > 1 && state.selectedUnits.includes(unitId))
+              ? state.selectedUnits
+              : [unitId];
+
+            targets.forEach(tid => {
+              const u = units[tid];
+              switch (action.id) {
+                case 'HOLD':
+                case 'RTB':
+                case 'WEAPONS_FREE':
+                case 'WEAPONS_SAFE':
+                case 'FORM_UP':
+                case 'DISPERSE':
+                  sendArmaCommand({ type: action.id, unit_id: tid });
+                  addCommsEntry('SPECTRE', u?.callsign || tid, action.id, 'BLUE');
+                  break;
+                case 'MOVE_TO':
+                case 'LAND_AT':
+                case 'SMOKE_AT':
+                case 'ARTILLERY_STRIKE':
+                case 'ATTACK':
+                  if (tid === targets[0]) {
+                    setPendingAction({ id: action.id, unitId: targets.length > 1 ? null : tid, label: action.label });
+                  }
+                  break;
+                default:
+                  sendArmaCommand({ type: action.id, unit_id: tid });
+                  addCommsEntry('SPECTRE', u?.callsign || tid, action.id, 'BLUE');
+              }
+            });
           }}
           onClose={() => setRadialMenu(null)}
         />
