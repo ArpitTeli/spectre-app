@@ -617,6 +617,7 @@ function writeCommandToFile(cmd) {
     if (!cmd._id) cmd._id = Date.now() + Math.floor(Math.random() * 10000);
     const sqf = buildSQFContent([cmd]);
     const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
+    console.log('[MOVE_TO DEBUG] writeCommandToFile:', cmd.type, cmd.unit_id, 'path:', p);
     fs.writeFileSync(p, sqf, 'utf8');
     fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} OK ${cmd.type}\n`);
   } catch (e) {
@@ -1348,6 +1349,7 @@ function getMissionFolders() {
 // ─── IPC Handlers ────────────────────────────────────────────────────────────
 
 ipcMain.on('send-command', (_, command) => {
+  console.log('[MOVE_TO DEBUG] IPC send-command received:', command.type, command.unit_id);
   writeCommandToFile(command);
 });
 

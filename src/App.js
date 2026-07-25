@@ -37,13 +37,24 @@ export default function App() {
   const [pendingAction, setPendingAction] = useState(null); // { id, unitId, label }
   const pendingActionRef = useRef(null);
   pendingActionRef.current = pendingAction;
+
+  // DEBUG: track pendingAction changes
+  useEffect(() => {
+    console.log('[MOVE_TO DEBUG] pendingAction state changed:', pendingAction);
+  }, [pendingAction]);
   const [fireMissionUnit, setFireMissionUnit] = useState(null);
   const [flightPlanUnit, setFlightPlanUnit] = useState(null);
   const [panelClickHandler, setPanelClickHandler] = useState(null);
+
+  // DEBUG: track panelClickHandler changes
+  useEffect(() => {
+    console.log('[MOVE_TO DEBUG] panelClickHandler changed:', !!panelClickHandler);
+  }, [panelClickHandler]);
   const qHeldRef = useRef(false);
   const ctrlHeldRef = useRef(false);
 
   const handleMapClick = useCallback((x, y) => {
+    console.log('[MOVE_TO DEBUG] handleMapClick fired', { x, y, panelClickHandler: !!panelClickHandler, pendingAction: pendingActionRef.current });
     if (panelClickHandler) {
       panelClickHandler(x, y);
       return;
@@ -54,6 +65,7 @@ export default function App() {
 
     const targets = action.unitId ? [action.unitId] : state.selectedUnits;
     const units = visibleUnits();
+    console.log('[MOVE_TO DEBUG] targets:', targets, 'unitId:', action.unitId, 'selectedUnits:', state.selectedUnits);
 
     targets.forEach(unitId => {
       const unit = units[unitId];
@@ -506,6 +518,7 @@ export default function App() {
           onSelect={(action) => {
             const unitId = radialMenu.unitId;
             const units = visibleUnits();
+            console.log('[MOVE_TO DEBUG] radial onSelect:', action.id, 'unitId:', unitId, 'complex:', action.complex);
             setRadialMenu(null);
 
             if (action.complex) {
@@ -539,7 +552,9 @@ export default function App() {
                 case 'ARTILLERY_STRIKE':
                 case 'ATTACK':
                   if (tid === targets[0]) {
-                    setPendingAction({ id: action.id, unitId: targets.length > 1 ? null : tid, label: action.label });
+                    const pendingVal = { id: action.id, unitId: targets.length > 1 ? null : tid, label: action.label };
+                    console.log('[MOVE_TO DEBUG] setPendingAction:', pendingVal);
+                    setPendingAction(pendingVal);
                   }
                   break;
                 default:
