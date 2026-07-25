@@ -1,27 +1,32 @@
-import React, { useState } from 'react';
+import React from 'react';
+import FireMissionPanel from './FireMissionPanel';
+import FlightPlanPanel from './FlightPlanPanel';
 
-export default function RightPanel({ state, patch, sendArmaCommand, addCommsEntry, selectedUnit }) {
-  const [activeTab, setActiveTab] = useState('STATUS');
+export default function RightPanel({ state, patch, sendArmaCommand, addCommsEntry, selectedUnit, fireMissionUnit, setFireMissionUnit, flightPlanUnit, setFlightPlanUnit, panelClickHandlerRef, activeTab, setActiveTab }) {
 
   const forceMetrics = state.forceMetrics || { firepower_index: 0, vehicles_active: 0, vehicles_total: 0, mobility: 'UNKNOWN' };
   const rewardData = state.rewardData || { score: 0, friendly_kia: 0, enemy_kills: 0 };
   const missionPhase = state.missionPhase || 'BRIEFING';
 
+  const tabs = [
+    { id: 'STATUS', label: 'Status' },
+    { id: 'UNIT', label: 'Unit' },
+    ...(fireMissionUnit ? [{ id: 'ARTILLERY', label: 'Artillery' }] : []),
+    ...(flightPlanUnit ? [{ id: 'FLIGHT', label: 'Flight Plan' }] : []),
+  ];
+
   return (
     <div className="right-panel">
       <div className="right-panel__tabs">
-        <button
-          className={`right-panel__tab ${activeTab === 'STATUS' ? 'active' : ''}`}
-          onClick={() => setActiveTab('STATUS')}
-        >
-          Status
-        </button>
-        <button
-          className={`right-panel__tab ${activeTab === 'UNIT' ? 'active' : ''}`}
-          onClick={() => setActiveTab('UNIT')}
-        >
-          Unit Detail
-        </button>
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            className={`right-panel__tab ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       <div className="right-panel__content">
@@ -42,6 +47,32 @@ export default function RightPanel({ state, patch, sendArmaCommand, addCommsEntr
             state={state}
             sendArmaCommand={sendArmaCommand}
             addCommsEntry={addCommsEntry}
+          />
+        )}
+        {activeTab === 'ARTILLERY' && fireMissionUnit && (
+          <FireMissionPanel
+            unit={fireMissionUnit}
+            onClose={() => { setFireMissionUnit(null); setActiveTab('STATUS'); }}
+            onSubmit={(cmd) => {
+              sendArmaCommand(cmd);
+              addCommsEntry('SPECTRE', fireMissionUnit?.callsign || fireMissionUnit?.id, `ARTILLERY STRIKE ${cmd.x},${cmd.y} (${cmd.rounds}x ${cmd.ammoType})`, 'BLUE');
+              setFireMissionUnit(null);
+              setActiveTab('STATUS');
+            }}
+            onMapClick={(handler) => { panelClickHandlerRef.current = handler; }}
+          />
+        )}
+        {activeTab === 'FLIGHT' && flightPlanUnit && (
+          <FlightPlanPanel
+            unit={flightPlanUnit}
+            onClose={() => { setFlightPlanUnit(null); setActiveTab('STATUS'); }}
+            onSubmit={(cmd) => {
+              sendArmaCommand(cmd);
+              addCommsEntry('SPECTRE', flightPlanUnit?.callsign || flightPlanUnit?.id, `FLIGHT PLAN (${cmd.waypoints.length} WPs)`, 'BLUE');
+              setFlightPlanUnit(null);
+              setActiveTab('STATUS');
+            }}
+            onMapClick={(handler) => { panelClickHandlerRef.current = handler; }}
           />
         )}
       </div>
@@ -162,7 +193,7 @@ function StatusTab({ forceMetrics, rewardData, missionPhase, state, patch, sendA
         </div>
         <div style={{ padding: '0 12px 8px' }}>
           <button className="tasks-action-btn" style={{ width: '100%' }} onClick={() => patch({ showSettings: true })}>
-            ⚙ Configuration
+            Configuration
           </button>
         </div>
       </div>
@@ -174,7 +205,7 @@ function UnitDetailTab({ unit, state, sendArmaCommand, addCommsEntry }) {
   if (!unit) {
     return (
       <div className="empty-state" style={{ height: '100%' }}>
-        <div style={{ fontSize: '24px', marginBottom: '8px', color: 'var(--text-muted)' }}>◎</div>
+        <div style={{ fontSize: '24px', marginBottom: '8px', color: 'var(--text-muted)' }}>&#9676;</div>
         <div>Select a unit to view details</div>
       </div>
     );
@@ -254,7 +285,7 @@ function UnitDetailTab({ unit, state, sendArmaCommand, addCommsEntry }) {
             <span className="health-section__title">Current Order</span>
           </div>
           <div style={{ padding: '0 12px 8px', fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-secondary)' }}>
-            ▸ {unit.current_order}
+            {unit.current_order}
           </div>
         </div>
       )}

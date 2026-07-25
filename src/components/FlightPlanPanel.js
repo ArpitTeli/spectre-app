@@ -1,15 +1,15 @@
 import React, { useState, useCallback, useEffect } from 'react';
 
 const SPEED_PRESETS = [
-  { id: 'SLOW', label: 'SLOW', value: 50, description: '50 km/h — Recon' },
-  { id: 'NORMAL', label: 'NORMAL', value: 120, description: '120 km/h — Transit' },
-  { id: 'FAST', label: 'FAST', value: 200, description: '200 km/h — Emergency' },
+  { id: 'SLOW', label: 'SLOW', value: 50 },
+  { id: 'NORM', label: 'NORM', value: 120 },
+  { id: 'FAST', label: 'FAST', value: 200 },
 ];
 
 const ALTITUDE_PRESETS = [
-  { id: 'LOW', label: 'LOW', value: 50, description: '50m AGL — Nap of earth' },
-  { id: 'MEDIUM', label: 'MED', value: 150, description: '150m AGL — Standard' },
-  { id: 'HIGH', label: 'HIGH', value: 300, description: '300m AGL — High approach' },
+  { id: 'LOW', label: 'LOW', value: 50 },
+  { id: 'MED', label: 'MED', value: 150 },
+  { id: 'HIGH', label: 'HIGH', value: 300 },
 ];
 
 export default function FlightPlanPanel({ unit, onClose, onSubmit, onMapClick }) {
@@ -17,7 +17,6 @@ export default function FlightPlanPanel({ unit, onClose, onSubmit, onMapClick })
   const [speed, setSpeed] = useState(120);
   const [defaultAlt, setDefaultAlt] = useState(150);
   const [editingWp, setEditingWp] = useState(null);
-  const [phase, setPhase] = useState('PLAN'); // PLAN | CONFIRM
 
   useEffect(() => {
     if (onMapClick) {
@@ -57,194 +56,69 @@ export default function FlightPlanPanel({ unit, onClose, onSubmit, onMapClick })
 
   const handleSubmit = useCallback(() => {
     if (waypoints.length === 0) return;
-
     onSubmit({
       type: 'MOVE_TO',
       unit_id: unit.id,
       x: waypoints[waypoints.length - 1].x,
       y: waypoints[waypoints.length - 1].y,
-      waypoints: waypoints.map((wp, i) => ({
-        x: wp.x,
-        y: wp.y,
-        altitude: wp.altitude,
-        hoverTime: wp.hoverTime,
-        description: wp.description,
-      })),
+      waypoints: waypoints.map(wp => ({ x: wp.x, y: wp.y, altitude: wp.altitude, hoverTime: wp.hoverTime, description: wp.description })),
       speed,
     });
-    onClose();
-  }, [unit, waypoints, speed, onSubmit, onClose]);
-
-  const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Escape') onClose();
-    if (e.key === 'Enter' && phase === 'CONFIRM') handleSubmit();
-  }, [onClose, phase, handleSubmit]);
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+  }, [unit, waypoints, speed, onSubmit]);
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-        <div className="modal__header">
-          <span>FLIGHT PLAN — {unit?.callsign || unit?.id || 'UNKNOWN'}</span>
-          <button className="modal__close" onClick={onClose}>✕</button>
+    <div className="flight-plan-inline">
+      <div className="fire-mission-section">
+        <div className="fire-mission-label">SPEED</div>
+        <div className="fire-mission-rounds">
+          {SPEED_PRESETS.map(p => (
+            <button key={p.id} className={`fire-mission-round-btn ${speed === p.value ? 'selected' : ''}`} onClick={() => setSpeed(p.value)}>{p.label}</button>
+          ))}
         </div>
+      </div>
 
-        <div className="modal__body">
-          {phase === 'PLAN' && (
-            <div className="flight-plan-form">
-              <div className="flight-plan-section">
-                <div className="flight-plan-label">SPEED</div>
-                <div className="flight-plan-grid">
-                  {SPEED_PRESETS.map(preset => (
-                    <button
-                      key={preset.id}
-                      className={`flight-plan-option ${speed === preset.value ? 'selected' : ''}`}
-                      onClick={() => setSpeed(preset.value)}
-                    >
-                      <div className="flight-plan-option-label">{preset.label}</div>
-                      <div className="flight-plan-option-desc">{preset.description}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flight-plan-section">
-                <div className="flight-plan-label">DEFAULT ALTITUDE</div>
-                <div className="flight-plan-grid">
-                  {ALTITUDE_PRESETS.map(preset => (
-                    <button
-                      key={preset.id}
-                      className={`flight-plan-option ${defaultAlt === preset.value ? 'selected' : ''}`}
-                      onClick={() => setDefaultAlt(preset.value)}
-                    >
-                      <div className="flight-plan-option-label">{preset.label}</div>
-                      <div className="flight-plan-option-desc">{preset.description}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flight-plan-section">
-                <div className="flight-plan-label">WAYPOINTS ({waypoints.length})</div>
-                <div className="flight-plan-hint">Click on map to add waypoints</div>
-                <div className="flight-plan-waypoint-list">
-                  {waypoints.length === 0 && (
-                    <div className="flight-plan-empty">No waypoints added yet</div>
-                  )}
-                  {waypoints.map((wp, idx) => (
-                    <div key={wp.id} className="flight-plan-waypoint">
-                      <div className="flight-plan-wp-num">{idx + 1}</div>
-                      <div className="flight-plan-wp-info">
-                        <div className="flight-plan-wp-coords">{wp.x}, {wp.y}</div>
-                        <div className="flight-plan-wp-details">
-                          <span>ALT: {wp.altitude}m</span>
-                          {wp.hoverTime > 0 && <span>HOVER: {wp.hoverTime}s</span>}
-                        </div>
-                      </div>
-                      <div className="flight-plan-wp-actions">
-                        <button
-                          className="flight-plan-wp-btn"
-                          onClick={() => moveWaypoint(wp.id, 'up')}
-                          disabled={idx === 0}
-                        >↑</button>
-                        <button
-                          className="flight-plan-wp-btn"
-                          onClick={() => moveWaypoint(wp.id, 'down')}
-                          disabled={idx === waypoints.length - 1}
-                        >↓</button>
-                        <button
-                          className="flight-plan-wp-btn"
-                          onClick={() => setEditingWp(editingWp === wp.id ? null : wp.id)}
-                        >✎</button>
-                        <button
-                          className="flight-plan-wp-btn danger"
-                          onClick={() => removeWaypoint(wp.id)}
-                        >✕</button>
-                      </div>
-                      {editingWp === wp.id && (
-                        <div className="flight-plan-wp-editor">
-                          <div className="flight-plan-input-row">
-                            <label>ALT (m)</label>
-                            <input
-                              type="number"
-                              value={wp.altitude}
-                              onChange={e => updateWaypoint(wp.id, { altitude: parseInt(e.target.value) || 0 })}
-                              className="flight-plan-input-sm"
-                            />
-                          </div>
-                          <div className="flight-plan-input-row">
-                            <label>HOVER (s)</label>
-                            <input
-                              type="number"
-                              value={wp.hoverTime}
-                              onChange={e => updateWaypoint(wp.id, { hoverTime: parseInt(e.target.value) || 0 })}
-                              className="flight-plan-input-sm"
-                            />
-                          </div>
-                          <div className="flight-plan-input-row">
-                            <label>DESC</label>
-                            <input
-                              type="text"
-                              value={wp.description}
-                              onChange={e => updateWaypoint(wp.id, { description: e.target.value })}
-                              className="flight-plan-input-sm"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {phase === 'CONFIRM' && (
-            <div className="flight-plan-confirm">
-              <div className="flight-plan-confirm-title">CONFIRM FLIGHT PLAN</div>
-              <div className="flight-plan-summary">
-                <div className="flight-plan-summary-row">
-                  <span className="flight-plan-summary-label">SPEED:</span>
-                  <span className="flight-plan-summary-value">{speed} km/h</span>
-                </div>
-                <div className="flight-plan-summary-row">
-                  <span className="flight-plan-summary-label">WAYPOINTS:</span>
-                  <span className="flight-plan-summary-value">{waypoints.length}</span>
-                </div>
-                {waypoints.map((wp, idx) => (
-                  <div key={wp.id} className="flight-plan-summary-wp">
-                    WP{idx + 1}: {wp.x}, {wp.y} — ALT {wp.altitude}m
-                    {wp.hoverTime > 0 ? ` — HOVER ${wp.hoverTime}s` : ''}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+      <div className="fire-mission-section">
+        <div className="fire-mission-label">ALTITUDE</div>
+        <div className="fire-mission-rounds">
+          {ALTITUDE_PRESETS.map(p => (
+            <button key={p.id} className={`fire-mission-round-btn ${defaultAlt === p.value ? 'selected' : ''}`} onClick={() => setDefaultAlt(p.value)}>{p.label}</button>
+          ))}
         </div>
+      </div>
 
-        <div className="modal__footer">
-          {phase === 'PLAN' ? (
-            <>
-              <button className="btn" onClick={onClose}>CANCEL</button>
-              <button
-                className="btn btn-primary"
-                disabled={waypoints.length === 0}
-                onClick={() => setPhase('CONFIRM')}
-              >
-                REVIEW
-              </button>
-            </>
-          ) : (
-            <>
-              <button className="btn" onClick={() => setPhase('PLAN')}>BACK</button>
-              <button className="btn btn-primary" onClick={handleSubmit}>EXECUTE FLIGHT PLAN</button>
-            </>
-          )}
-        </div>
+      <div className="fire-mission-section">
+        <div className="fire-mission-label">WAYPOINTS ({waypoints.length})</div>
+        <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginBottom: '4px' }}>Click map to add</div>
+        {waypoints.length === 0 && (
+          <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', padding: '8px 0' }}>No waypoints</div>
+        )}
+        {waypoints.map((wp, idx) => (
+          <div key={wp.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 0', borderBottom: '1px solid var(--border-hairline)', fontFamily: 'var(--font-mono)', fontSize: '9px' }}>
+            <span style={{ color: 'var(--accent)', width: '16px' }}>{idx + 1}</span>
+            <span style={{ flex: 1, color: 'var(--text-secondary)' }}>{wp.x},{wp.y} <span style={{ color: 'var(--text-muted)' }}>ALT:{wp.altitude}</span></span>
+            <button className="flight-plan-wp-btn" onClick={() => moveWaypoint(wp.id, 'up')} disabled={idx === 0} style={{ fontSize: '8px', padding: '1px 3px' }}>↑</button>
+            <button className="flight-plan-wp-btn" onClick={() => moveWaypoint(wp.id, 'down')} disabled={idx === waypoints.length - 1} style={{ fontSize: '8px', padding: '1px 3px' }}>↓</button>
+            <button className="flight-plan-wp-btn" onClick={() => setEditingWp(editingWp === wp.id ? null : wp.id)} style={{ fontSize: '8px', padding: '1px 3px' }}>✎</button>
+            <button className="flight-plan-wp-btn danger" onClick={() => removeWaypoint(wp.id)} style={{ fontSize: '8px', padding: '1px 3px' }}>✕</button>
+            {editingWp === wp.id && (
+              <div style={{ width: '100%', display: 'flex', gap: '4px', paddingTop: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  <label style={{ fontSize: '8px', color: 'var(--text-muted)' }}>ALT</label>
+                  <input type="number" value={wp.altitude} onChange={e => updateWaypoint(wp.id, { altitude: parseInt(e.target.value) || 0 })} style={{ width: '40px', fontSize: '9px', padding: '2px', background: 'var(--bg-panel)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  <label style={{ fontSize: '8px', color: 'var(--text-muted)' }}>HOVER</label>
+                  <input type="number" value={wp.hoverTime} onChange={e => updateWaypoint(wp.id, { hoverTime: parseInt(e.target.value) || 0 })} style={{ width: '30px', fontSize: '9px', padding: '2px', background: 'var(--bg-panel)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ padding: '8px 0', display: 'flex', gap: '4px' }}>
+        <button className="btn" style={{ flex: 1 }} onClick={onClose}>CANCEL</button>
+        <button className="btn btn-primary" style={{ flex: 1 }} disabled={waypoints.length === 0} onClick={handleSubmit}>EXECUTE</button>
       </div>
     </div>
   );

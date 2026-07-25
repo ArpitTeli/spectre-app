@@ -15,8 +15,6 @@ import AARPanel from './components/AARPanel';
 import ModeSelect from './components/ModeSelect';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import RadialMenu from './components/RadialMenu';
-import FireMissionPanel from './components/FireMissionPanel';
-import FlightPlanPanel from './components/FlightPlanPanel';
 import './styles/global.css';
 
 export default function App() {
@@ -40,6 +38,7 @@ export default function App() {
   const [fireMissionUnit, setFireMissionUnit] = useState(null);
   const [flightPlanUnit, setFlightPlanUnit] = useState(null);
   const panelClickHandlerRef = useRef(null);
+  const [rightTab, setRightTab] = useState('STATUS');
   const qHeldRef = useRef(false);
   const ctrlHeldRef = useRef(false);
 
@@ -385,6 +384,13 @@ export default function App() {
           sendArmaCommand={sendArmaCommand}
           addCommsEntry={addCommsEntry}
           selectedUnit={state.selectedUnit ? state.units[state.selectedUnit] : null}
+          fireMissionUnit={fireMissionUnit}
+          setFireMissionUnit={setFireMissionUnit}
+          flightPlanUnit={flightPlanUnit}
+          setFlightPlanUnit={setFlightPlanUnit}
+          panelClickHandlerRef={panelClickHandlerRef}
+          activeTab={rightTab}
+          setActiveTab={setRightTab}
         />
       </div>
 
@@ -448,30 +454,6 @@ export default function App() {
         />
       )}
 
-      {fireMissionUnit && (
-        <FireMissionPanel
-          unit={fireMissionUnit}
-          onClose={() => { setFireMissionUnit(null); panelClickHandlerRef.current = null; }}
-          onSubmit={(cmd) => {
-            sendArmaCommand(cmd);
-            addCommsEntry('SPECTRE', fireMissionUnit?.callsign || fireMissionUnit?.id, `ARTILLERY STRIKE ${cmd.x},${cmd.y} (${cmd.rounds}x ${cmd.ammoType})`, 'BLUE');
-          }}
-          onMapClick={(handler) => { panelClickHandlerRef.current = handler; }}
-        />
-      )}
-
-      {flightPlanUnit && (
-        <FlightPlanPanel
-          unit={flightPlanUnit}
-          onClose={() => { setFlightPlanUnit(null); panelClickHandlerRef.current = null; }}
-          onSubmit={(cmd) => {
-            sendArmaCommand(cmd);
-            addCommsEntry('SPECTRE', flightPlanUnit?.callsign || flightPlanUnit?.id, `FLIGHT PLAN (${cmd.waypoints.length} WPs)`, 'BLUE');
-          }}
-          onMapClick={(handler) => { panelClickHandlerRef.current = handler; }}
-        />
-      )}
-
       {state.showAAR && state.aarData && (
         <AARPanel
           aar={state.aarData}
@@ -511,8 +493,10 @@ export default function App() {
             if (action.complex) {
               if (action.id === 'ARTILLERY_STRIKE') {
                 setFireMissionUnit(units[unitId]);
+                setRightTab('ARTILLERY');
               } else if (action.id === 'HOVER' || action.id === 'LAND_AT') {
                 setFlightPlanUnit(units[unitId]);
+                setRightTab('FLIGHT');
               }
               return;
             }
