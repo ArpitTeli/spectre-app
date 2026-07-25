@@ -264,7 +264,6 @@ export default function MapView({
     });
 
     map.on('click', (e) => {
-      console.log('[MOVE_TO DEBUG] Leaflet click fired, onMapClickRef:', !!onMapClickRef.current);
       if (onMapClickRef.current) {
         onMapClickRef.current(e.latlng.lng, e.latlng.lat);
       }
