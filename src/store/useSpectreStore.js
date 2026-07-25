@@ -318,19 +318,34 @@ export function useSpectreStore() {
 }
 
 // ─── Process Arma state update ────────────────────────────────────────────────
+const dbg = (...args) => console.log('[SPECTRE]', ...args);
+
 function processArmaUpdate(data, stateRef, patch) {
   if (!data || typeof data !== 'object') return;
-  const { units = [], contacts = [], events = [], timestamp, mapName } = data;
+  const { units = [], contacts = [], events = [], timestamp, mapName, missionFolder } = data;
   const now = Date.now();
   const current = stateRef.current;
 
-  const unitsMap = { ...current.units };
+  // Detect mission restart: clear stale units/contacts if mission changed
+  const missionChanged = missionFolder && current._lastMissionFolder && missionFolder !== current._lastMissionFolder;
+  const unitsMap = missionChanged ? {} : { ...current.units };
+  const contactsMap = missionChanged ? {} : { ...current.contacts };
+  if (missionChanged) {
+    dbg('SPECTRE: Mission changed, clearing stale units/contacts');
+    patch({ processedEventIds: [], selectedUnits: [], selectedUnit: null });
+  }
+
   units.forEach(u => { unitsMap[u.id] = { ...unitsMap[u.id], ...u, last_updated: timestamp }; });
 
-  const contactsMap = { ...current.contacts };
-  contacts.forEach(c => { contactsMap[c.id] = { ...contactsMap[c.id], ...c, state: 'CONFIRMED', last_seen: now }; });
+  contacts.forEach(c => {
+    const existing = contactsMap[c.id];
+    // Don't overwrite DEAD contacts with CONFIRMED from broadcast
+    if (existing && existing.state === 'DEAD') return;
+    contactsMap[c.id] = { ...existing, ...c, state: 'CONFIRMED', last_seen: now };
+  });
   Object.keys(contactsMap).forEach(id => {
     const age = now - contactsMap[id].last_seen;
+    if (contactsMap[id].state === 'DEAD') return; // keep dead contacts visible
     if (age > 600000) delete contactsMap[id];
     else if (age > 120000) contactsMap[id] = { ...contactsMap[id], state: 'LAST_KNOWN' };
   });
@@ -350,6 +365,7 @@ function processArmaUpdate(data, stateRef, patch) {
     armaConnected: true,
     lastArmaUpdate: timestamp,
     mapName: mapName || prev.mapName,
+    _lastMissionFolder: missionFolder || prev._lastMissionFolder,
     events: [...prev.events, ...newEvents].slice(-200),
     processedEventIds: Array.from(processedSet).slice(-500)
   }));
@@ -370,7 +386,22 @@ async function handleArmaEvents(events, stateRef, patch) {
     } else if (event.type === 'UNIT_KIA') {
       patch(prev => ({ ...prev, rewardData: { ...prev.rewardData, friendly_kia: prev.rewardData.friendly_kia + 1, score: prev.rewardData.score + REWARD.FRIENDLY_KIA } }));
     } else if (event.type === 'ENEMY_KILLED') {
-      patch(prev => ({ ...prev, rewardData: { ...prev.rewardData, enemy_kills: prev.rewardData.enemy_kills + 1, score: prev.rewardData.score + REWARD.ENEMY_KILL } }));
+      patch(prev => {
+        const newContacts = { ...prev.contacts };
+        // Mark the killed contact as DEAD
+        const contactKey = event.contact || event.contact_type || event.unit || event.id;
+        for (const [id, c] of Object.entries(newContacts)) {
+          if (id.includes(contactKey) || (c.id && c.id.includes(contactKey))) {
+            newContacts[id] = { ...c, state: 'DEAD', last_seen: Date.now() };
+            break;
+          }
+        }
+        return {
+          ...prev,
+          contacts: newContacts,
+          rewardData: { ...prev.rewardData, enemy_kills: prev.rewardData.enemy_kills + 1, score: prev.rewardData.score + REWARD.ENEMY_KILL }
+        };
+      });
     } else if (event.type === 'CONTACT_SPOTTED') {
       patch(prev => {
         const db = { ...prev.intelDB, patterns: [...prev.intelDB.patterns, { type: 'contact_spotted', ...event, timestamp: new Date().toISOString() }] };

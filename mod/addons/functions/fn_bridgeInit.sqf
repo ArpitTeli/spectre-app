@@ -534,6 +534,57 @@ SPECTRE_fnc_detectEvents = {
         { _x knowsAbout _e > 0.3 } count SPECTRE_blufor > 0
     });
 
+    // Also detect newly spotted enemy vehicles
+    {
+        private _enemy    = _x;
+        private _enemyKey = str _enemy;
+
+        if (!(_enemyKey in SPECTRE_spottedEnemies)) then {
+            private _spotters = SPECTRE_blufor select { _x knowsAbout _enemy > 0.3 };
+            if (count _spotters > 0) then {
+                SPECTRE_spottedEnemies pushBack _enemyKey;
+                if (count SPECTRE_spottedEnemies > 200) then {
+                    SPECTRE_spottedEnemies = SPECTRE_spottedEnemies select [100, (count SPECTRE_spottedEnemies) - 100];
+                };
+                private _su        = _spotters select 0;
+                private _spotterCs = _su getVariable ["SPECTRE_callsign", vehicleVarName _su];
+                _evts pushBack format [
+                    "{""type"":""CONTACT_SPOTTED"",""unit"":""%1"",""contact_type"":""%2"",""id"":""CS_%3_%4""}",
+                    _spotterCs,
+                    [_enemy] call SPECTRE_fnc_vehicleType,
+                    SPECTRE_blufor find _su,
+                    round time
+                ];
+            };
+        };
+    } forEach (vehicles select {
+        private _e = _x;
+        !(crew _e isEqualTo []) &&
+        (side _e == east || side _e == independent) &&
+        alive _e &&
+        { _x knowsAbout _e > 0.3 } count SPECTRE_blufor > 0
+    });
+
+    // Enemy kill detection
+    {
+        private _enemy    = _x;
+        private _enemyKey = str _enemy;
+        private _wasAlive = _enemy getVariable ["SPECTRE_enemyWasAlive", true];
+
+        if (_wasAlive && !alive _enemy) then {
+            _enemy setVariable ["SPECTRE_enemyWasAlive", false, false];
+            private _cs = [_enemy] call SPECTRE_fnc_vehicleType;
+            _evts pushBack format [
+                "{""type"":""ENEMY_KILLED"",""contact_type"":""%1"",""id"":""EK_%2_%3""}",
+                _cs, _enemyKey, round time
+            ];
+        } else {
+            _enemy setVariable ["SPECTRE_enemyWasAlive", alive _enemy, false];
+        };
+    } forEach (allUnits + vehicles) select {
+        (side _x == east || side _x == independent) && !(_x isKindOf "Logic")
+    };
+
     _evts
 };
 
@@ -562,16 +613,28 @@ SPECTRE_fnc_broadcastState = {
         };
     } forEach SPECTRE_blufor;
 
-    // Send contacts (one per line)
+    // Send contacts (one per line) — include both infantry and vehicles
     private _ci = 0;
+    private _enemyInfantry = allUnits select {
+        private _e = _x;
+        (side _e == east || side _e == independent) &&
+        alive _e &&
+        { _x knowsAbout _e > 0.3 } count SPECTRE_blufor > 0
+    };
+    private _enemyVehicles = vehicles select {
+        private _e = _x;
+        !(crew _e isEqualTo []) &&
+        (side _e == east || side _e == independent) &&
+        alive _e &&
+        { _x knowsAbout _e > 0.3 } count SPECTRE_blufor > 0
+    };
+    private _allEnemies = _enemyInfantry + _enemyVehicles;
+    _allEnemies = _allEnemies arrayIntersect _allEnemies;
     {
         private _e = _x;
-        if ((side _e == east || side _e == independent) && alive _e &&
-            { _x knowsAbout _e > 0.3 } count SPECTRE_blufor > 0) then {
-            diag_log format ["SPECTRE_CONTACT:%1", [_e, format ["HOSTILE-%1", _ci]] call SPECTRE_fnc_serializeContact];
-            _ci = _ci + 1;
-        };
-    } forEach allUnits;
+        diag_log format ["SPECTRE_CONTACT:%1", [_e, format ["HOSTILE-%1", _ci]] call SPECTRE_fnc_serializeContact];
+        _ci = _ci + 1;
+    } forEach _allEnemies;
 
     // Send events (usually few, one line)
     private _evts = call SPECTRE_fnc_detectEvents;

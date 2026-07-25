@@ -1100,7 +1100,21 @@ function parseArmaLog(chunk) {
         const jsonStr = metaMatch[1].replace(/""/g, '"');
         const meta = JSON.parse(jsonStr);
         if (meta.map) pendingState.mapName = meta.map;
-        if (meta.mf) pendingState.missionFolder = meta.mf;
+        if (meta.mf) {
+          // Mission changed — clear stale commands from previous mission
+          if (pendingState.missionFolder && pendingState.missionFolder !== meta.mf) {
+            try {
+              const cmdsPath = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
+              fs.writeFileSync(cmdsPath, '// SPECTRE — mission restarted\n', 'utf8');
+              dbg('SPECTRE: Mission changed, cleared stale commands');
+            } catch (_) {}
+            // Clear stale units/contacts from previous mission
+            pendingState.units = {};
+            pendingState.contacts = {};
+            pendingState.events = [];
+          }
+          pendingState.missionFolder = meta.mf;
+        }
         // Full absolute path (added for folder-based mission support)
         if (meta.path) pendingState.fullMissionPath = meta.path;
         if (meta.ts) pendingState.timestamp = meta.ts;

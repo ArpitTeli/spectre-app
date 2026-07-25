@@ -189,10 +189,11 @@ function getUnitModelType(unit) {
   const t = (unit.type || '').toUpperCase();
   if (t.includes('HELICOPTER') || vt === 'HELI' || t === 'AIR') return 'helicopter';
   if (vt === 'TANK' || t.includes('TANK') || vt.includes('TRACKED')) return 'tank';
-  if (vt === 'IFV') return 'vehicle';
-  if (vt === 'CAR' || vt.includes('MRAP') || vt.includes('JLTV')) return 'vehicle';
-  if (vt === 'TRUCK') return 'vehicle';
+  if (vt === 'IFV' || t === 'IFV' || t === 'APC') return 'vehicle';
+  if (vt === 'CAR' || t === 'CAR' || vt.includes('MRAP') || vt.includes('JLTV')) return 'vehicle';
+  if (vt === 'TRUCK' || t === 'TRUCK') return 'vehicle';
   if (vt.includes('WHEELED') || vt.includes('CAR')) return 'vehicle';
+  if (vt === 'BOAT' || t === 'BOAT') return 'infantry';
   return 'infantry';
 }
 
@@ -649,6 +650,7 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
       const h = terrainH + altAGL;
 
       const state = (c.state || '').toUpperCase();
+      if (state === 'DEAD') return; // don't render dead contacts
       const opacity = state === 'LAST_KNOWN' ? 0.5 : state === 'SUSPECTED' ? 0.3 : 1;
       const color = DEAD;
       const emissive = 0x8a1a1a;
