@@ -549,9 +549,30 @@ function buildSQFContent(commands) {
       }
 
       case 'MOVE_TO': {
-        const x = Math.round(cmd.x || 0);
-        const y = Math.round(cmd.y || 0);
-        lines.push(`[${id}, "MOVE_TO", "${uid}", [[${x},${y}]]] call SPECTRE_fnc_execCmd;`);
+        const wps = (cmd.waypoints || []);
+        let wpStr;
+        if (wps.length > 0) {
+          wpStr = wps
+            .filter(wp => wp && (wp.x !== undefined || wp.y !== undefined))
+            .map(wp => {
+              const px = Math.round(wp.x || 0);
+              const py = Math.round(wp.y || 0);
+              const alt = wp.altitude != null ? Math.round(wp.altitude) : '';
+              return alt !== '' ? `[${px},${py},${alt}]` : `[${px},${py}]`;
+            })
+            .join(',');
+          if (!wpStr) {
+            const x = Math.round(cmd.x || 0);
+            const y = Math.round(cmd.y || 0);
+            wpStr = `[${x},${y}]`;
+          }
+        } else {
+          const x = Math.round(cmd.x || 0);
+          const y = Math.round(cmd.y || 0);
+          wpStr = `[${x},${y}]`;
+        }
+        const speed = cmd.speed != null ? `speed:${Math.round(cmd.speed)}` : '';
+        lines.push(`[${id}, "MOVE_TO", "${uid}", [${wpStr}], "", "${speed}"] call SPECTRE_fnc_execCmd;`);
         break;
       }
 

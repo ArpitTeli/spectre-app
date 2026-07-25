@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import FireMissionPanel from './FireMissionPanel';
 import FlightPlanPanel from './FlightPlanPanel';
 
 export default function RightPanel({ state, patch, sendArmaCommand, addCommsEntry, selectedUnit, fireMissionUnit, setFireMissionUnit, flightPlanUnit, setFlightPlanUnit, panelClickHandlerRef, activeTab, setActiveTab }) {
+
+  useEffect(() => {
+    panelClickHandlerRef.current = null;
+  }, [activeTab]);
 
   const forceMetrics = state.forceMetrics || { firepower_index: 0, vehicles_active: 0, vehicles_total: 0, mobility: 'UNKNOWN' };
   const rewardData = state.rewardData || { score: 0, friendly_kia: 0, enemy_kills: 0 };

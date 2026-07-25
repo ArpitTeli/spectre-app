@@ -363,21 +363,58 @@ SPECTRE_fnc_execCmd = {
 
         case "MOVE_TO": {
             if (!isNull _unit && count _waypoints > 0) then {
-                private _wp = _waypoints select 0;
-                private _pos = [_wp select 0, _wp select 1, 0];
                 private _veh = vehicle _unit;
-                if (_veh != _unit) then {
-                    private _d = driver _veh;
-                    if (!isNull _d) then {
-                        _d doMove _pos;
+                private _grp = group _unit;
+
+                // Parse speed from _action param (format: "speed:120")
+                private _speedStr = _action;
+                private _spd = "NORMAL";
+                if (_speedStr find "speed:" >= 0) then {
+                    private _val = parseNumber (_speedStr select [6]);
+                    if (_val > 0) then {
+                        if (_val < 80) then { _spd = "LIMITED"; }
+                        else { if (_val > 160) then { _spd = "FULL"; }; };
+                    };
+                };
+
+                // Multi-waypoint: use group waypoint system
+                if (count _waypoints > 1) then {
+                    // Clear existing group waypoints
+                    while { count (waypoints _grp) > 0 } do {
+                        deleteWaypoint ((waypoints _grp) select 0);
+                    };
+
+                    {
+                        private _wpData = _x;
+                        private _pos = [_wpData select 0, _wpData select 1, 0];
+                        private _alt = if (count _wpData > 2) then { _wpData select 2 } else { -1 };
+                        private _newWp = _grp addWaypoint [_pos, 0];
+                        _newWp setWaypointType "MOVE";
+                        _newWp setWaypointSpeed _spd;
+                        if (_alt >= 0) then {
+                            _newWp setWaypointAltitude _alt;
+                        };
+                    } forEach _waypoints;
+
+                    _unit setVariable ["SPECTRE_currentOrder", "MOVE TO (MULTI)", false];
+                    diag_log format ["SPECTRE MOVE_TO [%1]: %2 waypoints, speed %3", _unitId, count _waypoints, _spd];
+                } else {
+                    // Single waypoint: direct doMove
+                    private _wp = _waypoints select 0;
+                    private _pos = [_wp select 0, _wp select 1, 0];
+                    if (_veh != _unit) then {
+                        private _d = driver _veh;
+                        if (!isNull _d) then {
+                            _d doMove _pos;
+                        } else {
+                            _unit doMove _pos;
+                        };
                     } else {
                         _unit doMove _pos;
                     };
-                } else {
-                    _unit doMove _pos;
+                    _unit setVariable ["SPECTRE_currentOrder", "MOVE TO", false];
+                    diag_log format ["SPECTRE MOVE_TO [%1]: %2", _unitId, _pos];
                 };
-                _unit setVariable ["SPECTRE_currentOrder", "MOVE TO", false];
-                diag_log format ["SPECTRE MOVE_TO [%1]: %2", _unitId, _pos];
             };
         };
 
