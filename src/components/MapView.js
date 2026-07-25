@@ -192,6 +192,12 @@ export default function MapView({
   const currentMapRef = useRef(null);
   const prevUnitCountRef = useRef(0);
   const qHeldRef = useRef(false);
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
+  const onMapRightClickRef = useRef(onMapRightClick);
+  onMapRightClickRef.current = onMapRightClick;
+  const onUnitRightClickRef = useRef(onUnitRightClick);
+  onUnitRightClickRef.current = onUnitRightClick;
 
   useEffect(() => {
     const kd = (e) => { if (e.key === 'q' || e.key === 'Q') qHeldRef.current = true; };
@@ -254,12 +260,12 @@ export default function MapView({
     L.control.zoom({ position: 'topright' }).addTo(map);
 
     map.on('contextmenu', (e) => {
-      if (onMapRightClick) onMapRightClick(e.latlng, e.originalEvent.clientX, e.originalEvent.clientY);
+      if (onMapRightClickRef.current) onMapRightClickRef.current(e.latlng, e.originalEvent.clientX, e.originalEvent.clientY);
     });
 
     map.on('click', (e) => {
-      if (onMapClick) {
-        onMapClick(e.latlng.lng, e.latlng.lat);
+      if (onMapClickRef.current) {
+        onMapClickRef.current(e.latlng.lng, e.latlng.lat);
       }
     });
 
@@ -286,15 +292,15 @@ export default function MapView({
       marker.on('click', (e) => {
         L.DomEvent.stopPropagation(e);
         if (qHeldRef.current) {
-          onUnitRightClick && onUnitRightClick(unit.id, e.originalEvent.clientX, e.originalEvent.clientY);
+          onUnitRightClickRef.current && onUnitRightClickRef.current(unit.id, e.originalEvent.clientX, e.originalEvent.clientY);
         } else {
           onUnitSelect(unit.id, e.originalEvent.ctrlKey || e.originalEvent.metaKey);
         }
       });
-      if (onUnitRightClick) {
+      if (onUnitRightClickRef.current) {
         marker.on('contextmenu', (e) => {
           L.DomEvent.stopPropagation(e);
-          onUnitRightClick(unit.id, e.originalEvent.clientX, e.originalEvent.clientY);
+          onUnitRightClickRef.current(unit.id, e.originalEvent.clientX, e.originalEvent.clientY);
         });
       }
 

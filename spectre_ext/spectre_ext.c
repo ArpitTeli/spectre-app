@@ -24,7 +24,7 @@ void ensureBasePath() {
     }
     char* spectre = strstr(dllPath, "@SPECTRE");
     if (spectre) {
-        spectre += 9;
+        spectre += 8;
         int len = (int)(spectre - dllPath);
         strncpy_s(basePath, MAX_PATH, dllPath, len);
     } else {

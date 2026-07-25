@@ -226,11 +226,11 @@ let relayFatalError = false; // true when server rejects (don't reconnect)
 let relayReconnectAttempts = 0;
 const RELAY_MAX_RECONNECTS = 10; // stop after 10 failures (~30s)
 
-function connectToRelay(mode, roomCode, url) {
+function connectToRelay(mode, roomCode, url, _isReconnect) {
   relayMode = mode;
   relayRoomCode = roomCode;
   relayFatalError = false;
-  relayReconnectAttempts = 0;
+  if (!_isReconnect) relayReconnectAttempts = 0;
   if (relayWs) { relayWs.close(); relayWs = null; }
   if (relayReconnectTimer) { clearTimeout(relayReconnectTimer); relayReconnectTimer = null; }
 
@@ -324,7 +324,7 @@ function scheduleReconnect(mode, roomCode, url) {
     relayReconnectTimer = null;
     if (!relayConnected) {
       dbg(`SPECTRE: Attempting relay reconnect (${relayReconnectAttempts}/${RELAY_MAX_RECONNECTS})...`);
-      connectToRelay(mode, roomCode, url);
+      connectToRelay(mode, roomCode, url, true);
     }
   }, delay);
 }
@@ -1039,13 +1039,17 @@ function readNewLogData() {
     if (stat.size <= logFilePos) return;
 
     const fd  = fs.openSync(currentLogPath, 'r');
-    const len = stat.size - logFilePos;
-    const buf = Buffer.alloc(len);
-    fs.readSync(fd, buf, 0, len, logFilePos);
-    fs.closeSync(fd);
-    logFilePos = stat.size;
+    let chunk;
+    try {
+      const len = stat.size - logFilePos;
+      const buf = Buffer.alloc(len);
+      fs.readSync(fd, buf, 0, len, logFilePos);
+      logFilePos = stat.size;
+      chunk = buf.toString('utf8');
+    } finally {
+      fs.closeSync(fd);
+    }
 
-    const chunk = buf.toString('utf8');
     parseArmaLog(chunk);
   } catch (e) {
     console.error('SPECTRE: log read error:', e.message);
@@ -1184,7 +1188,7 @@ function parseArmaLog(chunk) {
   }
 
   // After processing all lines in this chunk, flush the accumulated state
-  if (gotData && (Object.keys(pendingState.units).length > 0 || Object.keys(pendingState.contacts).length > 0 || pendingState.mapName)) {
+  if (gotData && (Object.keys(pendingState.units).length > 0 || Object.keys(pendingState.contacts).length > 0 || pendingState.events.length > 0 || pendingState.mapName)) {
     const data = {
       missionFolder: pendingState.missionFolder || '',
       fullMissionPath: pendingState.fullMissionPath || '',
@@ -1252,6 +1256,7 @@ let lastAutoSet = '';
 let lastFullAutoSet = '';
 function autoSetMissionFolder(missionPath, fullPath) {
   if (!missionPath || (missionPath === lastAutoSet && fullPath === lastFullAutoSet)) return;
+  if (!ARMA_INSTALL) return;
   lastAutoSet = missionPath;
   lastFullAutoSet = fullPath || '';
 
@@ -1461,8 +1466,14 @@ ipcMain.on('relay-command',   (_, cmd) => {
   }
 });
 ipcMain.on('restart-app',     () => {
-  const { autoUpdater } = require('electron-updater');
-  autoUpdater.quitAndInstall();
+  try {
+    const { autoUpdater } = require('electron-updater');
+    autoUpdater.quitAndInstall();
+  } catch (e) {
+    dbg('SPECTRE: restart-app failed: ' + e.message);
+    app.relaunch();
+    app.exit(0);
+  }
 });
 
 // ─── Vault (Ontology Layer) ──────────────────────────────────────────────────

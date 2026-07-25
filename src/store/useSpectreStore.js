@@ -330,10 +330,6 @@ function processArmaUpdate(data, stateRef, patch) {
   const missionChanged = missionFolder && current._lastMissionFolder && missionFolder !== current._lastMissionFolder;
   const unitsMap = missionChanged ? {} : { ...current.units };
   const contactsMap = missionChanged ? {} : { ...current.contacts };
-  if (missionChanged) {
-    dbg('SPECTRE: Mission changed, clearing stale units/contacts');
-    patch({ processedEventIds: [], selectedUnits: [], selectedUnit: null });
-  }
 
   units.forEach(u => { unitsMap[u.id] = { ...unitsMap[u.id], ...u, last_updated: timestamp }; });
 
@@ -350,25 +346,39 @@ function processArmaUpdate(data, stateRef, patch) {
     else if (age > 120000) contactsMap[id] = { ...contactsMap[id], state: 'LAST_KNOWN' };
   });
 
-  const processedSet = new Set(current.processedEventIds);
-  const newEvents = events.filter(e => {
-    const key = e.id || `${e.type}_${e.timestamp}`;
-    if (processedSet.has(key)) return false;
-    processedSet.add(key);
-    return true;
+  patch(prev => {
+    // Deduplicate events using prev.processedEventIds (not stale ref)
+    const processedSet = new Set(missionChanged ? [] : prev.processedEventIds);
+    const deduped = events.filter(e => {
+      const key = e.id || `${e.type}_${e.timestamp}`;
+      if (processedSet.has(key)) return false;
+      processedSet.add(key);
+      return true;
+    });
+
+    return {
+      ...prev,
+      units: unitsMap,
+      contacts: contactsMap,
+      armaConnected: true,
+      lastArmaUpdate: timestamp,
+      mapName: mapName || prev.mapName,
+      _lastMissionFolder: missionFolder || prev._lastMissionFolder,
+      selectedUnits: missionChanged ? [] : prev.selectedUnits,
+      selectedUnit: missionChanged ? null : prev.selectedUnit,
+      events: [...prev.events, ...deduped].slice(-200),
+      processedEventIds: Array.from(processedSet).slice(-500)
+    };
   });
 
-  patch(prev => ({
-    ...prev,
-    units: unitsMap,
-    contacts: contactsMap,
-    armaConnected: true,
-    lastArmaUpdate: timestamp,
-    mapName: mapName || prev.mapName,
-    _lastMissionFolder: missionFolder || prev._lastMissionFolder,
-    events: [...prev.events, ...newEvents].slice(-200),
-    processedEventIds: Array.from(processedSet).slice(-500)
-  }));
+  // Compute newEvents after patch for event handling (use the same dedup result)
+  const processedSet2 = new Set(missionChanged ? [] : current.processedEventIds);
+  const newEvents = events.filter(e => {
+    const key = e.id || `${e.type}_${e.timestamp}`;
+    if (processedSet2.has(key)) return false;
+    processedSet2.add(key);
+    return true;
+  });
 
   if (newEvents.length > 0 && current.missionPhase === 'ACTIVE') {
     handleArmaEvents(newEvents, stateRef, patch);

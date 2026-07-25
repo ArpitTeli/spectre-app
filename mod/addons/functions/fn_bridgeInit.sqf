@@ -160,7 +160,7 @@ SPECTRE_fnc_serializeUnit = {
             };
             private _crole = assignedVehicleRole _x;
             private _croleStr = if (count _crole > 0) then { _crole select 0 } else { "CARGO" };
-            _crewArr pushBack format ["""%1""", _ccs regexReplace ["""", ""]];
+            _crewArr pushBack format ["""%1:%2""", _ccs regexReplace ["""", ""], _croleStr];
         } forEach (crew _unit);
         if (count _crewArr > 0) then {
             _crewStr = format [",""crew"":[%1]", _crewArr joinString ","];
@@ -221,11 +221,11 @@ SPECTRE_fnc_artilleryStrike = {
     private _veh = vehicle _unit;
 
     for "_i" from 1 to _rounds do {
-        [_veh, [_targetPos select 0, _targetPos select 1, 0]] spawn {
-            params ["_v", "_tp"];
+        [_veh, [_targetPos select 0, _targetPos select 1, 0], _ammoType] spawn {
+            params ["_v", "_tp", "_ammo"];
             private _delay = random 2;
             sleep _delay;
-            _v doFire _tp;
+            _v doArtilleryFire [_tp, _ammo];
         };
     };
     diag_log format ["SPECTRE: Artillery %1x %2 fired at %3", _rounds, _ammoType, _targetPos];
@@ -367,7 +367,12 @@ SPECTRE_fnc_execCmd = {
                 private _pos = [_wp select 0, _wp select 1, 0];
                 private _veh = vehicle _unit;
                 if (_veh != _unit) then {
-                    driver _veh doMove _pos;
+                    private _d = driver _veh;
+                    if (!isNull _d) then {
+                        _d doMove _pos;
+                    } else {
+                        _unit doMove _pos;
+                    };
                 } else {
                     _unit doMove _pos;
                 };
@@ -382,8 +387,14 @@ SPECTRE_fnc_execCmd = {
                 if (!isNull _target) then {
                     private _veh = vehicle _unit;
                     if (_veh != _unit) then {
-                        gunner _veh doTarget _target;
-                        gunner _veh doFire _target;
+                        private _g = gunner _veh;
+                        if (!isNull _g) then {
+                            _g doTarget _target;
+                            _g doFire _target;
+                        } else {
+                            _unit doTarget _target;
+                            _unit doFire _target;
+                        };
                     } else {
                         _unit doTarget _target;
                         _unit doFire _target;
@@ -401,8 +412,14 @@ SPECTRE_fnc_execCmd = {
                 private _veh = vehicle _unit;
                 private _tgt = "Sign_Arrow_Red_F" createVehicle _pos;
                 if (_veh != _unit) then {
-                    gunner _veh doTarget _tgt;
-                    gunner _veh doFire _tgt;
+                    private _g = gunner _veh;
+                    if (!isNull _g) then {
+                        _g doTarget _tgt;
+                        _g doFire _tgt;
+                    } else {
+                        _unit doTarget _tgt;
+                        _unit doFire _tgt;
+                    };
                 } else {
                     _unit doTarget _tgt;
                     _unit doFire _tgt;
@@ -439,7 +456,8 @@ SPECTRE_fnc_execCmd = {
                 private _pos = [_wp select 0, _wp select 1, 0];
                 private _veh = vehicle _unit;
                 if (_veh != _unit && {_veh isKindOf "Air"}) then {
-                    _veh landAt _pos;
+                    _veh doMove _pos;
+                    _veh land "LAND";
                 } else {
                     _unit doMove _pos;
                 };
@@ -465,7 +483,12 @@ SPECTRE_fnc_execCmd = {
                 private _veh = vehicle _unit;
                 private _tgt = "Sign_Arrow_Red_F" createVehicle _pos;
                 if (_veh != _unit) then {
-                    gunner _veh doTarget _tgt;
+                    private _g = gunner _veh;
+                    if (!isNull _g) then {
+                        _g doTarget _tgt;
+                    } else {
+                        _unit doTarget _tgt;
+                    };
                 } else {
                     _unit doTarget _tgt;
                 };
@@ -569,7 +592,7 @@ SPECTRE_fnc_detectEvents = {
     {
         private _enemy    = _x;
         private _enemyKey = str _enemy;
-        private _wasAlive = _enemy getVariable ["SPECTRE_enemyWasAlive", true];
+        private _wasAlive = _enemy getVariable ["SPECTRE_enemyWasAlive", false];
 
         if (_wasAlive && !alive _enemy) then {
             _enemy setVariable ["SPECTRE_enemyWasAlive", false, false];
