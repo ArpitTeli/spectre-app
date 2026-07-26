@@ -17,14 +17,24 @@ import numpy as np
 
 OUTPUT_DIR = r"F:\Projects\SPECTRE-ARMA 3\spectre-fixed\public\maps"
 
-UNIT_TYPES = ["tank", "ifv", "truck", "infantry", "helicopter", "boat"]
+UNIT_TYPES = [
+    "mbt", "ifv", "apc", "mrap", "light", "truck",
+    "spg", "spaa", "eng",
+    "infantry", "helicopter", "boat"
+]
 
 # Surface type codes: 0=unknown 1=grass 2=forest 3=concrete 4=water 5=dirt 6=rock
 SURFACE_COSTS = {
-    #           unk  grass  forest  concrete  water  dirt  rock
-    "tank":      [1.0, 1.0,  1.0,    0.8,     99.0, 1.1,  1.5],
-    "ifv":       [1.0, 1.0,  1.0,    0.8,     99.0, 1.0,  1.3],
-    "truck":     [1.0, 1.0,  1.0,    0.6,     99.0, 1.5,  2.0],
+    #            unk  grass  forest  concrete  water  dirt  rock
+    "mbt":       [1.0, 1.0,  1.5,    0.7,     99.0, 1.1,  1.5],
+    "ifv":       [1.0, 1.0,  1.3,    0.75,    99.0, 1.0,  1.3],
+    "apc":       [1.0, 1.0,  1.2,    0.7,      0.8, 1.0,  1.2],
+    "mrap":      [1.0, 1.0,  1.3,    0.7,     99.0, 1.0,  1.3],
+    "light":     [1.0, 1.0,  1.2,    0.7,     99.0, 1.0,  1.2],
+    "truck":     [1.0, 1.0,  1.5,    0.6,     99.0, 1.2,  1.8],
+    "spg":       [1.0, 1.0,  1.5,    0.7,     99.0, 1.1,  1.5],
+    "spaa":      [1.0, 1.0,  1.3,    0.75,    99.0, 1.0,  1.3],
+    "eng":       [1.0, 1.0,  1.3,    0.8,     99.0, 1.0,  1.2],
     "infantry":  [1.0, 1.0,  1.0,    1.0,     10.0, 1.0,  1.2],
     "helicopter":[1.0, 1.0,  1.0,    1.0,      1.0, 1.0,  1.0],
     "boat":      [99.0,99.0, 99.0,   99.0,     0.5, 99.0, 99.0],
@@ -33,23 +43,35 @@ SURFACE_COSTS = {
 # Road cost multiplier: applied when road=1 in cost grid
 # Lower = stronger road preference
 ROAD_COST = {
-    "tank":       0.30,   # tanks use roads but can go off-road
-    "ifv":        0.35,   # lighter, slightly more off-road capable
-    "truck":      0.15,   # trucks are road-bound, barely off-road capable
-    "infantry":   1.00,   # infantry doesn't care about roads
-    "helicopter": 1.00,   # helicopter flies over roads
-    "boat":       99.0,   # boat doesn't use roads
+    "mbt":        0.25,
+    "ifv":        0.30,
+    "apc":        0.25,
+    "mrap":       0.25,
+    "light":      0.30,
+    "truck":      0.15,
+    "spg":        0.30,
+    "spaa":       0.30,
+    "eng":        0.35,
+    "infantry":   1.00,
+    "helicopter": 1.00,
+    "boat":       99.0,
 }
 
 # Vegetation density penalty per tree/bush
 # Scales linearly with count, then multiplied by (1 + slope)
 # High = unit is severely affected by vegetation
 VEG_DENSITY_FACTOR = {
-    "tank":       0.08,   # 50 trees on flat = +4.0 cost, on 30° slope = +5.6
-    "ifv":        0.05,   # lighter, more agile
-    "truck":      0.10,   # trucks struggle more in vegetation
-    "infantry":  -0.03,   # negative = infantry LIKES cover (reduces cost)
-    "helicopter":  0.0,   # ignores ground vegetation
+    "mbt":        0.08,
+    "ifv":        0.06,
+    "apc":        0.05,
+    "mrap":       0.05,
+    "light":      0.04,
+    "truck":      0.10,
+    "spg":        0.08,
+    "spaa":       0.06,
+    "eng":        0.05,
+    "infantry":  -0.03,
+    "helicopter":  0.0,
     "boat":       0.0,
 }
 
@@ -57,10 +79,16 @@ VEG_DENSITY_FACTOR = {
 # Scales linearly with gradient, then vegetation penalty is multiplied by (1 + this)
 # High = unit is severely affected by steep terrain
 SLOPE_FACTOR = {
-    "tank":       0.06,   # 30° slope = +1.8x multiplier on vegetation penalty
-    "ifv":        0.04,   # lighter, handles slopes better
-    "truck":      0.07,   # trucks are worse on slopes than tanks
-    "infantry":   0.01,   # soldiers handle slopes well
+    "mbt":        0.06,
+    "ifv":        0.05,
+    "apc":        0.04,
+    "mrap":       0.04,
+    "light":      0.03,
+    "truck":      0.07,
+    "spg":        0.06,
+    "spaa":       0.05,
+    "eng":        0.04,
+    "infantry":   0.01,
     "helicopter": 0.0,
     "boat":       0.0,
 }

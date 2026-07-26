@@ -24,7 +24,11 @@ DIRECTIONS = [
     (-1, -1, 1.414), (-1, 1, 1.414), (1, -1, 1.414), (1, 1, 1.414),
 ]
 
-UNIT_TYPES = ["tank", "ifv", "truck", "infantry", "helicopter", "boat"]
+UNIT_TYPES = [
+    "mbt", "ifv", "apc", "mrap", "light", "truck",
+    "spg", "spaa", "eng",
+    "infantry", "helicopter", "boat"
+]
 
 GRID_DIR = os.path.join(os.path.dirname(__file__), "..", "public", "maps")
 

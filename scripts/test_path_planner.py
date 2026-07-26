@@ -13,7 +13,7 @@ def test_basic():
     start = (2592, 288)
     end = (5152, 3552)
 
-    for unit_type in ["infantry", "tank", "truck", "helicopter"]:
+    for unit_type in ["infantry", "mbt", "ifv", "apc", "mrap", "light", "truck", "spg", "spaa", "eng", "helicopter"]:
         wps = plan_route(start, end, unit_type=unit_type, grid=grid)
         if wps is None:
             print(f"  {unit_type:12s}: NO PATH FOUND")
