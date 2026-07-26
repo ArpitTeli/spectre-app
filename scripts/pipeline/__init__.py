@@ -1,6 +1,7 @@
 """SPECTRE Training Pipeline.
 
 Generates synthetic training data for the tactical AI model.
+All models accessed via OpenRouter for unified billing.
 """
 
 from .config import validate_config, TEACHER_MODEL, JUDGE_A_MODEL, JUDGE_B_MODEL

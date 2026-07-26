@@ -1,6 +1,6 @@
 """Teacher model for generating tactical decisions.
 
-Calls the teacher model (Claude/GPT-4) to generate tactical decisions
+Calls the teacher model via OpenRouter to generate tactical decisions
 for each scenario. The output includes intent, anchor waypoints,
 constraints, and structured reasoning.
 """
@@ -10,7 +10,7 @@ import time
 from typing import Optional
 
 from .config import (
-    TEACHER_MODEL, OPENAI_API_KEY, ANTHROPIC_API_KEY,
+    TEACHER_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL,
     MAX_RETRIES, BATCH_SIZE
 )
 
@@ -84,55 +84,46 @@ def format_prompt(state_json, terrain_digest_json=None):
     )
 
 
-def call_anthropic(prompt, model=None, max_tokens=4096):
-    """Call Anthropic API (Claude)."""
-    import anthropic
+def call_openrouter(prompt, model=None, max_tokens=4096):
+    """Call OpenRouter API."""
+    import httpx
     
-    if not ANTHROPIC_API_KEY:
-        raise ValueError("ANTHROPIC_API_KEY not set")
+    if not OPENROUTER_API_KEY:
+        raise ValueError("OPENROUTER_API_KEY not set")
     
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     model = model or TEACHER_MODEL
     
-    response = client.messages.create(
-        model=model,
-        max_tokens=max_tokens,
-        messages=[{"role": "user", "content": prompt}]
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/ArpitTeli/spectre-app",
+        "X-Title": "SPECTRE Training Pipeline"
+    }
+    
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "temperature": 0.7,
+        "response_format": {"type": "json_object"}
+    }
+    
+    response = httpx.post(
+        f"{OPENROUTER_BASE_URL}/chat/completions",
+        headers=headers,
+        json=payload,
+        timeout=120.0
     )
     
-    return response.content[0].text
-
-
-def call_openai(prompt, model=None, max_tokens=4096):
-    """Call OpenAI API (GPT-4)."""
-    import openai
+    if response.status_code != 200:
+        raise Exception(f"OpenRouter API error: {response.status_code} - {response.text}")
     
-    if not OPENAI_API_KEY:
-        raise ValueError("OPENAI_API_KEY not set")
-    
-    client = openai.OpenAI(api_key=OPENAI_API_KEY)
-    model = model or TEACHER_MODEL
-    
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=max_tokens,
-        response_format={"type": "json_object"}
-    )
-    
-    return response.choices[0].message.content
+    return response.json()["choices"][0]["message"]["content"]
 
 
 def call_teacher(prompt, model=None):
-    """Call the appropriate teacher model based on configuration."""
-    model = model or TEACHER_MODEL
-    
-    if "claude" in model.lower():
-        return call_anthropic(prompt, model)
-    elif "gpt" in model.lower():
-        return call_openai(prompt, model)
-    else:
-        raise ValueError(f"Unsupported teacher model: {model}")
+    """Call the teacher model via OpenRouter."""
+    return call_openrouter(prompt, model)
 
 
 def generate_teacher_output(state_json, terrain_digest_json=None, model=None):

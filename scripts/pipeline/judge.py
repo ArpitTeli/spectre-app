@@ -4,7 +4,7 @@ Two independent judges evaluate each example:
 - Judge A: checks tactical coherence (does the order make sense?)
 - Judge B: checks reasoning quality (is the logic sound?)
 
-Uses different providers to avoid correlated blind spots.
+Uses different providers via OpenRouter to avoid correlated blind spots.
 """
 
 import json
@@ -13,7 +13,7 @@ from typing import Dict, Any, Optional
 
 from .config import (
     JUDGE_A_MODEL, JUDGE_B_MODEL,
-    OPENAI_API_KEY, ANTHROPIC_API_KEY,
+    OPENROUTER_API_KEY, OPENROUTER_BASE_URL,
     MAX_RETRIES
 )
 
@@ -56,51 +56,44 @@ Return valid JSON:
 """
 
 
-def call_anthropic_judge(prompt, model):
-    """Call Anthropic API for judge."""
-    import anthropic
+def call_openrouter_judge(prompt, model):
+    """Call OpenRouter API for judge."""
+    import httpx
     
-    if not ANTHROPIC_API_KEY:
-        raise ValueError("ANTHROPIC_API_KEY not set")
+    if not OPENROUTER_API_KEY:
+        raise ValueError("OPENROUTER_API_KEY not set")
     
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/ArpitTeli/spectre-app",
+        "X-Title": "SPECTRE Training Pipeline"
+    }
     
-    response = client.messages.create(
-        model=model,
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}]
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 1024,
+        "temperature": 0.3,  # Lower temperature for more consistent judging
+        "response_format": {"type": "json_object"}
+    }
+    
+    response = httpx.post(
+        f"{OPENROUTER_BASE_URL}/chat/completions",
+        headers=headers,
+        json=payload,
+        timeout=60.0
     )
     
-    return response.content[0].text
-
-
-def call_openai_judge(prompt, model):
-    """Call OpenAI API for judge."""
-    import openai
+    if response.status_code != 200:
+        raise Exception(f"OpenRouter API error: {response.status_code} - {response.text}")
     
-    if not OPENAI_API_KEY:
-        raise ValueError("OPENAI_API_KEY not set")
-    
-    client = openai.OpenAI(api_key=OPENAI_API_KEY)
-    
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=1024,
-        response_format={"type": "json_object"}
-    )
-    
-    return response.choices[0].message.content
+    return response.json()["choices"][0]["message"]["content"]
 
 
 def call_judge(prompt, model):
-    """Call the appropriate judge model."""
-    if "claude" in model.lower():
-        return call_anthropic_judge(prompt, model)
-    elif "gpt" in model.lower():
-        return call_openai_judge(prompt, model)
-    else:
-        raise ValueError(f"Unsupported judge model: {model}")
+    """Call judge via OpenRouter."""
+    return call_openrouter_judge(prompt, model)
 
 
 def evaluate_order(state_json, order_json, model):
