@@ -121,3 +121,15 @@ Three-phase approach:
 - Terminal: pop to 150m directly over target, then 90° vertical drop. Clears tree canopy, hits weakest armor plate.
 - Mod handles collision detonation. SPECTRE provides flight path via waypoints.
 - SQF: `doMove` to each waypoint. Final phase: `doMove` to point at ground level under drone, or `setVelocity` for precise drop.
+
+### BLUFOR Doctrine — Vehicle Types (Decided)
+Four vehicle types. Nyx is the only crewed exception.
+
+| Vehicle | Type | Manned? | Targets | Tactic |
+|---|---|---|---|---|
+| FPV Kamikaze (AR-2 + RPG) | Suicide drone | No | MBT, IFV, APC | Swarm: 3+ per target, 150m dive top-attack |
+| AWC Nyx (AT variant) | Tracked recon/AT | Yes (exception) | MBT, hardened armor | Hit-and-run: ATGM at range, relocate |
+| Stomper RCWS | Wheeled UGV | No | Trucks, light vehicles, infantry | Hold ground, area denial, sustained HMG/GMG |
+| ED-1E (armed variant) | Tracked mini-UGV | No | Infantry (limited), recon | Infiltrate tight spaces, observe |
+
+Moved out of scope for now: MQ-12 Falcon, MQ-4A Greyhawk.
