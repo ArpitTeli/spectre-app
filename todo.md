@@ -132,4 +132,18 @@ Four vehicle types. Nyx is the only crewed exception.
 | Stomper RCWS | Wheeled UGV | No | Trucks, light vehicles, infantry | Hold ground, area denial, sustained HMG/GMG |
 | ED-1E (armed variant) | Tracked mini-UGV | No | Infantry (limited), recon | Infiltrate tight spaces, observe |
 
-Moved out of scope for now: MQ-12 Falcon, MQ-4A Greyhawk.
+Moved out of scope for now: MQ-12 Falcon, MQ-4A Greyhawk, ED-1E (unarmed variant).
+
+### BLUFOR Squad Composition & Attack Doctrine (Decided)
+Four-phase engagement:
+| Phase | Assets | Action |
+|---|---|---|
+| 1. Recon | ED-1D (armed mini-UGV) + AR-2 Darter (aerial) | Find and fix enemy positions |
+| 2. Strike | FPV Kamikaze swarm | Overwhelm armored targets. Chaos and destruction |
+| 3. Assault | Ground squad: 1 Nyx (AT, center) + 2 Stompers (GMG, flanks) | Reverse wedge formation. Nyx ATGMs finish armor. Stomper 40mm GMGs clear infantry/light vehicles. **Squad is visible to enemy the moment kamikazes hit** — no gap between phases |
+| 4. Cleanup | All 3 units | MG fire mops up survivors |
+
+**Squad composition**: Standard squad = 1 Nyx AT + 2 Stomper RCWS. Scale number of squads to enemy strength.
+**Recon**: ED-1D + AR-2 Darter operate independently, not part of squads.
+**Expendable**: FPV Kamikaze, ED-1D, AR-2 Darter. Losses don't trigger LLM.
+**Non-expendable**: Nyx, Stomper. Any loss → high priority LLM trigger.
