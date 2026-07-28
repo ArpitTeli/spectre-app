@@ -108,3 +108,16 @@ BLUFOR switches to drones/UGVs only. OPFOR keeps all conventional types (mbt, if
 5. Path planner integration (Python subprocess vs JS port)
 6. Define drone/UGV types and their engagement radii, reach, doctrine matrix entries
 7. Edit all files listed above for unmanned-only BLUFOR
+
+### FPV Kamikaze — Flight Profile (Decided)
+Three-phase approach:
+| Phase | Altitude | Time (at ~100 km/h) |
+|---|---|---|
+| Approach (transit) | 50m AGL, terrain-following via cost grid elevation | Variable |
+| Pop-up | Vertical climb 50m → 150m AGL above target | ~3s |
+| Strike | Vertical 90° drop 150m → impact on top armor | ~3s |
+
+- Transit: terrain-following at 50m AGL using cost grid channel 0 (elevation). Detour around building clusters (bldg > 2).
+- Terminal: pop to 150m directly over target, then 90° vertical drop. Clears tree canopy, hits weakest armor plate.
+- Mod handles collision detonation. SPECTRE provides flight path via waypoints.
+- SQF: `doMove` to each waypoint. Final phase: `doMove` to point at ground level under drone, or `setVelocity` for precise drop.
