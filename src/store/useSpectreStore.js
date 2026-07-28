@@ -72,13 +72,14 @@ export function useSpectreStore() {
   // ── Bootstrap ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!window.spectreAPI) return;
-    window.spectreAPI.onArmaUpdate(data => processArmaUpdate(data, stateRef, patch));
+    const offArma = window.spectreAPI.onArmaUpdate(data => processArmaUpdate(data, stateRef, patch));
     window.spectreAPI.getConfig().then(config => {
       patch({ config });
       import('../ai/aiService').then(m => m.aiService.setConfig(config));
     });
     window.spectreAPI.loadIntel().then(intelDB => patch({ intelDB }));
     window.spectreAPI.getPaths().then(bridgePaths => patch({ bridgePaths }));
+    return () => { offArma(); };
   }, [patch]);
 
   // ── Mission timer ─────────────────────────────────────────────────────────
@@ -144,7 +145,7 @@ export function useSpectreStore() {
       adaptationLockRef.current = true;
       triggerAbortCheck(state, patch).finally(() => { adaptationLockRef.current = false; });
     }
-  }, [state.forceMetrics, state.rewardData]); // eslint-disable-line
+  }, [state.forceMetrics, state.rewardData, state.abortState, state.missionPhase]);
 
   // ── Comms logger ──────────────────────────────────────────────────────────
   const addCommsEntry = useCallback((from, to, message, priority = 'WHITE') => {
@@ -176,24 +177,23 @@ export function useSpectreStore() {
 
   // ── Intel ─────────────────────────────────────────────────────────────────
   const addIntel = useCallback((type, data) => {
-    setState(prev => {
-      const db = { ...prev.intelDB, locations: [...prev.intelDB.locations], patterns: [...prev.intelDB.patterns], terrain: [...prev.intelDB.terrain] };
-      if (type === 'location') {
-        const idx = db.locations.findIndex(l => l.name === data.name);
-        if (idx >= 0) {
-          db.locations[idx] = { ...db.locations[idx], ...data, observations: [...(db.locations[idx].observations || []), ...(data.observations || [])] };
-        } else {
-          db.locations.push({ ...data, observations: data.observations || [] });
-        }
-      } else if (type === 'pattern') {
-        db.patterns.push({ ...data, timestamp: new Date().toISOString() });
-      } else if (type === 'terrain') {
-        db.terrain.push(data);
+    const prevDB = stateRef.current.intelDB;
+    const db = { ...prevDB, locations: [...prevDB.locations], patterns: [...prevDB.patterns], terrain: [...prevDB.terrain] };
+    if (type === 'location') {
+      const idx = db.locations.findIndex(l => l.name === data.name);
+      if (idx >= 0) {
+        db.locations[idx] = { ...db.locations[idx], ...data, observations: [...(db.locations[idx].observations || []), ...(data.observations || [])] };
+      } else {
+        db.locations.push({ ...data, observations: data.observations || [] });
       }
-      window.spectreAPI?.saveIntel(db);
-      return { ...prev, intelDB: db };
-    });
-  }, []);
+    } else if (type === 'pattern') {
+      db.patterns.push({ ...data, timestamp: new Date().toISOString() });
+    } else if (type === 'terrain') {
+      db.terrain.push(data);
+    }
+    patch({ intelDB: db });
+    window.spectreAPI?.saveIntel(db);
+  }, [patch]);
 
   // ── End mission ───────────────────────────────────────────────────────────
   const endMission = useCallback(async (objective_complete = false) => {
@@ -345,7 +345,10 @@ function processArmaUpdate(data, stateRef, patch) {
   });
   Object.keys(contactsMap).forEach(id => {
     const age = now - contactsMap[id].last_seen;
-    if (contactsMap[id].state === 'DEAD') return; // keep dead contacts visible
+    if (contactsMap[id].state === 'DEAD') {
+      if (age > 3600000) delete contactsMap[id]; // remove dead contacts after 1 hour
+      return;
+    }
     if (age > 600000) delete contactsMap[id];
     else if (age > 120000) contactsMap[id] = { ...contactsMap[id], state: 'LAST_KNOWN' };
   });
@@ -402,12 +405,18 @@ async function handleArmaEvents(events, stateRef, patch) {
     } else if (event.type === 'ENEMY_KILLED') {
       patch(prev => {
         const newContacts = { ...prev.contacts };
-        // Mark the killed contact as DEAD
-        const contactKey = event.contact || event.contact_type || event.unit || event.id;
-        for (const [id, c] of Object.entries(newContacts)) {
-          if (id.includes(contactKey) || (c.id && c.id.includes(contactKey))) {
-            newContacts[id] = { ...c, state: 'DEAD', last_seen: Date.now() };
-            break;
+        const victimId = event.contact || event.contact_id || event.id || event.unit || '';
+        // Direct lookup by contact key
+        if (victimId && newContacts[victimId]) {
+          newContacts[victimId] = { ...newContacts[victimId], state: 'DEAD', last_seen: Date.now() };
+        } else {
+          // Fallback: scan contacts for type match
+          const killType = event.contact_type || '';
+          for (const [id, c] of Object.entries(newContacts)) {
+            if (killType && (c.type || '').toUpperCase() === killType.toUpperCase() && c.state !== 'DEAD') {
+              newContacts[id] = { ...c, state: 'DEAD', last_seen: Date.now() };
+              break;
+            }
           }
         }
         return {

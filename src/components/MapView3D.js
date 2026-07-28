@@ -110,8 +110,8 @@ function cacheHeightmap(heightImg) {
 function getHeightAt(armaX, armaY) {
   if (!_hCache) return 0;
   const w = 512;
-  const px = Math.round((armaX / MAP) * (w - 1));
-  const py = Math.round((armaY / MAP) * (w - 1));
+  const px = Math.max(0, Math.min(w - 1, Math.round((armaX / MAP) * (w - 1))));
+  const py = Math.max(0, Math.min(w - 1, Math.round((armaY / MAP) * (w - 1))));
   const v = _hCache[(py * w + px) * 4];
   return Math.max(0, -157.5 + (v / 255) * 392.4) * EXAG;
 }
@@ -377,6 +377,7 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
 
     const buildingsGroup = new THREE.Group();
     scene.add(buildingsGroup);
+    let roadGroup = null;
 
     const DENSITY_OPACITY = [0.35, 0.50, 0.70, 0.90];
 
@@ -448,7 +449,7 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
         off += 16;
       }
 
-      const roadGroup = new THREE.Group();
+      roadGroup = new THREE.Group();
       scene.add(roadGroup);
       const roadMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.85, metalness: 0.05, side: THREE.DoubleSide });
       const HALF_W = 5;
@@ -495,7 +496,7 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
     const markers = new THREE.Group();
     scene.add(markers);
 
-    st.current = { scene, cam, ctrl, renderer, markers, terrainMesh: mesh };
+    st.current = { scene, cam, ctrl, renderer, markers, terrainMesh: mesh, buildingsGroup, roadGroup };
 
     const keys = {};
     function kd(e) { keys[e.key] = true; if (e.key === 'q' || e.key === 'Q') qHeldRef.current = true; if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); }
@@ -544,6 +545,20 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
       running = false;
       window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku);
       window.removeEventListener('resize', rs);
+      // Dispose all Three.js resources
+      const s = st.current;
+      [s.terrainMesh, s.buildingsGroup, s.roadGroup, s.markers].forEach(obj => {
+        if (obj) {
+          obj.traverse(child => {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+              if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+              else child.material.dispose();
+            }
+          });
+          if (obj.parent) obj.parent.remove(obj);
+        }
+      });
       renderer.dispose();
       if (c.contains(renderer.domElement)) c.removeChild(renderer.domElement);
     };

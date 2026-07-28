@@ -1,58 +1,45 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-const DEBUG = false;
-function dbg(msg) {
-  if (DEBUG) console.log('[SPECTRE-RENDERER] ' + msg);
+function onEvent(channel, cb) {
+  const handler = (_, data) => cb(data);
+  ipcRenderer.on(channel, handler);
+  return () => { ipcRenderer.removeListener(channel, handler); };
 }
 
 contextBridge.exposeInMainWorld('spectreAPI', {
-  // ── Arma bridge ───────────────────────────────────────────────────────────
-  onArmaUpdate: (cb) => ipcRenderer.on('arma-state-update', (_, data) => {
-    dbg('IPC arma-state-update received — units: ' + (data.units ? data.units.length : 'N/A') + ', mapName: ' + data.mapName);
-    if (data.units) data.units.forEach(u => dbg('  unit: ' + u.id + ' pos: ' + JSON.stringify(u.position)));
-    cb(data);
-  }),
-  onArmaEvent:  (cb) => ipcRenderer.on('arma-event',        (_, data) => cb(data)),
+  onArmaUpdate: (cb) => onEvent('arma-state-update', cb),
+  onArmaEvent:  (cb) => onEvent('arma-event', cb),
 
-  // ── Commands to Arma ─────────────────────────────────────────────────────
   sendCommand: (cmd) => ipcRenderer.send('send-command', cmd),
 
-  // ── Config ────────────────────────────────────────────────────────────────
   getConfig:   ()     => ipcRenderer.invoke('get-config'),
   saveConfig:  (cfg)  => ipcRenderer.invoke('save-config', cfg),
-  onConfigUpdated: (cb) => ipcRenderer.on('config-updated', (_, data) => cb(data)),
+  onConfigUpdated: (cb) => onEvent('config-updated', cb),
 
-  // ── Mission data ──────────────────────────────────────────────────────────
   saveMission: (data) => ipcRenderer.invoke('save-mission', data),
 
-  // ── Intel database ────────────────────────────────────────────────────────
   loadIntel:   ()      => ipcRenderer.invoke('load-intel'),
   saveIntel:   (intel) => ipcRenderer.invoke('save-intel', intel),
 
-  // ── Vault (Ontology Layer) ────────────────────────────────────────────────
   vaultCreate:     (missionId)                    => ipcRenderer.invoke('vault-create', missionId),
   vaultWriteNode:  (vaultPath, filename, content) => ipcRenderer.invoke('vault-write-node', vaultPath, filename, content),
   vaultReadNodes:  (vaultPath)                    => ipcRenderer.invoke('vault-read-nodes', vaultPath),
   vaultUpdateNode: (vaultPath, nodeId, updates)   => ipcRenderer.invoke('vault-update-node', vaultPath, nodeId, updates),
   vaultAddWikilink:(vaultPath, nodeId, target)    => ipcRenderer.invoke('vault-add-wikilink', vaultPath, nodeId, target),
 
-  // ── Mission folder auto-detect ────────────────────────────────────────────
   getMissionFolders: () => ipcRenderer.invoke('get-mission-folders'),
 
-  // ── Diagnostics ───────────────────────────────────────────────────────────
   getPaths:    () => ipcRenderer.invoke('get-paths'),
   getArmaInfo: () => ipcRenderer.invoke('get-arma-info'),
   setArmaPath:  (p) => ipcRenderer.invoke('set-arma-path', p),
   installMod:   (type) => ipcRenderer.invoke('install-mod', type),
   checkModStatus: () => ipcRenderer.invoke('check-mod-status'),
 
-  // ── Auto-update ───────────────────────────────────────────────────────────
-  onUpdateAvailable:  (cb) => ipcRenderer.on('update-available',  (_, info) => cb(info)),
-  onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', (_, info) => cb(info)),
-  onUpdateNotAvailable: (cb) => ipcRenderer.on('update-not-available', (_, info) => cb(info)),
+  onUpdateAvailable:  (cb) => onEvent('update-available', cb),
+  onUpdateDownloaded: (cb) => onEvent('update-downloaded', cb),
+  onUpdateNotAvailable: (cb) => onEvent('update-not-available', cb),
   checkForUpdates:   ()   => ipcRenderer.invoke('check-for-updates'),
 
-  // ── Window controls ───────────────────────────────────────────────────────
   minimize: () => ipcRenderer.send('minimize-window'),
   maximize: () => ipcRenderer.send('maximize-window'),
   close:    () => ipcRenderer.send('close-window'),
@@ -63,6 +50,6 @@ contextBridge.exposeInMainWorld('spectreAPI', {
   relayConnect: (opts) => ipcRenderer.send('relay-connect', opts),
   relayDisconnect: () => ipcRenderer.send('relay-disconnect'),
   relayCommand: (cmd) => ipcRenderer.send('relay-command', cmd),
-  onRelayStatus: (cb) => ipcRenderer.on('relay-status', (_, data) => cb(data)),
+  onRelayStatus: (cb) => onEvent('relay-status', cb),
   startHostServices: () => ipcRenderer.send('start-host-services'),
 });

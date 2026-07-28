@@ -302,7 +302,9 @@ export default function App() {
         <div className={`app-center ${pendingAction ? 'target-mode' : ''}`}>
           {pendingAction && (
             <div className="target-mode-indicator">
-              Click map to set target — {pendingAction.label} — ESC to cancel
+              {pendingAction.id === 'KAMIKAZE'
+                ? `Click enemy contact to send drone — ${pendingAction.label} — ESC to cancel`
+                : `Click map to set target — ${pendingAction.label} — ESC to cancel`}
             </div>
           )}
           {state.selectedUnits.length > 1 && !pendingAction && (
@@ -348,7 +350,9 @@ export default function App() {
               onUnitRightClick={(id, x, y) => setRadialMenu({ x, y, unitId: id })}
               onContactSelect={id => {
                 if (pendingAction && pendingAction.id === 'KAMIKAZE') {
-                  const targets = pendingAction.unitId ? [pendingAction.unitId] : state.selectedUnits;
+                  const units = visibleUnits();
+                  const allTargets = pendingAction.unitId ? [pendingAction.unitId] : state.selectedUnits;
+                  const targets = allTargets.filter(uid => units[uid]?.vehicle_type === 'FPV');
                   targets.forEach(uid => {
                     sendArmaCommand({ type: 'KAMIKAZE', unit_id: uid, target_id: id });
                     addCommsEntry('SPECTRE', uid, `KAMIKAZE → ${id}`, 'RED');
@@ -377,7 +381,9 @@ export default function App() {
               onUnitRightClick={(id, x, y) => setRadialMenu({ x, y, unitId: id })}
               onContactSelect={id => {
                 if (pendingAction && pendingAction.id === 'KAMIKAZE') {
-                  const targets = pendingAction.unitId ? [pendingAction.unitId] : state.selectedUnits;
+                  const units = visibleUnits();
+                  const allTargets = pendingAction.unitId ? [pendingAction.unitId] : state.selectedUnits;
+                  const targets = allTargets.filter(uid => units[uid]?.vehicle_type === 'FPV');
                   targets.forEach(uid => {
                     sendArmaCommand({ type: 'KAMIKAZE', unit_id: uid, target_id: id });
                     addCommsEntry('SPECTRE', uid, `KAMIKAZE → ${id}`, 'RED');
@@ -515,11 +521,9 @@ export default function App() {
 
             if (action.complex) {
               if (action.id === 'ARTILLERY_STRIKE') {
-                setFireMissionUnit(units[unitId]);
-                setRightTab('ARTILLERY');
+                if (units[unitId]) { setFireMissionUnit(units[unitId]); setRightTab('ARTILLERY'); }
               } else if (action.id === 'HOVER' || action.id === 'LAND_AT') {
-                setFlightPlanUnit(units[unitId]);
-                setRightTab('FLIGHT');
+                if (units[unitId]) { setFlightPlanUnit(units[unitId]); setRightTab('FLIGHT'); }
               }
               return;
             }

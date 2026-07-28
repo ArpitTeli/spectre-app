@@ -282,7 +282,7 @@ export default function MapView({
     if (!unitLayer.current) return;
     unitLayer.current.clearLayers();
 
-    Object.values(units).forEach(unit => {
+    Object.values(units || {}).forEach(unit => {
       const latlng = getUnitLatLng(unit.position);
       if (!latlng) return;
 
@@ -338,7 +338,7 @@ export default function MapView({
     if (!contactLayer.current) return;
     contactLayer.current.clearLayers();
 
-    Object.values(contacts).forEach(contact => {
+    Object.values(contacts || {}).forEach(contact => {
       const latlng = getUnitLatLng(contact.position);
       if (!latlng) return;
 

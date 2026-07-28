@@ -303,10 +303,10 @@ function connectToRelay(mode, roomCode, url, _isReconnect) {
 
   relayWs.on('error', (e) => {
     dbg(`SPECTRE: Relay WebSocket error: ${e.message}`);
-    // HTTP 404 means server is gone — treat as fatal
-    if (e.message && e.message.includes('404')) {
+    // Treat HTTP upgrade failures (404, 500, etc.) as fatal
+    if (e.message && (/\b40[34]\b/.test(e.message) || e.message.includes('Unexpected server response'))) {
       relayFatalError = true;
-      dbg('SPECTRE: relay server returned 404 — server may be offline');
+      dbg('SPECTRE: relay server rejected connection — fatal');
     }
   });
 }
@@ -512,12 +512,14 @@ let pendingCommands = [];
 function buildSQFContent(commands) {
   if (commands.length === 0) return '// SPECTRE — no pending commands\n';
 
+  const sqfSafe = (s) => (s || '').replace(/["'\[\];\n\r]/g, '').substring(0, 100);
+
   const lines = [];
 
   for (const cmd of commands) {
     const id   = cmd._id || Date.now();
     const type = (cmd.type     || '').replace(/[^A-Z0-9_]/g, '');
-    const uid  = (cmd.unit_id  || 'ALL').replace(/["'\n\r]/g, '');
+    const uid  = sqfSafe(cmd.unit_id || 'ALL');
 
     switch (type) {
       case 'HOLD':
@@ -542,14 +544,14 @@ function buildSQFContent(commands) {
           .filter(wp => wp && (wp.x !== undefined || wp.y !== undefined))
           .map(wp => `[${Math.round(wp.x || 0)},${Math.round(wp.y || 0)}]`)
           .join(',');
-        const roe    = (cmd.engagement_rules || '').replace(/["'\n\r]/g, '').substring(0, 60);
-        const action = (cmd.action           || '').replace(/["'\n\r]/g, '').substring(0, 100);
+        const roe    = sqfSafe(cmd.engagement_rules).substring(0, 60);
+        const action = sqfSafe(cmd.action).substring(0, 100);
         lines.push(`[${id}, "EXECUTE_ORDER", "${uid}", [${wps}], "${roe}", "${action}"] call SPECTRE_fnc_execCmd;`);
         break;
       }
 
       case 'CUSTOM': {
-        const instr = (cmd.instruction || '').replace(/["'\n\r]/g, '').substring(0, 100);
+        const instr = sqfSafe(cmd.instruction).substring(0, 100);
         lines.push(`[${id}, "CUSTOM", "${uid}", [], "", "${instr}"] call SPECTRE_fnc_execCmd;`);
         break;
       }
@@ -583,7 +585,7 @@ function buildSQFContent(commands) {
       }
 
       case 'ATTACK': {
-        const targetId = (cmd.target_id || '').replace(/["'\n\r]/g, '');
+        const targetId = sqfSafe(cmd.target_id);
         const ax = cmd.x !== undefined ? Math.round(cmd.x) : '';
         const ay = cmd.y !== undefined ? Math.round(cmd.y) : '';
         if (targetId) {
@@ -594,11 +596,17 @@ function buildSQFContent(commands) {
         break;
       }
 
+      case 'KAMIKAZE': {
+        const targetId = sqfSafe(cmd.target_id);
+        lines.push(`[${id}, "KAMIKAZE", "${uid}", [], "${targetId}"] call SPECTRE_fnc_execCmd;`);
+        break;
+      }
+
       case 'ARTILLERY_STRIKE': {
         const rx = Math.round(cmd.x || 0);
         const ry = Math.round(cmd.y || 0);
         const rounds = Math.min(12, Math.max(1, Math.round(cmd.rounds || 6)));
-        const ammo = (cmd.ammoType || 'HE').replace(/["'\n\r]/g, '').substring(0, 20);
+        const ammo = sqfSafe(cmd.ammoType).substring(0, 20);
         lines.push(`[${id}, "ARTILLERY_STRIKE", "${uid}", [[${rx},${ry}]], "${rounds}", "${ammo}"] call SPECTRE_fnc_execCmd;`);
         break;
       }
@@ -674,6 +682,7 @@ function tryInstallMod() {
     return;
   }
 
+  if (!mainWindow) return;
   const result = dialog.showMessageBoxSync(mainWindow, {
     type: 'question',
     buttons: ['Install Mod', 'Skip'],

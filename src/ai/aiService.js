@@ -127,7 +127,10 @@ class AIService {
           await this.sleep(this.RETRY_WAIT_MS);
           continue;
         }
-        this.rotateKey();
+        // Only rotate key on auth errors, not network failures
+        if (err.message?.includes('401') || err.message?.includes('403')) {
+          this.rotateKey();
+        }
         await this.sleep(this.RETRY_WAIT_MS);
       }
     }
