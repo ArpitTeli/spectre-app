@@ -349,18 +349,34 @@ export default function App() {
               }}
               onUnitRightClick={(id, x, y) => setRadialMenu({ x, y, unitId: id })}
               onContactSelect={id => {
-                if (pendingAction && pendingAction.id === 'KAMIKAZE') {
-                  const units = visibleUnits();
-                  const allTargets = pendingAction.unitId ? [pendingAction.unitId] : state.selectedUnits;
-                  const targets = allTargets.filter(uid => units[uid]?.vehicle_type === 'FPV');
-                  targets.forEach(uid => {
-                    sendArmaCommand({ type: 'KAMIKAZE', unit_id: uid, target_id: id });
-                    addCommsEntry('SPECTRE', uid, `KAMIKAZE → ${id}`, 'RED');
-                  });
-                  setPendingAction(null);
-                } else {
-                  patch({ selectedContact: id });
-                }
+                (async () => {
+                  if (pendingAction && pendingAction.id === 'KAMIKAZE') {
+                    const units = visibleUnits();
+                    const allTargets = pendingAction.unitId ? [pendingAction.unitId] : state.selectedUnits;
+                    const targets = allTargets.filter(uid => units[uid]?.vehicle_type === 'FPV');
+                    if (targets.length === 0) { setPendingAction(null); return; }
+                    // Generate terrain-following waypoints for first drone
+                    let waypoints = null;
+                    const firstDrone = units[targets[0]];
+                    const contact = state.contacts[id];
+                    if (firstDrone?.position && contact?.pos) {
+                      try {
+                        const start = [firstDrone.position.x || firstDrone.position[0] || 0, firstDrone.position.y || firstDrone.position[1] || 0, firstDrone.position.z || firstDrone.position[2] || 0];
+                        const tgt = contact.pos;
+                        const tgtPos = Array.isArray(tgt) ? [tgt[0] || 0, tgt[1] || 0, 0] : [(tgt.x || tgt[0] || 0), (tgt.y || tgt[1] || 0), 0];
+                        const result = await window.spectreAPI?.generateFpvWaypoints(start, tgtPos);
+                        if (result?.waypoints) waypoints = result.waypoints;
+                      } catch (_) {}
+                    }
+                    targets.forEach(uid => {
+                      sendArmaCommand({ type: 'KAMIKAZE', unit_id: uid, target_id: id, waypoints });
+                      addCommsEntry('SPECTRE', uid, `KAMIKAZE → ${id}`, 'RED');
+                    });
+                    setPendingAction(null);
+                  } else {
+                    patch({ selectedContact: id });
+                  }
+                })();
               }}
               onMapClick={handleMapClick}
             />
@@ -380,18 +396,33 @@ export default function App() {
               }}
               onUnitRightClick={(id, x, y) => setRadialMenu({ x, y, unitId: id })}
               onContactSelect={id => {
-                if (pendingAction && pendingAction.id === 'KAMIKAZE') {
-                  const units = visibleUnits();
-                  const allTargets = pendingAction.unitId ? [pendingAction.unitId] : state.selectedUnits;
-                  const targets = allTargets.filter(uid => units[uid]?.vehicle_type === 'FPV');
-                  targets.forEach(uid => {
-                    sendArmaCommand({ type: 'KAMIKAZE', unit_id: uid, target_id: id });
-                    addCommsEntry('SPECTRE', uid, `KAMIKAZE → ${id}`, 'RED');
-                  });
-                  setPendingAction(null);
-                } else {
-                  patch({ selectedContact: id });
-                }
+                (async () => {
+                  if (pendingAction && pendingAction.id === 'KAMIKAZE') {
+                    const units = visibleUnits();
+                    const allTargets = pendingAction.unitId ? [pendingAction.unitId] : state.selectedUnits;
+                    const targets = allTargets.filter(uid => units[uid]?.vehicle_type === 'FPV');
+                    if (targets.length === 0) { setPendingAction(null); return; }
+                    let waypoints = null;
+                    const firstDrone = units[targets[0]];
+                    const contact = state.contacts[id];
+                    if (firstDrone?.position && contact?.pos) {
+                      try {
+                        const start = [firstDrone.position.x || firstDrone.position[0] || 0, firstDrone.position.y || firstDrone.position[1] || 0, firstDrone.position.z || firstDrone.position[2] || 0];
+                        const tgt = contact.pos;
+                        const tgtPos = Array.isArray(tgt) ? [tgt[0] || 0, tgt[1] || 0, 0] : [(tgt.x || tgt[0] || 0), (tgt.y || tgt[1] || 0), 0];
+                        const result = await window.spectreAPI?.generateFpvWaypoints(start, tgtPos);
+                        if (result?.waypoints) waypoints = result.waypoints;
+                      } catch (_) {}
+                    }
+                    targets.forEach(uid => {
+                      sendArmaCommand({ type: 'KAMIKAZE', unit_id: uid, target_id: id, waypoints });
+                      addCommsEntry('SPECTRE', uid, `KAMIKAZE → ${id}`, 'RED');
+                    });
+                    setPendingAction(null);
+                  } else {
+                    patch({ selectedContact: id });
+                  }
+                })();
               }}
               onMapClick={handleMapClick}
             />

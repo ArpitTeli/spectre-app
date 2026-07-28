@@ -598,7 +598,16 @@ function buildSQFContent(commands) {
 
       case 'KAMIKAZE': {
         const targetId = sqfSafe(cmd.target_id);
-        lines.push(`[${id}, "KAMIKAZE", "${uid}", [], "${targetId}"] call SPECTRE_fnc_execCmd;`);
+        const wps = (cmd.waypoints || []);
+        if (wps.length > 0) {
+          const wpStr = wps
+            .filter(wp => wp && wp.length >= 2)
+            .map(wp => `[${Math.round(wp[0])},${Math.round(wp[1])},${Math.round(wp[2] || 0)}]`)
+            .join(',');
+          lines.push(`[${id}, "KAMIKAZE", "${uid}", [${wpStr}], "${targetId}"] call SPECTRE_fnc_execCmd;`);
+        } else {
+          lines.push(`[${id}, "KAMIKAZE", "${uid}", [], "${targetId}"] call SPECTRE_fnc_execCmd;`);
+        }
         break;
       }
 
@@ -1459,6 +1468,30 @@ ipcMain.handle('get-arma-info', async () => {
     documentsPath: ARMA_DOCS,
     detected: !!ARMA_INSTALL,
   };
+});
+
+// ── FPV waypoint generation ──────────────────────────────────────────────
+ipcMain.handle('generate-fpv-waypoints', async (_, { start, target }) => {
+  return new Promise((resolve) => {
+    const script = path.join(__dirname, '..', 'scripts', 'fpv_waypoints.py');
+    const input = JSON.stringify({ start, target });
+    const py = require('child_process').spawn('python', [script], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let stdout = '', stderr = '';
+    py.stdout.on('data', d => { stdout += d.toString(); });
+    py.stderr.on('data', d => { stderr += d.toString(); });
+    py.on('close', (code) => {
+      if (code === 0) {
+        try { resolve(JSON.parse(stdout)); } catch (_) { resolve({ error: 'Invalid JSON from Python' }); }
+      } else {
+        resolve({ error: stderr || 'Python exited with code ' + code });
+      }
+    });
+    py.on('error', () => resolve({ error: 'Failed to spawn Python' }));
+    py.stdin.write(input);
+    py.stdin.end();
+  });
 });
 
 let customArmaPath = null;

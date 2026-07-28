@@ -257,15 +257,40 @@ SPECTRE_fnc_execCmd = {
             private _drone = _unit;
             private _target = missionNamespace getVariable [_roe, objNull];
             if (!isNull _drone && !isNull _target) then {
-                [_drone, _target] spawn {
-                    params ["_drone", "_target"];
-                    while {alive _drone && alive _target} do {
-                        _drone doMove (getPos _target);
-                        sleep 0.1;
+                if (count _waypoints > 1) then {
+                    // Multi-waypoint terrain-following flight profile
+                    [_drone, _target, _waypoints] spawn {
+                        params ["_drone", "_target", "_wps"];
+                        private _wpIdx = 0;
+                        while {alive _drone && alive _target && _wpIdx < count _wps} do {
+                            private _wp = _wps select _wpIdx;
+                            private _pos = [_wp select 0, _wp select 1, _wp select 2];
+                            _drone doMove _pos;
+                            // Wait until drone is within 40m of waypoint or dead
+                            private _timeout = time + 30;
+                            waitUntil {
+                                sleep 0.1;
+                                (alive _drone && (_drone distance _pos) < 40) || !alive _drone || time > _timeout
+                            };
+                            _wpIdx = _wpIdx + 1;
+                        };
+                        // Final phase: ensure drone is heading to target ground position
+                        if (alive _drone && alive _target) then {
+                            _drone doMove (getPos _target);
+                        };
+                    };
+                } else {
+                    // Simple direct approach (fallback)
+                    [_drone, _target] spawn {
+                        params ["_drone", "_target"];
+                        while {alive _drone && alive _target} do {
+                            _drone doMove (getPos _target);
+                            sleep 0.1;
+                        };
                     };
                 };
                 _drone setVariable ["SPECTRE_currentOrder", "KAMIKAZE", false];
-                diag_log format ["SPECTRE KAMIKAZE [%1] -> %2", _unitId, _roe];
+                diag_log format ["SPECTRE KAMIKAZE [%1] -> %2 (wps=%3)", _unitId, _roe, count _waypoints];
             };
         };
 

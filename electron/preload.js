@@ -52,4 +52,5 @@ contextBridge.exposeInMainWorld('spectreAPI', {
   relayCommand: (cmd) => ipcRenderer.send('relay-command', cmd),
   onRelayStatus: (cb) => onEvent('relay-status', cb),
   startHostServices: () => ipcRenderer.send('start-host-services'),
+  generateFpvWaypoints: (start, target) => ipcRenderer.invoke('generate-fpv-waypoints', { start, target }),
 });
