@@ -261,10 +261,11 @@ SPECTRE_fnc_execCmd = {
                     // Multi-waypoint terrain-following flight profile
                     [_drone, _target, _waypoints] spawn {
                         params ["_drone", "_target", "_wps"];
-                        private _wpIdx = 0;
-                        while {alive _drone && alive _target && _wpIdx < count _wps} do {
-                            private _wp = _wps select _wpIdx;
-                            private _pos = [_wp select 0, _wp select 1, _wp select 2];
+                    private _wpIdx = 0;
+                    while {alive _drone && alive _target && _wpIdx < count _wps} do {
+                        private _wp = _wps select _wpIdx;
+                        private _alt = if (count _wp > 2) then { _wp select 2 } else { 50 };
+                        private _pos = [_wp select 0, _wp select 1, _alt];
                             _drone doMove _pos;
                             // Wait until drone is within 40m of waypoint or dead
                             private _timeout = time + 30;
@@ -280,10 +281,11 @@ SPECTRE_fnc_execCmd = {
                         };
                     };
                 } else {
-                    // Simple direct approach (fallback)
+                    // Simple direct approach (fallback) — 60s timeout
                     [_drone, _target] spawn {
                         params ["_drone", "_target"];
-                        while {alive _drone && alive _target} do {
+                        private _timeout = time + 60;
+                        while {alive _drone && alive _target && time < _timeout} do {
                             _drone doMove (getPos _target);
                             sleep 0.1;
                         };

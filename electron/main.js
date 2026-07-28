@@ -533,12 +533,6 @@ function buildSQFContent(commands) {
         lines.push(`[${id}, "${type}", "${uid}"] call SPECTRE_fnc_execCmd;`);
         break;
 
-      case 'KAMIKAZE': {
-        const targetId = (cmd.target_id || '').replace(/["'\n\r]/g, '');
-        lines.push(`[${id}, "KAMIKAZE", "${uid}", [], "${targetId}"] call SPECTRE_fnc_execCmd;`);
-        break;
-      }
-
       case 'EXECUTE_ORDER': {
         const wps = (cmd.waypoints || [])
           .filter(wp => wp && (wp.x !== undefined || wp.y !== undefined))
@@ -1475,17 +1469,24 @@ ipcMain.handle('generate-fpv-waypoints', async (_, { start, target }) => {
   return new Promise((resolve) => {
     const script = path.join(__dirname, '..', 'scripts', 'fpv_waypoints.py');
     const input = JSON.stringify({ start, target });
-    const py = require('child_process').spawn('python', [script], {
+    const pyExe = (() => {
+      try { require('child_process').execSync('python3 --version 2>nul'); return 'python3'; } catch {}
+      try { require('child_process').execSync('python --version 2>nul'); return 'python'; } catch {}
+      return 'python';
+    })();
+    const py = require('child_process').spawn(pyExe, [script], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stdout = '', stderr = '';
     py.stdout.on('data', d => { stdout += d.toString(); });
     py.stderr.on('data', d => { stderr += d.toString(); });
     py.on('close', (code) => {
+      let data;
+      try { data = JSON.parse(stdout); } catch (_) {}
       if (code === 0) {
-        try { resolve(JSON.parse(stdout)); } catch (_) { resolve({ error: 'Invalid JSON from Python' }); }
+        resolve(data || { error: 'Invalid JSON from Python' });
       } else {
-        resolve({ error: stderr || 'Python exited with code ' + code });
+        resolve(data || { error: stderr || `Python exited with code ${code}` });
       }
     });
     py.on('error', () => resolve({ error: 'Failed to spawn Python' }));

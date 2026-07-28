@@ -65,7 +65,7 @@ def generate(start, target):
         elev = get_elevation(grid, px, py)
         bldg = get_building_count(grid, px, py)
 
-        alt = elev + FLY_HEIGHT
+        alt = max(elev + FLY_HEIGHT, 5)  # minimum 5m AGL over water/low terrain
         if bldg > BUILDING_THRESHOLD:
             alt = max(alt, elev + 80)  # extra clearance over dense buildings
 
