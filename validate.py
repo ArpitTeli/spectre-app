@@ -15,25 +15,16 @@ v2 changes over v1:
     1.5). A mismatch is a hard error here so the generated set stays doctrine-clean.
 """
 import json, math, glob, os
-from threat import classify, score
-from doctrine import VULNERABLE_TO, vulnerable_types_for, is_mismatch
+from doctrine import (VULNERABLE_TO, vulnerable_types_for, is_mismatch,
+                       THREAT_POINTS, FORCES_HIGH, threat_score, classify_threat,
+                       ENGAGEMENT_RADII, COMPOSITIONS, OBJECTIVES, INTENTS,
+                       ENEMY_TYPES, ZONE_RADIUS_MIN, ZONE_RADIUS_MAX)
 
-ENG = {'mbt': 1200, 'ifv': 800, 'apc': 600, 'mrap': 500,
-       'light': 400, 'truck': 300, 'infantry': 300, 'helicopter': 1500}
-
-# Canonical friendly composition roster (also used by the regeneration prompts).
-COMP = {
-    ('light', 'infantry'): 'Recon',
-    ('mrap', 'light', 'infantry'): 'Patrol',
-    ('mbt', 'ifv', 'infantry'): 'Mechanized',
-    ('mbt', 'ifv', 'apc', 'infantry', 'infantry'): 'Heavy',
-    ('mbt', 'ifv', 'mrap', 'light', 'infantry'): 'Combined',
-    ('spg', 'ifv', 'mrap', 'infantry'): 'Support',
-    ('helicopter', 'infantry', 'infantry'): 'Aviation',
-}
-OBJ = {'attack', 'defend', 'patrol', 'evacuate', 'recon', 'hold', 'support'}
-INTENT = {'attack', 'defend', 'move', 'hold', 'recon', 'evacuate', 'support'}
-CONTACT_TYPES = set(VULNERABLE_TO)  # valid enemy contact types (no helicopter)
+ENG = ENGAGEMENT_RADII
+COMP = COMPOSITIONS
+OBJ = OBJECTIVES
+INTENT = INTENTS
+CONTACT_TYPES = set(ENEMY_TYPES)
 
 
 def rng(p):
@@ -98,10 +89,10 @@ for bf in sorted(glob.glob('batches/batch_*.json')):
                             f'!= {expected}')
 
         # --- threat level (capability-weighted, must match classifier) ------
-        want = classify(contacts)
+        want = classify_threat(contacts)
         if sp['threat_level'] != want:
             errs.append(f'{tag} threat_level sp={sp["threat_level"]} != {want} '
-                        f'(score={score(contacts)}, {[c["type"] for c in contacts]})')
+                        f'(score={threat_score(contacts)}, {[c["type"] for c in contacts]})')
         if sj['threat_level'] != want:
             errs.append(f'{tag} threat_level sj={sj["threat_level"]} != {want}')
 

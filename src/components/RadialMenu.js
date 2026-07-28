@@ -44,12 +44,36 @@ const ACTIONS = {
     { id: 'HOLD',        label: 'Hold',        icon: '⏸', color: '#eab308' },
     { id: 'ATTACK',      label: 'Attack',      icon: '⚔', color: '#ef4444' },
   ],
+  FPV: [
+    { id: 'KAMIKAZE',    label: 'Kamikaze',    icon: '⌖', color: '#ef4444' },
+    { id: 'MOVE_TO',     label: 'Move To',     icon: '↗', color: '#3b82f6' },
+    { id: 'HOLD',        label: 'Hold',        icon: '⏸', color: '#eab308' },
+  ],
+  STOMPER: [
+    { id: 'MOVE_TO',     label: 'Move To',     icon: '↗', color: '#3b82f6' },
+    { id: 'HOLD',        label: 'Hold',        icon: '⏸', color: '#eab308' },
+    { id: 'ATTACK',      label: 'Attack',      icon: '⚔', color: '#ef4444' },
+    { id: 'WEAPONS_FREE',label: 'Open Fire',   icon: '🔴', color: '#ef4444' },
+    { id: 'WEAPONS_SAFE',label: 'Cease Fire',  icon: '⚪', color: '#94a3b8' },
+  ],
+  ED1: [
+    { id: 'MOVE_TO',     label: 'Move To',     icon: '↗', color: '#3b82f6' },
+    { id: 'HOLD',        label: 'Hold',        icon: '⏸', color: '#eab308' },
+  ],
+  UAV: [
+    { id: 'MOVE_TO',     label: 'Move To',     icon: '↗', color: '#3b82f6' },
+    { id: 'HOLD',        label: 'Hold',        icon: '⏸', color: '#eab308' },
+  ],
 };
 
 function getUnitActions(unit) {
   if (!unit) return ACTIONS.INFANTRY;
   const type = (unit.type || '').toUpperCase();
   const vt = (unit.vehicle_type || '').toUpperCase();
+  if (vt === 'FPV') return ACTIONS.FPV;
+  if (vt === 'UAV') return ACTIONS.UAV;
+  if (vt === 'STOMPER') return ACTIONS.STOMPER;
+  if (vt === 'ED1') return ACTIONS.ED1;
   if (vt === 'HELI' || vt === 'PLANE') return ACTIONS.HELICOPTER;
   if (vt === 'ARTILLERY') return ACTIONS.ARTILLERY;
   if (vt === 'TANK' || vt === 'IFV' || vt.includes('TRACKED')) return ACTIONS.ARMORED;

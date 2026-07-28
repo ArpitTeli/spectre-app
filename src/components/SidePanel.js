@@ -5,9 +5,10 @@ const TYPE_LABELS = {
   INFANTRY: 'Infantry', CAR: 'Car', RECON: 'Recon', TRUCK: 'Truck',
   APC: 'APC', IFV: 'IFV', TANK: 'Tank', HELI: 'Helicopter',
   PLANE: 'Fixed-Wing', BOAT: 'Boat', VEHICLE: 'Vehicle',
+  FPV: 'FPV Drone', UAV: 'UAV', STOMPER: 'Stomper', ED1: 'ED-1D',
 };
 
-const VEHICLE_SYMBOL = { TANK: '▲', IFV: '▲', APC: '◆', CAR: '●', RECON: '◇', HELI: '✦', TRUCK: '▪', BOAT: '◆', PLANE: '✦', INFANTRY: '●', DEFAULT: '○' };
+const VEHICLE_SYMBOL = { TANK: '▲', IFV: '▲', APC: '◆', CAR: '●', RECON: '◇', HELI: '✦', TRUCK: '▪', BOAT: '◆', PLANE: '✦', INFANTRY: '●', FPV: '⌖', UAV: '◎', STOMPER: '◉', ED1: '○', DEFAULT: '○' };
 
 function getDistance(unit) {
   if (!unit.position) return null;

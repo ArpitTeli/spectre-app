@@ -39,7 +39,7 @@ def export_training_set(db_path=None, output_path=None):
     conn.row_factory = sqlite3.Row
     
     rows = conn.execute(
-        """SELECT state_json, terrain_digest_json, planner_output_json 
+        """SELECT state_json, terrain_digest_json, teacher_output_json 
            FROM examples WHERE final_status = 'accepted'"""
     ).fetchall()
     
@@ -49,7 +49,7 @@ def export_training_set(db_path=None, output_path=None):
         for row in rows:
             state = json.loads(row["state_json"])
             terrain = json.loads(row["terrain_digest_json"]) if row["terrain_digest_json"] else {}
-            orders = json.loads(row["planner_output_json"])
+            orders = json.loads(row["teacher_output_json"])
             
             # Build prompt
             prompt = TRAINING_PROMPT.format(
@@ -85,7 +85,7 @@ def export_with_reasoning(db_path=None, output_path=None):
     conn.row_factory = sqlite3.Row
     
     rows = conn.execute(
-        """SELECT state_json, terrain_digest_json, teacher_output_json, planner_output_json 
+        """SELECT state_json, terrain_digest_json, teacher_output_json
            FROM examples WHERE final_status = 'accepted'"""
     ).fetchall()
     
@@ -96,7 +96,6 @@ def export_with_reasoning(db_path=None, output_path=None):
             state = json.loads(row["state_json"])
             terrain = json.loads(row["terrain_digest_json"]) if row["terrain_digest_json"] else {}
             teacher_output = json.loads(row["teacher_output_json"])
-            planner_output = json.loads(row["planner_output_json"])
             
             # Build prompt with terrain digest
             prompt = TRAINING_PROMPT.format(
@@ -104,18 +103,10 @@ def export_with_reasoning(db_path=None, output_path=None):
                 terrain_json=json.dumps(terrain, indent=2)
             )
             
-            # Merge teacher reasoning with planner output
-            for order in planner_output.get("orders", []):
-                # Find matching teacher order by unit_id
-                for teacher_order in teacher_output.get("orders", []):
-                    if teacher_order.get("unit_id") == order.get("unit_id"):
-                        order["reasoning"] = teacher_order.get("reasoning", {})
-                        break
-            
-            # Write JSONL
+            # Write JSONL - teacher output IS the completion
             example = {
                 "prompt": prompt,
-                "completion": json.dumps(planner_output, indent=2)
+                "completion": json.dumps(teacher_output, indent=2)
             }
             f.write(json.dumps(example) + "\n")
     

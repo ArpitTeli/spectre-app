@@ -106,7 +106,7 @@ export function useSpectreStore() {
       const crew = units.filter(u => u.type === 'INFANTRY');
       const activeVehicles = vehicles.filter(u => u.status !== 'DESTROYED' && u.status !== 'DEAD');
       const activeCrew = crew.filter(u => u.status !== 'DEAD');
-      const fpW = { TANK: 30, IFV: 20, APC: 12, RECON: 8, HELI: 25, TRUCK: 2, CAR: 5, PLANE: 35, BOAT: 8 };
+      const fpW = { TANK: 30, IFV: 20, APC: 12, RECON: 8, HELI: 25, TRUCK: 2, CAR: 5, PLANE: 35, BOAT: 8, STOMPER: 8, FPV: 3, UAV: 1, ED1: 1 };
       const maxFP = vehicles.reduce((s, v) => s + (fpW[v.vehicle_type] || 10), 0) || 100;
       const curFP = activeVehicles.reduce((s, v) => s + (fpW[v.vehicle_type] || 10), 0);
       const firepower_index = Math.round((curFP / maxFP) * 100);
@@ -310,6 +310,10 @@ export function useSpectreStore() {
       PLANE: 'Fixed-Wing',
       BOAT: 'Boat',
       VEHICLE: 'Vehicle',
+      FPV: 'FPV Drone',
+      UAV: 'UAV',
+      STOMPER: 'Stomper',
+      ED1: 'ED-1D',
     };
     return labels[unit?.vehicle_type] || 'Unit';
   }, []);

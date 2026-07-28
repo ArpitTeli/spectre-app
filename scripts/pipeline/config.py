@@ -16,11 +16,11 @@ except ImportError:
 
 # API Keys (from environment variables)
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# Model selection (OpenRouter format: provider/model)
-TEACHER_MODEL = os.getenv("TEACHER_MODEL", "anthropic/claude-3.5-sonnet")
-JUDGE_A_MODEL = os.getenv("JUDGE_A_MODEL", "anthropic/claude-3.5-haiku")
-JUDGE_B_MODEL = os.getenv("JUDGE_B_MODEL", "openai/gpt-4o-mini")
+# Model selection
+TEACHER_MODEL = os.getenv("TEACHER_MODEL", "kimi-k3")
+JUDGE_MODEL = os.getenv("JUDGE_MODEL", "gemini-2.5-pro")
 
 # Pipeline settings
 TARGET_EXAMPLES = int(os.getenv("TARGET_EXAMPLES", "1000"))
@@ -43,7 +43,7 @@ UNIT_TYPES = [
 ]
 
 # OpenRouter API settings
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://agentrouter.org/v1")
 
 # Validate API keys
 def validate_config():

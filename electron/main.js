@@ -392,7 +392,7 @@ const unitMarkers = {};
 const contactMarkers = {};
 let connected = false;
 
-const VEHICLE_SYMBOL = { MBT: '▲', TANK: '▲', IFV: '■', APC: '◆', CAR: '●', RECON: '◇', HELI: '✦', TRUCK: '▪', BOAT: '◆', PLANE: '✦', INFANTRY: '●', DEFAULT: '○' };
+const VEHICLE_SYMBOL = { MBT: '▲', TANK: '▲', IFV: '■', APC: '◆', CAR: '●', RECON: '◇', HELI: '✦', TRUCK: '▪', BOAT: '◆', PLANE: '✦', INFANTRY: '●', FPV: '⌖', UAV: '◎', STOMPER: '◉', ED1: '○', DEFAULT: '○' };
 
 function makeUnitIcon(unit) {
   const symbol = VEHICLE_SYMBOL[unit.vehicle_type || unit.vtype] || VEHICLE_SYMBOL.DEFAULT;
@@ -530,6 +530,12 @@ function buildSQFContent(commands) {
       case 'DISPERSE':
         lines.push(`[${id}, "${type}", "${uid}"] call SPECTRE_fnc_execCmd;`);
         break;
+
+      case 'KAMIKAZE': {
+        const targetId = (cmd.target_id || '').replace(/["'\n\r]/g, '');
+        lines.push(`[${id}, "KAMIKAZE", "${uid}", [], "${targetId}"] call SPECTRE_fnc_execCmd;`);
+        break;
+      }
 
       case 'EXECUTE_ORDER': {
         const wps = (cmd.waypoints || [])
@@ -1237,7 +1243,7 @@ function parseArmaLog(chunk) {
 
 function expandUnit(raw) {
   const vtype = raw.vehicle_type || raw.vtype || 'INFANTRY';
-  const isVehicle = ['MBT','TANK','IFV','APC','RECON','HELI','TRUCK','PLANE','BOAT','CAR','VEHICLE'].includes(vtype);
+  const isVehicle = ['MBT','TANK','IFV','APC','RECON','HELI','TRUCK','PLANE','BOAT','CAR','VEHICLE','FPV','UAV','STOMPER','ED1'].includes(vtype);
   return {
     id: raw.id,
     callsign: raw.callsign || raw.id,

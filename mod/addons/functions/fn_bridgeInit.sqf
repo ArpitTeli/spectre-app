@@ -78,6 +78,12 @@ diag_log format ["SPECTRE: Initialized — tracking %1 blufor assets on %2", cou
 // ─── Vehicle type classifier ──────────────────────────────────────────────────
 SPECTRE_fnc_vehicleType = {
     params ["_v"];
+    // Drone types
+    if (_v isKindOf "B_FPV_UAV")        exitWith { "FPV" };
+    if (_v isKindOf "UAV_01_base_F")    exitWith { "UAV" };
+    if (_v isKindOf "UGV_01_base_F")    exitWith { "STOMPER" };
+    if (_v isKindOf "UGV_02_base_F")    exitWith { "ED1" };
+    // Conventional types
     if (_v isKindOf "Helicopter")  exitWith { "HELI" };
     if (_v isKindOf "Plane")       exitWith { "PLANE" };
     if (_v isKindOf "Ship")        exitWith { "BOAT" };
@@ -246,6 +252,22 @@ SPECTRE_fnc_execCmd = {
     diag_log format ["SPECTRE CMD: %1 -> %2 (units=%3)", _type, _unitId, count SPECTRE_blufor];
 
     switch (_type) do {
+
+        case "KAMIKAZE": {
+            private _drone = _unit;
+            private _target = missionNamespace getVariable [_roe, objNull];
+            if (!isNull _drone && !isNull _target) then {
+                [_drone, _target] spawn {
+                    params ["_drone", "_target"];
+                    while {alive _drone && alive _target} do {
+                        _drone doMove (getPos _target);
+                        sleep 0.1;
+                    };
+                };
+                _drone setVariable ["SPECTRE_currentOrder", "KAMIKAZE", false];
+                diag_log format ["SPECTRE KAMIKAZE [%1] -> %2", _unitId, _roe];
+            };
+        };
 
         case "HOLD": {
             if (!isNull _unit) then {

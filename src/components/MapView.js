@@ -129,7 +129,7 @@ function getUnitLatLng(position) {
 }
 
 // ─── Icon factories ───────────────────────────────────────────────────────────
-const VEHICLE_SYMBOL = { MBT: '▲', TANK: '▲', IFV: '■', APC: '◆', CAR: '●', RECON: '◇', HELI: '✦', TRUCK: '▪', BOAT: '◆', PLANE: '✦', INFANTRY: '●', DEFAULT: '○' };
+const VEHICLE_SYMBOL = { MBT: '▲', TANK: '▲', IFV: '■', APC: '◆', CAR: '●', RECON: '◇', HELI: '✦', TRUCK: '▪', BOAT: '◆', PLANE: '✦', INFANTRY: '●', FPV: '⌖', UAV: '◎', STOMPER: '◉', ED1: '○', DEFAULT: '○' };
 const CONTACT_SYMBOL = { INFANTRY: '●', VEHICLE: '■', TANK: '▲', UNKNOWN: '?' };
 
 function makeUnitIcon(unit, selected) {

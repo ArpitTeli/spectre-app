@@ -346,7 +346,18 @@ export default function App() {
                 }
               }}
               onUnitRightClick={(id, x, y) => setRadialMenu({ x, y, unitId: id })}
-              onContactSelect={id => patch({ selectedContact: id })}
+              onContactSelect={id => {
+                if (pendingAction && pendingAction.id === 'KAMIKAZE') {
+                  const targets = pendingAction.unitId ? [pendingAction.unitId] : state.selectedUnits;
+                  targets.forEach(uid => {
+                    sendArmaCommand({ type: 'KAMIKAZE', unit_id: uid, target_id: id });
+                    addCommsEntry('SPECTRE', uid, `KAMIKAZE → ${id}`, 'RED');
+                  });
+                  setPendingAction(null);
+                } else {
+                  patch({ selectedContact: id });
+                }
+              }}
               onMapClick={handleMapClick}
             />
           ) : (
@@ -364,10 +375,22 @@ export default function App() {
                 }
               }}
               onUnitRightClick={(id, x, y) => setRadialMenu({ x, y, unitId: id })}
-              onContactSelect={id => patch({ selectedContact: id })}
+              onContactSelect={id => {
+                if (pendingAction && pendingAction.id === 'KAMIKAZE') {
+                  const targets = pendingAction.unitId ? [pendingAction.unitId] : state.selectedUnits;
+                  targets.forEach(uid => {
+                    sendArmaCommand({ type: 'KAMIKAZE', unit_id: uid, target_id: id });
+                    addCommsEntry('SPECTRE', uid, `KAMIKAZE → ${id}`, 'RED');
+                  });
+                  setPendingAction(null);
+                } else {
+                  patch({ selectedContact: id });
+                }
+              }}
               onMapClick={handleMapClick}
             />
           )}
+
 
           <button
             onClick={() => setViewMode(v => v === '2d' ? '3d' : '2d')}
@@ -517,6 +540,7 @@ export default function App() {
                   sendArmaCommand({ type: action.id, unit_id: tid });
                   addCommsEntry('SPECTRE', u?.callsign || tid, action.id, 'BLUE');
                   break;
+                case 'KAMIKAZE':
                 case 'MOVE_TO':
                 case 'LAND_AT':
                 case 'SMOKE_AT':

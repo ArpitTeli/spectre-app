@@ -91,7 +91,7 @@ def update_teacher_output(conn, example_id, teacher_model, teacher_output, raw_r
     conn.execute(
         """UPDATE examples 
            SET teacher_model = ?, teacher_output_json = ?, teacher_raw_response = ?,
-               updated_at = ?
+               final_status = 'teacher_done', updated_at = ?
            WHERE id = ?""",
         (teacher_model, json.dumps(teacher_output), raw_response,
          datetime.now().isoformat(), example_id)
@@ -123,11 +123,13 @@ def update_planner_output(conn, example_id, planner_output):
 
 def update_geo_filter(conn, example_id, geo_result, status):
     """Update with geometric filter result."""
+    final_status = 'geo_passed' if status == 'passed' else 'geo_failed'
     conn.execute(
         """UPDATE examples 
-           SET geo_filter_result = ?, geo_filter_status = ?, updated_at = ?
+           SET geo_filter_result = ?, geo_filter_status = ?, final_status = ?,
+               updated_at = ?
            WHERE id = ?""",
-        (json.dumps(geo_result) if geo_result else None, status,
+        (json.dumps(geo_result) if geo_result else None, status, final_status,
          datetime.now().isoformat(), example_id)
     )
     conn.commit()
@@ -137,7 +139,8 @@ def update_judge_verdict(conn, example_id, judge_a_verdict, judge_b_verdict):
     """Update with judge verdicts."""
     conn.execute(
         """UPDATE examples 
-           SET judge_a_verdict = ?, judge_b_verdict = ?, updated_at = ?
+           SET judge_a_verdict = ?, judge_b_verdict = ?, final_status = 'judged',
+               updated_at = ?
            WHERE id = ?""",
         (json.dumps(judge_a_verdict) if judge_a_verdict else None,
          json.dumps(judge_b_verdict) if judge_b_verdict else None,
@@ -192,9 +195,19 @@ def get_stats(conn):
     # Total count
     stats["total"] = conn.execute("SELECT COUNT(*) FROM examples").fetchone()[0]
     
-    # Accepted count
-    stats["accepted"] = conn.execute(
-        "SELECT COUNT(*) FROM examples WHERE final_status = 'accepted'"
-    ).fetchone()[0]
+    # Flatten status counts for UI
+    by_status = stats["by_status"]
+    stats["sampled"] = by_status.get("sampled", 0)
+    stats["teacher_done"] = by_status.get("teacher_done", 0)
+    stats["geo_passed"] = by_status.get("geo_passed", 0)
+    stats["geo_failed"] = by_status.get("geo_failed", 0)
+    stats["judged"] = by_status.get("judged", 0)
+    stats["accepted"] = by_status.get("accepted", 0)
+    stats["rejected"] = by_status.get("rejected", 0)
+    stats["flagged"] = by_status.get("flagged", 0)
+    
+    # Target for UI display
+    from .config import TARGET_EXAMPLES
+    stats["target"] = TARGET_EXAMPLES
     
     return stats
