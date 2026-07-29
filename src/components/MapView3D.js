@@ -515,6 +515,8 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
         if (fwd.length() < 0.001) fwd.z = -1;
         fwd.normalize();
         const rt = new THREE.Vector3(); rt.crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
+        // Safety: clear keys if window lost focus
+        if (!document.hasFocus()) { for (const k in keys) delete keys[k]; }
         const spd = (keys['Shift'] ? 400 : 120) / 60;
         let mx = 0, mz = 0;
         if (keys['w']||keys['W']||keys['ArrowUp'])    { mx += fwd.x * spd; mz += fwd.z * spd; }
