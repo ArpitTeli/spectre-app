@@ -314,11 +314,8 @@ function connectToRelay(mode, roomCode, url, _isReconnect) {
       try { relayWs.close(); } catch (_) {}
     }
   });
-  relayWs.on('close', (code) => {
-    // Clean up stale listeners on close
-    relayWs.removeAllListeners();
-}
 
+  
 function scheduleReconnect(mode, roomCode, url) {
   if (relayReconnectTimer) return;
   relayReconnectAttempts++;
