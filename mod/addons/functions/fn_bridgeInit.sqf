@@ -759,7 +759,7 @@ SPECTRE_fnc_broadcastState = {
 // No call compile — uses direct parsing + function call.
 SPECTRE_fnc_readCommands = {
     private _result = "spectre_ext" callExtension ["READ", ["addons\spectre_cmds.sqf"]];
-    if (count _result < 3) exitWith {};
+    if (count _result < 1) exitWith {};
     private _sqf = _result select 0;
     if (_sqf isEqualTo "" || { _sqf find "ERR_" == 0 }) exitWith {};
 
