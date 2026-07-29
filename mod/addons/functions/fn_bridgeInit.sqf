@@ -765,25 +765,51 @@ SPECTRE_fnc_readCommands = {
     private _sqf = _result select 0;
     if (_sqf isEqualTo "" || { _sqf find "ERR_" == 0 }) exitWith {};
 
-    // Content-based dedup: skip if same content as last read
+    // Whole-file dedup: skip re-parsing when the file is byte-identical to last read.
     if (_sqf == SPECTRE_lastSQF) exitWith {};
     SPECTRE_lastSQF = _sqf;
 
-    diag_log format ["SPECTRE: CMD %1", _sqf select [0, 60]];
+    // The file holds MANY commands, one per line, each ending in
+    //   ... call SPECTRE_fnc_execCmd;
+    // Split on CR and LF (drops blank lines), then run every command line.
+    // Per-command-id dedup means new lines run even if earlier lines are unchanged.
+    private _lines = _sqf splitString (toString [13, 10]);
+    private _ran = 0;
 
-    // Extract the argument array by finding everything before " call SPECTRE_fnc_execCmd;"
-    // Handles both: [id, "TYPE", "UID"] and: [id, "EXECUTE_ORDER", "UID", [wp,wp], "ROE", "act"]
-    private _callIdx = _sqf find " call SPECTRE_fnc_execCmd;";
-    if (_callIdx < 0) exitWith {};
-    private _argsStr = _sqf select [0, _callIdx];
-    if (_argsStr select [0, 1] != "[") exitWith {};
+    {
+        private _line = _x;
+        private _callIdx = _line find " call SPECTRE_fnc_execCmd;";
+        if (_callIdx >= 0) then {
+            private _argsStr = _line select [0, _callIdx];
+            // Trim leading whitespace so indented lines still parse.
+            while { count _argsStr > 0 && { (_argsStr select [0, 1]) in [" ", toString [9]] } } do {
+                _argsStr = _argsStr select [1];
+            };
+            if (count _argsStr > 0 && { _argsStr select [0, 1] == "[" }) then {
+                private _args = call compile _argsStr;
+                if (!isNil "_args" && { typeName _args == "ARRAY" } && { count _args > 0 }) then {
+                    private _cmdId = _args select 0;
+                    // Skip commands we've already executed (per-id dedup).
+                    if !(_cmdId in SPECTRE_execCmdIds) then {
+                        SPECTRE_execCmdIds pushBack _cmdId;
+                        _args call SPECTRE_fnc_execCmd;
+                        _ran = _ran + 1;
+                        diag_log format ["SPECTRE: Executed OK: %1", _argsStr select [0, 50]];
+                    };
+                } else {
+                    diag_log format ["SPECTRE: Bad args: %1", _argsStr];
+                };
+            };
+        };
+    } forEach _lines;
 
-    private _args = call compile _argsStr;
-    if (!isNil "_args" && { typeName _args == "ARRAY" }) then {
-        _args call SPECTRE_fnc_execCmd;
-        diag_log format ["SPECTRE: Executed OK: %1", _argsStr select [0, 50]];
-    } else {
-        diag_log format ["SPECTRE: Bad args: %1", _argsStr];
+    // Keep the executed-id list bounded (the file is capped to the last 50 cmds).
+    if (count SPECTRE_execCmdIds > 200) then {
+        SPECTRE_execCmdIds = SPECTRE_execCmdIds select [(count SPECTRE_execCmdIds) - 100];
+    };
+
+    if (_ran > 0) then {
+        diag_log format ["SPECTRE: CMD batch ran %1 new command(s)", _ran];
     };
 };
 
@@ -792,6 +818,7 @@ hint "SPECTRE C2 Bridge: ACTIVE";
 diag_log "SPECTRE: Bridge running (wall-clock mode). Broadcasting every 0.5s, reading commands every 0.3s.";
 SPECTRE_initialized = true;
 SPECTRE_lastSQF = "";
+SPECTRE_execCmdIds = [];
 
 [] spawn {
     private _lastBroadcast = -999;

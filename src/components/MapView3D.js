@@ -223,6 +223,8 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
   onUnitRightClickRef.current = onUnitRightClick;
   const onMapClickRef = useRef(onMapClick);
   onMapClickRef.current = onMapClick;
+  const onContactSelectRef = useRef(onContactSelect);
+  onContactSelectRef.current = onContactSelect;
   const qHeldRef = useRef(false);
 
   useEffect(() => {
@@ -316,16 +318,25 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
       const s = st.current;
       if (!s.markers) return;
       const hits = raycaster.intersectObjects(s.markers.children, true);
-        if (hits.length > 0) {
-        let obj = hits[0].object;
-        while (obj && !obj.userData?.unitId) obj = obj.parent;
-        if (obj?.userData?.unitId) {
-          if ((e.button === 2 || qHeldRef.current) && onUnitRightClickRef.current) {
-            onUnitRightClickRef.current(obj.userData.unitId, e.clientX, e.clientY);
-          } else {
-            onUnitSelectRef.current(obj.userData.unitId, e.ctrlKey || e.metaKey);
-          }
+
+      // Resolve which marker (unit or contact) was hit by walking up the parent chain.
+      let unitObj = null;
+      let contactObj = null;
+      for (const hit of hits) {
+        let obj = hit.object;
+        while (obj && !obj.userData?.unitId && !obj.userData?.contactId) obj = obj.parent;
+        if (obj?.userData?.unitId) { unitObj = obj; break; }
+        if (obj?.userData?.contactId && !contactObj) { contactObj = obj; }
+      }
+
+      if (unitObj) {
+        if ((e.button === 2 || qHeldRef.current) && onUnitRightClickRef.current) {
+          onUnitRightClickRef.current(unitObj.userData.unitId, e.clientX, e.clientY);
+        } else {
+          onUnitSelectRef.current(unitObj.userData.unitId, e.ctrlKey || e.metaKey);
         }
+      } else if (contactObj) {
+        if (onContactSelectRef.current) onContactSelectRef.current(contactObj.userData.contactId);
       } else if (onMapClickRef.current) {
         const terrainHits = raycaster.intersectObject(s.terrainMesh, false);
         if (terrainHits.length > 0) {

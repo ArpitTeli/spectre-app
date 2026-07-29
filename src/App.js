@@ -304,6 +304,8 @@ export default function App() {
             <div className="target-mode-indicator">
               {pendingAction.id === 'KAMIKAZE'
                 ? `Click enemy contact to send drone — ${pendingAction.label} — ESC to cancel`
+                : pendingAction.id === 'ATTACK'
+                ? `Click enemy contact to attack — ${pendingAction.label} — ESC to cancel`
                 : `Click map to set target — ${pendingAction.label} — ESC to cancel`}
             </div>
           )}
@@ -351,6 +353,19 @@ export default function App() {
               onContactSelect={id => {
                 (async () => {
                   const action = pendingActionRef.current;
+                  // Target-requiring actions that resolve against an enemy contact
+                  if (action && action.id === 'ATTACK') {
+                    setPendingAction(null);
+                    const units = visibleUnits();
+                    const attackTargets = action.unitId ? [action.unitId] : state.selectedUnits;
+                    if (attackTargets.length === 0) { patch({ selectedContact: id }); return; }
+                    attackTargets.forEach(uid => {
+                      sendArmaCommand({ type: 'ATTACK', unit_id: uid, target_id: id });
+                      const u = units[uid];
+                      addCommsEntry('SPECTRE', u?.callsign || uid, `ATTACK → ${id}`, 'RED');
+                    });
+                    return;
+                  }
                   if (!action || action.id !== 'KAMIKAZE') {
                     patch({ selectedContact: id });
                     return;
@@ -398,6 +413,19 @@ export default function App() {
               onContactSelect={id => {
                 (async () => {
                   const action = pendingActionRef.current;
+                  // Target-requiring actions that resolve against an enemy contact
+                  if (action && action.id === 'ATTACK') {
+                    setPendingAction(null);
+                    const units = visibleUnits();
+                    const attackTargets = action.unitId ? [action.unitId] : state.selectedUnits;
+                    if (attackTargets.length === 0) { patch({ selectedContact: id }); return; }
+                    attackTargets.forEach(uid => {
+                      sendArmaCommand({ type: 'ATTACK', unit_id: uid, target_id: id });
+                      const u = units[uid];
+                      addCommsEntry('SPECTRE', u?.callsign || uid, `ATTACK → ${id}`, 'RED');
+                    });
+                    return;
+                  }
                   if (!action || action.id !== 'KAMIKAZE') {
                     patch({ selectedContact: id });
                     return;
