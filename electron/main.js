@@ -315,7 +315,7 @@ function connectToRelay(mode, roomCode, url, _isReconnect) {
     }
   });
 
-  
+  }
 function scheduleReconnect(mode, roomCode, url) {
   if (relayReconnectTimer) return;
   relayReconnectAttempts++;
