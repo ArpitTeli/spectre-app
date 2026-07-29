@@ -68,7 +68,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
         intelDB: state.intelDB || { locations: [], patterns: [] }
       };
 
-      const conversation = aiService.conversationHistory;
+      const conversation = aiService.conversationHistory || [];
       // First user message is the objective, everything after is constraints/refinements
       const userMsgs   = conversation.filter(m => m.role === 'user').map(m => m.content);
       const objective  = userMsgs[0] || 'Unspecified';
@@ -159,7 +159,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
             <div className="planning-container__title">Mission Planning</div>
             <div className="planning-container__subtitle">
               {state.armaConnected
-                ? `${Object.keys(state.units).length} units available · ${Object.keys(state.contacts).length} contacts tracked`
+                ? `${Object.keys(state.units || {}).length} units available · ${Object.keys(state.contacts || {}).length} contacts tracked`
                 : 'Arma not connected — planning in simulation mode'}
             </div>
           </div>

@@ -6,7 +6,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
   const [error, setError] = useState('');
 
   const handleHost = () => {
-    onSelect({ mode: 'host', roomCode: '' });
+    if (typeof onSelect === 'function') onSelect({ mode: 'host', roomCode: '' });
   };
 
   const handleClient = () => {
@@ -15,7 +15,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
       setError('Enter a room code (at least 4 characters)');
       return;
     }
-    onSelect({ mode: 'client', roomCode: code });
+    if (typeof onSelect === 'function') onSelect({ mode: 'client', roomCode: code });
   };
 
   return (

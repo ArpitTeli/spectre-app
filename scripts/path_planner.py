@@ -35,8 +35,12 @@ GRID_DIR = os.path.join(os.path.dirname(__file__), "..", "public", "maps")
 
 def load_weighted_grid(map_name="stratis"):
     path = os.path.join(GRID_DIR, f"{map_name}_costgrid_weighted.npz")
-    data = np.load(path)
-    return data["grid"]  # shape: [128, 128, 5]
+    try:
+        data = np.load(path)
+        return data["grid"]  # shape: [128, 128, 5]
+    except (FileNotFoundError, OSError) as e:
+        print(f"Warning: Could not load cost grid for '{map_name}': {e}", file=sys.stderr)
+        return None
 
 
 def world_to_grid(x, y):

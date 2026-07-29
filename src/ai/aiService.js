@@ -174,9 +174,9 @@ class AIService {
   // ── Planning conversation ──────────────────────────────────────────────────
   async chat(userMessage, context, vaultPath) {
     this.compressHistory();
-    this.conversationHistory.push({ role: 'user', content: userMessage });
 
     const ctx = vaultPath ? await this.buildVaultContext(vaultPath, context) : this.buildContext(context);
+    this.conversationHistory.push({ role: 'user', content: userMessage });
     const messages = [
       { role: 'user', content: `BATTLEFIELD CONTEXT:\n${ctx}\n\n---` },
       ...this.conversationHistory
@@ -570,12 +570,17 @@ ${patternStr}`;
     }
 
     const candidates = [];
-    let depth = 0, start = -1;
+    let depth = 0, start = -1, inStr = false, esc = false;
     for (let i = 0; i < text.length; i++) {
-      if (text[i] === '{') {
+      const ch = text[i];
+      if (esc) { esc = false; continue; }
+      if (ch === '\\') { esc = true; continue; }
+      if (ch === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (ch === '{') {
         if (depth === 0) start = i;
         depth++;
-      } else if (text[i] === '}') {
+      } else if (ch === '}') {
         depth--;
         if (depth === 0 && start !== -1) {
           candidates.push(text.slice(start, i + 1));

@@ -4,6 +4,7 @@ export default function AARPanel({ aar, rewardData, onClose, onNewMission }) {
   const [tab, setTab] = useState('SUMMARY');
 
   if (!aar) return null;
+  if (!rewardData) return null;
 
   const scoreColor = rewardData.score >= 70 ? 'var(--accent)' : rewardData.score >= 40 ? 'var(--color-yellow)' : 'var(--color-red)';
   const scoreLetter = rewardData.score >= 80 ? 'S' : rewardData.score >= 60 ? 'A' : rewardData.score >= 40 ? 'B' : rewardData.score >= 20 ? 'C' : 'F';
@@ -92,9 +93,9 @@ function SummaryTab({ aar, rewardData, scoreColor }) {
           SCORE BREAKDOWN
         </div>
         <ScoreLine label="Objective captured" value={outcome.objective_captured ? '+50' : '0'} positive={outcome.objective_captured} />
-        <ScoreLine label={`Enemy eliminated (${rewardData.enemy_kills})`} value={`+${rewardData.enemy_kills * 3}`} positive />
-        <ScoreLine label={`Friendly KIA (${rewardData.friendly_kia})`} value={rewardData.friendly_kia > 0 ? `-${rewardData.friendly_kia * 15}` : '0'} negative={rewardData.friendly_kia > 0} />
-        <ScoreLine label={`Vehicles lost (${rewardData.vehicles_lost})`} value={rewardData.vehicles_lost > 0 ? `-${rewardData.vehicles_lost * 20}` : '0'} negative={rewardData.vehicles_lost > 0} />
+        <ScoreLine label={`Enemy eliminated (${rewardData.enemy_kills ?? 0})`} value={`+${(rewardData.enemy_kills ?? 0) * 3}`} positive />
+        <ScoreLine label={`Friendly KIA (${rewardData.friendly_kia ?? 0})`} value={(rewardData.friendly_kia ?? 0) > 0 ? `-${(rewardData.friendly_kia ?? 0) * 15}` : '0'} negative={(rewardData.friendly_kia ?? 0) > 0} />
+        <ScoreLine label={`Vehicles lost (${rewardData.vehicles_lost ?? 0})`} value={(rewardData.vehicles_lost ?? 0) > 0 ? `-${(rewardData.vehicles_lost ?? 0) * 20}` : '0'} negative={(rewardData.vehicles_lost ?? 0) > 0} />
         <div style={{ borderTop: '1px solid var(--border-primary)', marginTop: '6px', paddingTop: '6px', display: 'flex', justifyContent: 'space-between' }}>
           <span style={{ fontFamily: 'var(--font-condensed)', fontWeight: 700, color: 'var(--text-bright)' }}>TOTAL</span>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 'bold', color: scoreColor }}>{rewardData.score.toFixed(0)}</span>
@@ -174,7 +175,7 @@ function AnalysisTab({ aar }) {
         <Section title="INTELLIGENCE UPDATES">
           {aar.intelligence_updates.map((u, i) => (
             <div key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)', padding: '3px 0' }}>
-              ✓ Intel updated: {u.type} — {JSON.stringify(u.data).slice(0, 80)}...
+              ✓ Intel updated: {u.type} — {JSON.stringify(u.data ?? '').slice(0, 80) || ''}...
             </div>
           ))}
         </Section>

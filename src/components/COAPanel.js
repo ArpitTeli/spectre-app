@@ -14,6 +14,51 @@ function getProbColor(pct) {
   return 'var(--color-red)';
 }
 
+function PhaseBar({ selectedCOA, showCOAOverlay, activePhaseIdx, onAdvancePhase }) {
+  if (!selectedCOA || !showCOAOverlay) return null;
+  const phases     = selectedCOA.phases || [];
+  const isLastPhase = activePhaseIdx >= phases.length - 1;
+  if (phases.length <= 1) return null;
+
+  return (
+    <div style={{
+      margin: '0 0 16px', padding: '12px 14px',
+      background: 'rgba(13,127,204,0.08)', border: '1px solid var(--border-accent)',
+      borderRadius: '4px'
+    }}>
+        <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '2px', marginBottom: '8px' }}>
+        ACTIVE COA: {selectedCOA.name}
+      </div>
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '10px' }}>
+        {phases.map((ph, i) => (
+          <div key={i} style={{
+            flex: 1, height: '6px', borderRadius: '3px',
+            background: i < activePhaseIdx ? 'var(--accent)'
+              : i === activePhaseIdx ? 'var(--accent)'
+              : 'var(--bg-tertiary)',
+            transition: 'background 0.3s'
+          }} />
+        ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-secondary)' }}>
+          Phase {activePhaseIdx + 1}/{phases.length}: {phases[activePhaseIdx]?.name}
+        </span>
+        {!isLastPhase && (
+          <button className="btn btn-primary" style={{ fontSize: '11px' }} onClick={onAdvancePhase}>
+            ▶ ADVANCE TO PHASE {activePhaseIdx + 2}
+          </button>
+        )}
+        {isLastPhase && (
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)' }}>
+          Final phase active
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntry, sendArmaCommand }) {
   const [modifyingId,  setModifyingId]  = useState(null);
   const [modifyInput,  setModifyInput]  = useState('');
@@ -27,6 +72,7 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
   const [activePhaseIdx, setActivePhaseIdx] = useState(0);
   const syncPhaseIdx = (val) => { activePhaseIdxRef.current = val; setActivePhaseIdx(val); };
 
+  if (!state) return null;
   if (!coas || coas.length === 0) return null;
 
   // ── COA modification ─────────────────────────────────────────────────────
@@ -40,7 +86,7 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
       patch({ currentCOAs: updated });
       setModifyingId(null);
       setModifyInput('');
-      if (modified.changes?.length) {
+      if (modified?.changes?.length) {
         addCommsEntry('SPECTRE', 'COMMANDER', `COA ${coa.id} modified: ${modified.changes.join(', ')}`, 'BLUE');
       }
     } catch (err) {
@@ -82,7 +128,7 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
         waypoints:        order.waypoints || [],
         engagement_rules: order.engagement_rules
       });
-      addCommsEntry('SPECTRE', order.callsign || order.unit_id,
+      addCommsEntry('SPECTRE', order.callsign || order.unit_id || 'UNIT',
         `${order.action}${order.engagement_rules ? ' — ' + order.engagement_rules : ''}`, 'BLUE');
     }
   };
@@ -177,52 +223,6 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
     );
   }
 
-  // ─── Phase advancement bar (shown when a COA is active, panel reopened) ──
-  const PhaseBar = () => {
-    if (!selectedCOA || !state.showCOAOverlay) return null;
-    const phases     = selectedCOA.phases || [];
-    const isLastPhase = activePhaseIdx >= phases.length - 1;
-    if (phases.length <= 1) return null;
-
-    return (
-      <div style={{
-        margin: '0 0 16px', padding: '12px 14px',
-        background: 'rgba(13,127,204,0.08)', border: '1px solid var(--border-accent)',
-        borderRadius: '4px'
-      }}>
-          <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '2px', marginBottom: '8px' }}>
-          ACTIVE COA: {selectedCOA.name}
-        </div>
-        <div style={{ display: 'flex', gap: '4px', marginBottom: '10px' }}>
-          {phases.map((ph, i) => (
-            <div key={i} style={{
-              flex: 1, height: '6px', borderRadius: '3px',
-              background: i < activePhaseIdx ? 'var(--accent)'
-                : i === activePhaseIdx ? 'var(--accent)'
-                : 'var(--bg-tertiary)',
-              transition: 'background 0.3s'
-            }} />
-          ))}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-secondary)' }}>
-            Phase {activePhaseIdx + 1}/{phases.length}: {phases[activePhaseIdx]?.name}
-          </span>
-          {!isLastPhase && (
-            <button className="btn btn-primary" style={{ fontSize: '11px' }} onClick={handleAdvancePhase}>
-              ▶ ADVANCE TO PHASE {activePhaseIdx + 2}
-            </button>
-          )}
-          {isLastPhase && (
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)' }}>
-            Final phase active
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   // ─── Main COA selection view ──────────────────────────────────────────────
   return (
     <div className="coa-overlay">
@@ -238,7 +238,7 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
         </div>
 
         <div style={{ padding: '0 16px' }}>
-          <PhaseBar />
+          <PhaseBar selectedCOA={selectedCOA} showCOAOverlay={state.showCOAOverlay} activePhaseIdx={activePhaseIdx} onAdvancePhase={handleAdvancePhase} />
         </div>
 
         <div className="coa-cards">

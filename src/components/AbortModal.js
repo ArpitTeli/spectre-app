@@ -54,9 +54,9 @@ export default function AbortModal({ abortState, forceMetrics, rewardData, onCho
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginTop: '10px' }}>
-              <Stat label="FIREPOWER" value={`${forceMetrics.firepower_index}%`} danger={forceMetrics.firepower_index < 50} />
-              <Stat label="VEHICLES" value={`${forceMetrics.vehicles_active}/${forceMetrics.vehicles_total}`} danger={forceMetrics.vehicles_active < forceMetrics.vehicles_total / 2} />
-              <Stat label="CREW KIA" value={rewardData.friendly_kia} danger={rewardData.friendly_kia > 0} />
+              <Stat label="FIREPOWER" value={`${forceMetrics?.firepower_index ?? 0}%`} danger={forceMetrics?.firepower_index ? forceMetrics.firepower_index < 50 : false} />
+              <Stat label="VEHICLES" value={`${forceMetrics?.vehicles_active ?? 0}/${forceMetrics?.vehicles_total ?? 0}`} danger={forceMetrics?.vehicles_active != null ? forceMetrics.vehicles_active < (forceMetrics.vehicles_total ?? 0) / 2 : false} />
+              <Stat label="CREW KIA" value={rewardData?.friendly_kia ?? 0} danger={(rewardData?.friendly_kia ?? 0) > 0} />
             </div>
           </div>
 

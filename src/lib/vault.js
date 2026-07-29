@@ -13,7 +13,12 @@ export function parseFrontmatter(content) {
   const frontmatter = {};
 
   for (const line of yaml.split('\n')) {
-    const colonIdx = line.indexOf(':');
+    let inQuotes = false;
+    let colonIdx = -1;
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') inQuotes = !inQuotes;
+      else if (line[i] === ':' && !inQuotes) { colonIdx = i; break; }
+    }
     if (colonIdx === -1) continue;
     const key = line.slice(0, colonIdx).trim();
     let val = line.slice(colonIdx + 1).trim();
@@ -51,7 +56,7 @@ export function writeFrontmatter(frontmatter, body) {
     if (val === undefined || val === null) continue;
     if (Array.isArray(val)) {
       lines.push(`${key}: ${JSON.stringify(val)}`);
-    } else if (typeof val === 'string' && (val.includes(':') || val.includes('#') || val.includes('"') || val.includes('\n'))) {
+    } else if (typeof val === 'string' && (val.includes(':') || val.includes('#') || val.includes('"') || val.includes('\n') || /^(true|false|null|yes|no|on|off|\d+(\.\d+)?)$/.test(val))) {
       lines.push(`${key}: "${val.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`);
     } else {
       lines.push(`${key}: ${val}`);

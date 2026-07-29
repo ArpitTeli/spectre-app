@@ -194,7 +194,7 @@ function setVercelUrl(url) {
 
 async function postToVercel(data) {
   if (!vercelUrl) return;
-  vercelPostQueue.push(data);
+  vercelPostQueue.push(JSON.parse(JSON.stringify(data)));
   if (vercelPosting) return;
   vercelPosting = true;
 
@@ -307,8 +307,12 @@ function connectToRelay(mode, roomCode, url, _isReconnect) {
     if (e.message && (/\b40[34]\b/.test(e.message) || e.message.includes('Unexpected server response'))) {
       relayFatalError = true;
       dbg('SPECTRE: relay server rejected connection — fatal');
+      try { relayWs.close(); } catch (_) {}
     }
   });
+  relayWs.on('close', (code) => {
+    // Clean up stale listeners on close
+    relayWs.removeAllListeners();
 }
 
 function scheduleReconnect(mode, roomCode, url) {
@@ -507,6 +511,7 @@ connect();
 }
 
 // ─── Command queue ───────────────────────────────────────────────────────────
+let pendingSpectreCmds = [];   // local bridge command buffer (prevents overwrite)
 let pendingCommands = [];
 
 function buildSQFContent(commands) {
@@ -653,7 +658,9 @@ function writeCommandToFile(cmd) {
   if (!ARMA_INSTALL) return;
   try {
     if (!cmd._id) cmd._id = Date.now() + Math.floor(Math.random() * 10000);
-    const sqf = buildSQFContent([cmd]);
+    pendingSpectreCmds.push(cmd);
+    if (pendingSpectreCmds.length > 50) pendingSpectreCmds = pendingSpectreCmds.slice(-50);
+    const sqf = buildSQFContent(pendingSpectreCmds);
     const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
     fs.writeFileSync(p, sqf, 'utf8');
     fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} OK ${cmd.type}\n`);
@@ -787,6 +794,7 @@ ipcMain.handle('install-mod', async (_, modType) => {
               res.on('data', (chunk) => {
                 downloaded += chunk.length;
               });
+              res.on('error', reject);
               res.pipe(file);
               file.on('finish', () => {
                 file.close();

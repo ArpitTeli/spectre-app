@@ -378,8 +378,8 @@ function processArmaUpdate(data, stateRef, patch) {
     };
   });
 
-  // Compute newEvents after patch for event handling (use the same dedup result)
-  const processedSet2 = new Set(missionChanged ? [] : current.processedEventIds);
+  // Compute newEvents after patch for event handling — use stateRef for fresh dedup
+  const processedSet2 = new Set(missionChanged ? [] : stateRef.current.processedEventIds);
   const newEvents = events.filter(e => {
     const key = e.id || `${e.type}_${e.timestamp}`;
     if (processedSet2.has(key)) return false;
@@ -477,7 +477,8 @@ async function handleArmaEvents(events, stateRef, patch) {
 async function triggerAbortCheck(state, patch) {
   const fp = state.forceMetrics.firepower_index;
   const kia = state.rewardData.friendly_kia;
-  let reason = fp <= 50 ? `Force strength critical — ${fp}% firepower remaining` : `${kia} crew KIA — force below effective threshold`;
+  const threshold = state.config?.auto_abort_threshold?.firepower_loss_pct ?? 50;
+  let reason = fp <= threshold ? `Force strength critical — ${fp}% firepower remaining` : `${kia} crew KIA — force below effective threshold`;
 
   const baseOptions = [
     { id: 'WITHDRAW', label: 'FIGHTING WITHDRAWAL', description: 'Suppress and disengage to nearest safe position', success_pct: 82, risk: 'LOW' },

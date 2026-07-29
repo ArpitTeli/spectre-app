@@ -27,7 +27,7 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
     return () => clearInterval(t);
   }, []);
 
-  const fpColor = forceMetrics.firepower_index < 50 ? 'danger' : forceMetrics.firepower_index < 70 ? 'warning' : '';
+  const fpColor = (forceMetrics?.firepower_index ?? 100) < 50 ? 'danger' : (forceMetrics?.firepower_index ?? 100) < 70 ? 'warning' : '';
   const webUrl = bridgePaths?.web_viewer_url;
 
   return (
@@ -59,10 +59,10 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
       )}
       <div className="statusbar__divider" />
       <div className="statusbar__item">
-        <span className={`statusbar__value ${fpColor}`}>FP {forceMetrics.firepower_index}%</span>
+        <span className={`statusbar__value ${fpColor}`}>FP {forceMetrics?.firepower_index ?? 0}%</span>
       </div>
       <div className="statusbar__item">
-        <span className="statusbar__value">{forceMetrics.vehicles_active}/{forceMetrics.vehicles_total} V</span>
+        <span className="statusbar__value">{forceMetrics?.vehicles_active ?? 0}/{forceMetrics?.vehicles_total ?? 0} V</span>
       </div>
       {rewardData && (
         <>

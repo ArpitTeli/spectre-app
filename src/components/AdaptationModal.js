@@ -3,7 +3,7 @@ import React from 'react';
 export default function AdaptationModal({ adaptation, onAccept, onDismiss, onShowNewCOAs }) {
   if (!adaptation) return null;
 
-  const severityColors = { MINOR: 'var(--color-yellow)', MAJOR: 'var(--color-last-known)', CRITICAL: 'var(--color-red)' };
+  const severityColors = { MINOR: '#f5a623', MAJOR: '#f5a6a6', CRITICAL: '#db3838' };
   const color = severityColors[adaptation.severity] || 'var(--color-yellow)';
 
   return (
