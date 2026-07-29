@@ -80,10 +80,10 @@ SPECTRE_fnc_vehicleType = {
     params ["_v"];
     private _t = typeOf _v;
     // Drones — check class name patterns (robust across mod variants)
-    if (_t find "FPV" >= 0) exitWith { "FPV" };
+    if ("FPV" in _t) exitWith { "FPV" };
     if (_v isKindOf "UAV_01_base_F") exitWith { "UAV" };
-    if (_t find "UGV_01" >= 0) exitWith { "STOMPER" };
-    if (_t find "UGV_02" >= 0) exitWith { "ED1" };
+    if ("UGV_01" in _t) exitWith { "STOMPER" };
+    if ("UGV_02" in _t) exitWith { "ED1" };
     // Conventional types
     if (_v isKindOf "Helicopter")  exitWith { "HELI" };
     if (_v isKindOf "Plane")       exitWith { "PLANE" };
