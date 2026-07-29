@@ -79,13 +79,15 @@ diag_log format ["SPECTRE: Initialized — tracking %1 blufor assets on %2", cou
 SPECTRE_fnc_vehicleType = {
     params ["_v"];
     private _t = typeOf _v;
+    // Temporary debug — check if classifier is working
+    diag_log format ["SPECTRE CLASSIFIER: typeOf=%1 isKindOf_UAV_01=%2 isKindOf_Heli=%3", _t, _v isKindOf "UAV_01_base_F", _v isKindOf "Helicopter"];
     // Drones — check class name patterns (robust across mod variants)
-    if ("FPV" in _t) exitWith { "FPV" };
-    if (_v isKindOf "UAV_01_base_F") exitWith { "UAV" };
-    if ("UGV_01" in _t) exitWith { "STOMPER" };
-    if ("UGV_02" in _t) exitWith { "ED1" };
+    if ("FPV" in _t) exitWith { diag_log "SPECTRE CLASSIFIER: -> FPV"; "FPV" };
+    if (_v isKindOf "UAV_01_base_F") exitWith { diag_log "SPECTRE CLASSIFIER: -> UAV"; "UAV" };
+    if ("UGV_01" in _t) exitWith { diag_log "SPECTRE CLASSIFIER: -> STOMPER"; "STOMPER" };
+    if ("UGV_02" in _t) exitWith { diag_log "SPECTRE CLASSIFIER: -> ED1"; "ED1" };
     // Conventional types
-    if (_v isKindOf "Helicopter")  exitWith { "HELI" };
+    if (_v isKindOf "Helicopter")  exitWith { diag_log "SPECTRE CLASSIFIER: -> HELI"; "HELI" };
     if (_v isKindOf "Plane")       exitWith { "PLANE" };
     if (_v isKindOf "Ship")        exitWith { "BOAT" };
     if (_v isKindOf "Truck_F")     exitWith { "TRUCK" };
