@@ -144,6 +144,26 @@ def find_valid_start_end(grid, window, min_distance=2000, max_distance=6000):
     return (sx, sy), (ex, ey)
 
 
+def is_on_land(grid, x, y, cell_size=64):
+    """Check if a world position is on land (not water)."""
+    if grid is None:
+        return True  # No terrain data, assume valid
+    grid_dim = grid.shape[0]
+    gx = int(x / cell_size) % grid_dim
+    gy = int(y / cell_size) % grid_dim
+    return grid[gy, gx, 1] != 4  # Channel 1 == 4 is water
+
+
+def find_land_position(grid, x, y, spread=300, max_tries=20):
+    """Find a land position near (x, y). Retries with jitter up to max_tries."""
+    for _ in range(max_tries):
+        tx = x + random.randint(-spread, spread)
+        ty = y + random.randint(-spread, spread)
+        if is_on_land(grid, tx, ty):
+            return tx, ty
+    return x, y  # Fallback
+
+
 def generate_scenario(map_name=None):
     """Generate a random but realistic scenario."""
     map_name = map_name or MAP_NAME
@@ -161,12 +181,11 @@ def generate_scenario(map_name=None):
     # Generate unit positions (spread around start)
     friendly_units = []
     for i, unit_type in enumerate(units):
-        offset_x = random.randint(-300, 300)
-        offset_y = random.randint(-300, 300)
+        fx, fy = find_land_position(grid, start_x, start_y)
         friendly_units.append({
             "unit_id": f"friendly_{i}",
             "type": unit_type,
-            "pos": [start_x + offset_x, start_y + offset_y],
+            "pos": [fx, fy],
             "status": "ready"
         })
     
@@ -182,10 +201,13 @@ def generate_scenario(map_name=None):
             t = random.uniform(0.25, 0.75)
             enemy_x = int(start_x + t * (end_x - start_x) + random.randint(-800, 800))
             enemy_y = int(start_y + t * (end_y - start_y) + random.randint(-800, 800))
-            
+
             # Clamp to window
             enemy_x = max(window["x_min"], min(window["x_max"], enemy_x))
             enemy_y = max(window["y_min"], min(window["y_max"], enemy_y))
+
+            # Reject water positions
+            enemy_x, enemy_y = find_land_position(grid, enemy_x, enemy_y)
             
             known_contacts.append({
                 "contact_id": f"enemy_{contact_id}",

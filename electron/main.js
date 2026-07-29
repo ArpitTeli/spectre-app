@@ -44,7 +44,7 @@ let ARMA_INSTALL = (_configData.arma_path && fs.existsSync(_configData.arma_path
   ? _configData.arma_path
   : detectArma3();
 const ARMA_DOCS    = detectArmaDocuments();
-const ARMA_SPECTRE = path.join(ARMA_DOCS, 'SPECTRE');
+const ARMA_SPECTRE = ARMA_DOCS ? path.join(ARMA_DOCS, 'SPECTRE') : null;
 
 // Persist detected path back to config if we found one and config didn't have it
 if (ARMA_INSTALL && !_configData.arma_path) {
@@ -99,9 +99,12 @@ const DEFAULT_CONFIG = {
 };
 
 // ─── Ensure directories exist ────────────────────────────────────────────────
-[BRIDGE_DIR, MISSIONS_DIR, INTEL_DIR, ARMA_SPECTRE, VAULTS_DIR].forEach(d => {
+[BRIDGE_DIR, MISSIONS_DIR, INTEL_DIR, VAULTS_DIR].forEach(d => {
   try { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); } catch (_) {}
 });
+if (ARMA_DOCS && ARMA_SPECTRE) {
+  try { if (!fs.existsSync(ARMA_SPECTRE)) fs.mkdirSync(ARMA_SPECTRE, { recursive: true }); } catch (_) {}
+}
 if (!fs.existsSync(CONFIG_PATH)) {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(DEFAULT_CONFIG, null, 2));
 }
@@ -195,6 +198,7 @@ function setVercelUrl(url) {
 async function postToVercel(data) {
   if (!vercelUrl) return;
   vercelPostQueue.push(JSON.parse(JSON.stringify(data)));
+  if (vercelPostQueue.length > 100) vercelPostQueue.shift();
   if (vercelPosting) return;
   vercelPosting = true;
 
@@ -1072,7 +1076,11 @@ function startBridgeWatcher() {
   dbg('SPECTRE: bridge watching Arma log files');
 }
 
+let lastReadTime = 0;
 function readNewLogData() {
+  const now = Date.now();
+  if (now - lastReadTime < 100) return;
+  lastReadTime = now;
   if (!currentLogPath) return;
   try {
     if (!fs.existsSync(currentLogPath)) return;
@@ -1142,6 +1150,7 @@ let pendingState = { units: {}, contacts: {}, events: [], mapName: null, mission
 function parseArmaLog(chunk) {
   const lines = chunk.split('\n');
   let gotData = false;
+  let legacyFlushed = false;
 
   for (const line of lines) {
     // New per-line format: SPECTRE_META, SPECTRE_UNIT, SPECTRE_CONTACT, SPECTRE_EVENTS
@@ -1228,6 +1237,7 @@ function parseArmaLog(chunk) {
         postToVercel(data);
         sendStateToRelay(data);
         gotData = true;
+        legacyFlushed = true;
       } catch (e) {
         dbg('SPECTRE: legacy parse error: ' + e.message);
       }
@@ -1235,7 +1245,7 @@ function parseArmaLog(chunk) {
   }
 
   // After processing all lines in this chunk, flush the accumulated state
-  if (gotData && (Object.keys(pendingState.units).length > 0 || Object.keys(pendingState.contacts).length > 0 || pendingState.events.length > 0 || pendingState.mapName)) {
+  if (!legacyFlushed && gotData && (Object.keys(pendingState.units).length > 0 || Object.keys(pendingState.contacts).length > 0 || pendingState.events.length > 0 || pendingState.mapName)) {
     const data = {
       missionFolder: pendingState.missionFolder || '',
       fullMissionPath: pendingState.fullMissionPath || '',

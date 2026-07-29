@@ -65,6 +65,7 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
   const [steppingCOA,  setSteppingCOA] = useState(null);
   const [stepIndex,    setStepIndex]   = useState(0);
   const [loading,      setLoading]     = useState(false);
+  const [modifyError,  setModifyError] = useState('');
 
   // Phase advancement: track which phase of the selected COA is currently active
   // Use ref for synchronous access in async handlers to avoid race conditions
@@ -86,11 +87,13 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
       patch({ currentCOAs: updated });
       setModifyingId(null);
       setModifyInput('');
+      setModifyError('');
       if (modified?.changes?.length) {
         addCommsEntry('SPECTRE', 'COMMANDER', `COA ${coa.id} modified: ${modified.changes.join(', ')}`, 'BLUE');
       }
     } catch (err) {
       console.error('Modify failed:', err);
+      setModifyError(err.message || 'COA modification failed');
     } finally {
       setLoading(false);
     }
@@ -326,7 +329,12 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
                     <button className="btn btn-primary" onClick={() => handleModify(coa)} disabled={loading}>
                       {loading ? '⟳' : 'APPLY'}
                     </button>
-                    <button className="btn" onClick={() => setModifyingId(null)}>✕</button>
+                    <button className="btn" onClick={() => { setModifyingId(null); setModifyError(''); }}>✕</button>
+                    {modifyError && (
+                      <div style={{ padding: '4px 8px', marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-red)' }}>
+                        {modifyError}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

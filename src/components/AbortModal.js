@@ -10,7 +10,9 @@ const RISK_COLORS = {
 export default function AbortModal({ abortState, forceMetrics, rewardData, onChoice }) {
   if (!abortState) return null;
 
-  const { countdown, options, assessment, auto_select } = abortState;
+  const countdown = abortState?.countdown ?? 0;
+  const { options, assessment, auto_select } = abortState;
+  const autoOption = options?.find(o => o.id === auto_select);
   const pct = (countdown / 30) * 100;
 
   return (
@@ -103,7 +105,7 @@ export default function AbortModal({ abortState, forceMetrics, rewardData, onCho
           {/* Countdown */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Auto-selecting FIGHTING WITHDRAWAL in</span>
+              <span style={{ color: 'var(--text-muted)' }}>Auto-selecting {autoOption?.label || 'WITHDRAW'} in</span>
               <span style={{ color: countdown <= 10 ? 'var(--color-red)' : 'var(--color-yellow)', fontWeight: 'bold' }}>{countdown}s</span>
             </div>
             <div style={{ height: '4px', background: 'var(--bg-tertiary)', borderRadius: '2px', overflow: 'hidden' }}>

@@ -25,6 +25,8 @@ export default function VaultGraph({ vaultPath, units, contacts }) {
   const cyRef = useRef(null);
   const unitsRef = useRef(units);
   const contactsRef = useRef(contacts);
+  const epochRef = useRef(0);
+  const fitTimerRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [nodeCount, setNodeCount] = useState(0);
   const [edgeCount, setEdgeCount] = useState(0);
@@ -37,13 +39,15 @@ export default function VaultGraph({ vaultPath, units, contacts }) {
   const buildGraph = useCallback(async () => {
     if (!vaultPath || !containerRef.current) return;
 
+    const currentEpoch = ++epochRef.current;
     const liveUnits = unitsRef.current;
     const liveContacts = contactsRef.current;
 
     setLoading(true);
     try {
       const nodes = await readVaultNodes(vaultPath);
-      if (!nodes.length) {
+      if (currentEpoch !== epochRef.current) return;
+      if (!nodes || !nodes.length) {
         setLoading(false);
         return;
       }
@@ -211,7 +215,8 @@ export default function VaultGraph({ vaultPath, units, contacts }) {
       setLoading(false);
 
       // Fit after layout finishes
-      setTimeout(() => {
+      if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
+      fitTimerRef.current = setTimeout(() => {
         if (cyRef.current && !cyRef.current.destroyed()) {
           cyRef.current.fit(undefined, 30);
         }
@@ -226,6 +231,7 @@ export default function VaultGraph({ vaultPath, units, contacts }) {
   useEffect(() => {
     buildGraph();
     return () => {
+      if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
       if (cyRef.current) {
         cyRef.current.destroy();
         cyRef.current = null;

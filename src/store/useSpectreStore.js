@@ -340,7 +340,13 @@ function processArmaUpdate(data, stateRef, patch) {
   contacts.forEach(c => {
     const existing = contactsMap[c.id];
     // Don't overwrite DEAD contacts with CONFIRMED from broadcast
-    if (existing && existing.state === 'DEAD') return;
+    if (existing && existing.state === 'DEAD') {
+      if (existing.last_seen && (now - existing.last_seen) > 3600000) {
+        delete contactsMap[c.id];
+        contactsMap[c.id] = { ...c, state: 'CONFIRMED', last_seen: now };
+      }
+      return;
+    }
     contactsMap[c.id] = { ...existing, ...c, state: 'CONFIRMED', last_seen: now };
   });
   Object.keys(contactsMap).forEach(id => {
@@ -477,8 +483,11 @@ async function handleArmaEvents(events, stateRef, patch) {
 async function triggerAbortCheck(state, patch) {
   const fp = state.forceMetrics.firepower_index;
   const kia = state.rewardData.friendly_kia;
-  const threshold = state.config?.auto_abort_threshold?.firepower_loss_pct ?? 50;
-  let reason = fp <= threshold ? `Force strength critical — ${fp}% firepower remaining` : `${kia} crew KIA — force below effective threshold`;
+  const fpThreshold = state.config?.auto_abort_threshold?.firepower_loss_pct ?? 50;
+  const kiaThreshold = state.config?.auto_abort_threshold?.crew_kia ?? 2;
+  let reason = fp <= fpThreshold
+    ? `Force strength critical — ${fp}% firepower remaining (threshold: ${fpThreshold}%)`
+    : `${kia} crew KIA — exceeded crew KIA threshold of ${kiaThreshold}`;
 
   const baseOptions = [
     { id: 'WITHDRAW', label: 'FIGHTING WITHDRAWAL', description: 'Suppress and disengage to nearest safe position', success_pct: 82, risk: 'LOW' },

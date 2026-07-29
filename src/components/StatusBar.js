@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 function formatElapsed(sec) {
   if (!sec) return '00:00';
@@ -151,6 +151,7 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
   const [modStatus, setModStatus]   = useState({});
   const [installing, setInstalling] = useState('');
   const [livePaths, setLivePaths]   = useState(null);
+  const savedTimerRef = useRef(null);
 
   useEffect(() => {
     window.spectreAPI?.getPaths?.().then(setLivePaths).catch(() => {});
@@ -158,6 +159,7 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
       if (info?.installPath) setArmaPath(info.installPath);
     }).catch(() => {});
     window.spectreAPI?.checkModStatus?.().then(setModStatus).catch(() => {});
+    return () => { if (savedTimerRef.current) clearTimeout(savedTimerRef.current); };
   }, []);
 
   const PRESETS = {
@@ -170,7 +172,7 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
   const handleSave = async () => {
     await onSave(form);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
   };
 
   const handleAutoDetect = async () => {
@@ -329,7 +331,7 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
               {[
                 ['Arma log', (livePaths || bridgePaths)?.arma_log_watched],
                 ['Cmds file', (livePaths || bridgePaths)?.spectre_to_arma],
-                ['Web viewer', (livePaths || bridgePaths)?.web_viewer_url + ' (' + ((livePaths || bridgePaths)?.ws_clients || 0) + ' cl)'],
+                ['Web viewer', ((livePaths || bridgePaths)?.web_viewer_url || 'N/A') + ' (' + ((livePaths || bridgePaths)?.ws_clients || 0) + ' cl)'],
               ].map(([label, val]) => (
                 <div key={label} className="settings-field">
                   <div className="settings-field__label">{label}</div>

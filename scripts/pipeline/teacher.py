@@ -221,37 +221,38 @@ def generate_batch(terrain_digest_fn=None, model=None):
     
     conn = get_db()
     pending = get_examples_by_status(conn, "sampled", limit=BATCH_SIZE)
-    
+
     results = []
-    for example in pending:
-        example_id = example["id"]
-        state_json = json.loads(example["state_json"])
-        scenario_params = json.loads(example["scenario_params"])
-        
-        # Get terrain digest if available
-        terrain_digest = None
-        if terrain_digest_fn:
+    try:
+        for example in pending:
+            example_id = example["id"]
+            state_json = json.loads(example["state_json"])
+            scenario_params = json.loads(example["scenario_params"])
+
+            # Get terrain digest if available
+            terrain_digest = None
+            if terrain_digest_fn:
+                try:
+                    terrain_digest = terrain_digest_fn(scenario_params)
+                    update_terrain_digest(conn, example_id, terrain_digest)
+                except Exception as e:
+                    print(f"Warning: Could not get terrain digest for example {example_id}: {e}")
+
+            # Generate teacher output
             try:
-                terrain_digest = terrain_digest_fn(scenario_params)
-                update_terrain_digest(conn, example_id, terrain_digest)
+                teacher_output, raw_response, usage = generate_teacher_output(
+                    state_json, terrain_digest, model
+                )
+                update_teacher_output(conn, example_id, model or TEACHER_MODEL,
+                                     teacher_output, raw_response)
+                results.append((example_id, teacher_output, raw_response))
+                tokens = usage.get("total_tokens", "?")
+                print(f"Generated output for example {example_id} ({tokens} tokens)")
+
             except Exception as e:
-                print(f"Warning: Could not get terrain digest for example {example_id}: {e}")
-        
-        # Generate teacher output
-        try:
-            teacher_output, raw_response, usage = generate_teacher_output(
-                state_json, terrain_digest, model
-            )
-            update_teacher_output(conn, example_id, model or TEACHER_MODEL,
-                                 teacher_output, raw_response)
-            results.append((example_id, teacher_output, raw_response))
-            tokens = usage.get("total_tokens", "?")
-            print(f"Generated output for example {example_id} ({tokens} tokens)")
-            
-        except Exception as e:
-            print(f"Error generating output for example {example_id}: {e}")
-    
-    conn.close()
+                print(f"Error generating output for example {example_id}: {e}")
+    finally:
+        conn.close()
     return results
 
 

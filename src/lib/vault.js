@@ -103,7 +103,15 @@ export function buildGraphFromWikilinks(nodes) {
 
 // ── Node ID generator ───────────────────────────────────────────────────────
 function slugify(str) {
-  return (str || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const slug = (str || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  if (!slug) {
+    let hex = '';
+    for (let i = 0; i < (str || '').length && hex.length < 12; i++) {
+      hex += (str.charCodeAt(i) % 16).toString(16);
+    }
+    return hex || String(Date.now());
+  }
+  return slug;
 }
 
 // ── Node Factories ──────────────────────────────────────────────────────────

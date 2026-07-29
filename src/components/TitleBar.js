@@ -1,6 +1,7 @@
 import React from 'react';
 
 function formatTime(sec) {
+  if (typeof sec !== 'number' || isNaN(sec)) return '00:00';
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = sec % 60;

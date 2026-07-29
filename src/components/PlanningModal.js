@@ -99,6 +99,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
   const handleApproveOPORD = async () => {
     if (!opord) return;
     setThinking(true);
+    setPhase('GENERATING');
     setError('');
 
     try {
