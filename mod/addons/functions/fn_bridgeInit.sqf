@@ -78,14 +78,12 @@ diag_log format ["SPECTRE: Initialized — tracking %1 blufor assets on %2", cou
 // ─── Vehicle type classifier ──────────────────────────────────────────────────
 SPECTRE_fnc_vehicleType = {
     params ["_v"];
-    // Drones — check vanilla base classes first
-    if (_v isKindOf "UAV_01_base_F") exitWith {
-        private _t = typeOf _v;
-        if (_t find "FPV" >= 0) exitWith { "FPV" };
-        "UAV"
-    };
-    if (_v isKindOf "UGV_01_base_F") exitWith { "STOMPER" };
-    if (_v isKindOf "UGV_02_base_F") exitWith { "ED1" };
+    private _t = typeOf _v;
+    // Drones — check class name patterns (robust across mod variants)
+    if (_t find "FPV" >= 0) exitWith { "FPV" };
+    if (_v isKindOf "UAV_01_base_F") exitWith { "UAV" };
+    if (_t find "UGV_01" >= 0) exitWith { "STOMPER" };
+    if (_t find "UGV_02" >= 0) exitWith { "ED1" };
     // Conventional types
     if (_v isKindOf "Helicopter")  exitWith { "HELI" };
     if (_v isKindOf "Plane")       exitWith { "PLANE" };
