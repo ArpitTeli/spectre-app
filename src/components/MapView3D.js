@@ -501,7 +501,8 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
     const keys = {};
     function kd(e) { keys[e.key] = true; if (e.key === 'q' || e.key === 'Q') qHeldRef.current = true; if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); }
     function ku(e) { keys[e.key] = false; if (e.key === 'q' || e.key === 'Q') qHeldRef.current = false; }
-    window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
+    const onBlur = () => { for (const k in keys) delete keys[k]; };
+    window.addEventListener('keydown', kd); window.addEventListener('keyup', ku); window.addEventListener('blur', onBlur);
 
     let running = true;
     function tick() {
@@ -543,7 +544,7 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
 
     return () => {
       running = false;
-      window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku);
+      window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); window.removeEventListener('blur', onBlur);
       window.removeEventListener('resize', rs);
       // Dispose all Three.js resources
       const s = st.current;
