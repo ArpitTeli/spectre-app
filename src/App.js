@@ -480,6 +480,7 @@ export default function App() {
           panelClickHandlerRef={panelClickHandlerRef}
           activeTab={rightTab}
           setActiveTab={setRightTab}
+          endMission={endMission}
         />
       </div>
 

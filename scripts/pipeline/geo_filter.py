@@ -128,7 +128,7 @@ def check_route_through_threats(order, contacts):
         for i in range(len(waypoints) - 1):
             p1 = waypoints[i]
             p2 = waypoints[i + 1]
-            
+
             if line_intersects_circle(p1, p2, contact_pos, contact_radius):
                 # Check if reasoning mentions this threat
                 reasoning = order.get("reasoning", {})
@@ -145,6 +145,25 @@ def check_route_through_threats(order, contacts):
                         "contact_id": contact.get("contact_id"),
                         "segment": [p1, p2],
                         "issue": f"Route passes through {contact_type} threat zone without mentioning it"
+                    })
+
+        # Single-point route: the lone waypoint (target) sits inside a threat circle
+        if len(waypoints) == 1 and len(contact_pos) >= 2:
+            p = waypoints[0]
+            if len(p) >= 2 and line_intersects_circle(p, p, contact_pos, contact_radius):
+                reasoning = order.get("reasoning", {})
+                if isinstance(reasoning, dict):
+                    reasoning_text = " ".join(str(v) for v in reasoning.values()).lower()
+                else:
+                    reasoning_text = str(reasoning).lower()
+                contact_type = contact.get("type", "unknown")
+                if contact_type not in reasoning_text and "threat" not in reasoning_text:
+                    flags.append({
+                        "type": "unacknowledged_threat",
+                        "unit_id": order.get("unit_id"),
+                        "contact_id": contact.get("contact_id"),
+                        "segment": [p, p],
+                        "issue": f"Target sits inside {contact_type} threat zone without mentioning it"
                     })
     
     return flags

@@ -169,7 +169,7 @@ def run_judges(batch_size=None, batch_api_size=10):
     from .db import get_db, get_examples_by_status, update_judge_verdict
 
     conn = get_db()
-    pending = get_examples_by_status(conn, "teacher_done")
+    pending = get_examples_by_status(conn, "geo_passed")
 
     if batch_size:
         pending = pending[:batch_size]

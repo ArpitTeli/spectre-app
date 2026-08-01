@@ -12,6 +12,7 @@ import heapq
 import math
 import numpy as np
 import os
+import sys
 
 MAP_SIZE = 8192
 GRID_DIM = 128
@@ -38,7 +39,7 @@ def load_weighted_grid(map_name="stratis"):
     try:
         data = np.load(path)
         return data["grid"]  # shape: [128, 128, 5]
-    except (FileNotFoundError, OSError) as e:
+    except (FileNotFoundError, OSError, KeyError, ValueError) as e:
         print(f"Warning: Could not load cost grid for '{map_name}': {e}", file=sys.stderr)
         return None
 

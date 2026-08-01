@@ -83,10 +83,15 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
     try {
       const ctx = { units: state.units, contacts: state.contacts, forceMetrics: state.forceMetrics, intelDB: state.intelDB };
       const modified = await aiService.modifyCOA(coa, modifyInput, ctx, state.vaultPath);
+      if (!modified || !modified.id || !modified.name) {
+        setModifyError('AI returned an invalid modified COA. Please try again.');
+        return;
+      }
       const updated  = coas.map(c => c.id === coa.id ? { ...modified, id: coa.id } : c);
       patch({ currentCOAs: updated });
       setModifyingId(null);
       setModifyInput('');
+      setModifyError('');
       setModifyError('');
       if (modified?.changes?.length) {
         addCommsEntry('SPECTRE', 'COMMANDER', `COA ${coa.id} modified: ${modified.changes.join(', ')}`, 'BLUE');

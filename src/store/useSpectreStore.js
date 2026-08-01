@@ -12,8 +12,11 @@ export const REWARD = {
   ABORT: -10
 };
 
-const INITIAL_STATE = {
-  armaConnected: false,
+// Module-level synchronous dedup set — protects against double-processing when
+// two processArmaUpdate calls land in the same render cycle.
+const syncEventIds = new Set();
+
+const INITIAL_STATE = {  armaConnected: false,
   lastArmaUpdate: null,
   missionPhase: 'BRIEFING',
   missionStartTime: null,
@@ -384,12 +387,13 @@ function processArmaUpdate(data, stateRef, patch) {
     };
   });
 
-  // Compute newEvents after patch for event handling — use stateRef for fresh dedup
-  const processedSet2 = new Set(missionChanged ? [] : stateRef.current.processedEventIds);
+  // Compute newEvents after patch for event handling — use syncEventIds for
+  // synchronous dedup across rapid processArmaUpdate calls.
+  if (missionChanged) syncEventIds.clear();
   const newEvents = events.filter(e => {
     const key = e.id || `${e.type}_${e.timestamp}`;
-    if (processedSet2.has(key)) return false;
-    processedSet2.add(key);
+    if (syncEventIds.has(key)) return false;
+    syncEventIds.add(key);
     return true;
   });
 

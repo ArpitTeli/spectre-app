@@ -45,7 +45,7 @@ def export_training_set(db_path=None, output_path=None):
     
     conn.close()
     
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         for row in rows:
             state = json.loads(row["state_json"])
             terrain = json.loads(row["terrain_digest_json"]) if row["terrain_digest_json"] else {}
@@ -91,7 +91,7 @@ def export_with_reasoning(db_path=None, output_path=None):
     
     conn.close()
     
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         for row in rows:
             state = json.loads(row["state_json"])
             terrain = json.loads(row["terrain_digest_json"]) if row["terrain_digest_json"] else {}

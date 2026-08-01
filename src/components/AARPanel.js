@@ -6,8 +6,9 @@ export default function AARPanel({ aar, rewardData, onClose, onNewMission }) {
   if (!aar) return null;
   if (!rewardData) return null;
 
-  const scoreColor = rewardData.score >= 70 ? 'var(--accent)' : rewardData.score >= 40 ? 'var(--color-yellow)' : 'var(--color-red)';
-  const scoreLetter = rewardData.score >= 80 ? 'S' : rewardData.score >= 60 ? 'A' : rewardData.score >= 40 ? 'B' : rewardData.score >= 20 ? 'C' : 'F';
+  const score = rewardData.score ?? 0;
+  const scoreColor = score >= 70 ? 'var(--accent)' : score >= 40 ? 'var(--color-yellow)' : 'var(--color-red)';
+  const scoreLetter = score >= 80 ? 'S' : score >= 60 ? 'A' : score >= 40 ? 'B' : score >= 20 ? 'C' : 'F';
 
   return (
     <div style={{
@@ -37,7 +38,7 @@ export default function AARPanel({ aar, rewardData, onClose, onNewMission }) {
           {/* Score box */}
           <div style={{ textAlign: 'center', background: 'var(--bg-secondary)', border: `2px solid ${scoreColor}`, borderRadius: '4px', padding: '8px 16px' }}>
             <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '36px', fontWeight: 900, color: scoreColor, lineHeight: 1 }}>{scoreLetter}</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: scoreColor, marginTop: '2px' }}>{rewardData.score.toFixed(0)} pts</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: scoreColor, marginTop: '2px' }}>{score.toFixed(0)} pts</div>
             <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '9px', color: 'var(--text-muted)', letterSpacing: '1px', marginTop: '2px' }}>OVERALL</div>
           </div>
         </div>
@@ -98,7 +99,7 @@ function SummaryTab({ aar, rewardData, scoreColor }) {
         <ScoreLine label={`Vehicles lost (${rewardData.vehicles_lost ?? 0})`} value={(rewardData.vehicles_lost ?? 0) > 0 ? `-${(rewardData.vehicles_lost ?? 0) * 20}` : '0'} negative={(rewardData.vehicles_lost ?? 0) > 0} />
         <div style={{ borderTop: '1px solid var(--border-primary)', marginTop: '6px', paddingTop: '6px', display: 'flex', justifyContent: 'space-between' }}>
           <span style={{ fontFamily: 'var(--font-condensed)', fontWeight: 700, color: 'var(--text-bright)' }}>TOTAL</span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 'bold', color: scoreColor }}>{rewardData.score.toFixed(0)}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 'bold', color: scoreColor }}>{(rewardData.score ?? 0).toFixed(0)}</span>
         </div>
       </div>
 
@@ -187,7 +188,7 @@ function AnalysisTab({ aar }) {
 // ─── Training Data Tab ────────────────────────────────────────────────────────
 function TrainingDataTab({ rewardData }) {
   const sample = {
-    reward_score: rewardData.score.toFixed(1),
+    reward_score: (rewardData.score ?? 0).toFixed(1),
     objective_complete: rewardData.objective_complete,
     enemy_kills: rewardData.enemy_kills,
     friendly_kia: rewardData.friendly_kia,

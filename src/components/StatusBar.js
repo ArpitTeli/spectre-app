@@ -331,7 +331,9 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
               {[
                 ['Arma log', (livePaths || bridgePaths)?.arma_log_watched],
                 ['Cmds file', (livePaths || bridgePaths)?.spectre_to_arma],
-                ['Web viewer', ((livePaths || bridgePaths)?.web_viewer_url || 'N/A') + ' (' + ((livePaths || bridgePaths)?.ws_clients || 0) + ' cl)'],
+                ['Web viewer', ((livePaths || bridgePaths)?.web_viewer_url
+                  ? `${(livePaths || bridgePaths).web_viewer_url} (${(livePaths || bridgePaths)?.ws_clients || 0} cl)`
+                  : 'N/A')],
               ].map(([label, val]) => (
                 <div key={label} className="settings-field">
                   <div className="settings-field__label">{label}</div>

@@ -227,6 +227,7 @@ let relayRoomCode = '';
 let relayMode = 'host'; // 'host' or 'client'
 let relayReconnectTimer = null;
 let relayFatalError = false; // true when server rejects (don't reconnect)
+let relayIntentionalClose = false; // true when user initiated disconnect
 let relayReconnectAttempts = 0;
 const RELAY_MAX_RECONNECTS = 10; // stop after 10 failures (~30s)
 
@@ -250,14 +251,19 @@ function connectToRelay(mode, roomCode, url, _isReconnect) {
     return;
   }
 
-  relayWs.on('open', () => {
+  const thisSocket = relayWs;
+  relayIntentionalClose = false;
+
+  thisSocket.on('open', () => {
+    if (relayWs !== thisSocket) return;
     relayConnected = true;
     relayReconnectAttempts = 0; // reset on successful connect
     dbg('SPECTRE: Relay connected, joining room...');
-    relayWs.send(JSON.stringify({ type: 'join', room: roomCode, role: mode }));
+    try { thisSocket.send(JSON.stringify({ type: 'join', room: roomCode, role: mode })); } catch (_) {}
   });
 
-  relayWs.on('message', (raw) => {
+  thisSocket.on('message', (raw) => {
+    if (relayWs !== thisSocket) return;
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
 
@@ -295,23 +301,26 @@ function connectToRelay(mode, roomCode, url, _isReconnect) {
     }
   });
 
-  relayWs.on('close', () => {
+  thisSocket.on('close', () => {
+    if (relayWs !== thisSocket) return;
     relayConnected = false;
     dbg('SPECTRE: Relay disconnected');
-    // Don't auto-reconnect on fatal errors (server rejected us)
-    if (!relayFatalError) {
+    // Don't auto-reconnect on fatal errors or intentional disconnect
+    if (!relayFatalError && !relayIntentionalClose) {
       sendToRenderer('relay-status', { connected: false, mode, room: roomCode });
       scheduleReconnect(mode, roomCode, url);
     }
+    relayIntentionalClose = false;
   });
 
-  relayWs.on('error', (e) => {
+  thisSocket.on('error', (e) => {
+    if (relayWs !== thisSocket) return;
     dbg(`SPECTRE: Relay WebSocket error: ${e.message}`);
     // Treat HTTP upgrade failures (404, 500, etc.) as fatal
     if (e.message && (/\b40[34]\b/.test(e.message) || e.message.includes('Unexpected server response'))) {
       relayFatalError = true;
       dbg('SPECTRE: relay server rejected connection — fatal');
-      try { relayWs.close(); } catch (_) {}
+      try { thisSocket.close(); } catch (_) {}
     }
   });
 
@@ -344,9 +353,11 @@ function sendStateToRelay(data) {
 }
 
 function disconnectRelay() {
-  if (relayWs) { relayWs.close(); relayWs = null; }
+  relayIntentionalClose = true;
+  if (relayWs) { try { relayWs.close(); } catch (_) {} relayWs = null; }
   if (relayReconnectTimer) { clearTimeout(relayReconnectTimer); relayReconnectTimer = null; }
   relayConnected = false;
+  relayFatalError = false;
   sendToRenderer('relay-status', { connected: false, mode: null, room: null });
 }
 
@@ -523,7 +534,10 @@ function buildSQFContent(commands) {
   const lines = [];
 
   for (const cmd of commands) {
-    const id   = cmd._id || Date.now();
+    // Sanitize _id to a non-negative integer to prevent SQF injection
+    let rawId = parseInt(cmd._id, 10);
+    if (isNaN(rawId) || rawId < 0) rawId = Date.now();
+    const id   = rawId;
     const type = (cmd.type     || '').replace(/[^A-Z0-9_]/g, '');
     const uid  = sqfSafe(cmd.unit_id || 'ALL');
 
@@ -661,7 +675,15 @@ function writeCommandToFile(cmd) {
     if (!cmd._id) cmd._id = Date.now() + Math.floor(Math.random() * 10000);
     pendingSpectreCmds.push(cmd);
     if (pendingSpectreCmds.length > 50) pendingSpectreCmds = pendingSpectreCmds.slice(-50);
-    const sqf = buildSQFContent(pendingSpectreCmds);
+    let sqf = buildSQFContent(pendingSpectreCmds);
+    // DLL output cap is 10240 bytes; keep the file safely under it so Arma
+    // never receives ERR_SIZE and drops every command.
+    const SAFE_CAP = 8192;
+    while (sqf.length > SAFE_CAP && pendingSpectreCmds.length > 1) {
+      pendingSpectreCmds.shift();
+      sqf = buildSQFContent(pendingSpectreCmds);
+    }
+    if (sqf.length > SAFE_CAP) sqf = sqf.slice(0, SAFE_CAP) + '\n';
     const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
     fs.writeFileSync(p, sqf, 'utf8');
     fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} OK ${cmd.type}\n`);
@@ -818,11 +840,11 @@ ipcMain.handle('install-mod', async (_, modType) => {
         return { success: false, error: 'Downloaded file is too small - download may have failed.' };
       }
 
-      // Extract using PowerShell
+      // Extract using PowerShell — pass paths as args to avoid injection
       console.log('SPECTRE: Extracting CBA_A3...');
       const { execSync } = require('child_process');
       fs.mkdirSync(cbaDir, { recursive: true });
-      execSync(`powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${cbaDir}' -Force"`, { stdio: 'ignore' });
+      execSync('powershell', ['-NoProfile', '-Command', 'Expand-Archive', '-LiteralPath', zipPath, '-DestinationPath', cbaDir, '-Force'], { stdio: 'ignore' });
       fs.unlinkSync(zipPath);
 
       // Fix nested folder: CBA_A3 zip extracts to @CBA_A3/@CBA_A3/, move contents up
@@ -1074,6 +1096,7 @@ function startBridgeWatcher() {
 }
 
 let lastReadTime = 0;
+let logLineBuffer = ''; // carry an unterminated final line across reads
 function readNewLogData() {
   const now = Date.now();
   if (now - lastReadTime < 100) return;
@@ -1086,6 +1109,7 @@ function readNewLogData() {
     // Log rotated (file shrunk) — reset position
     if (stat.size < logFilePos) {
       logFilePos = 0;
+      logLineBuffer = '';
     }
 
     if (stat.size <= logFilePos) return;
@@ -1102,7 +1126,12 @@ function readNewLogData() {
       fs.closeSync(fd);
     }
 
-    parseArmaLog(chunk);
+    // Prepend any previously unterminated final line, and keep the current
+    // unterminated final line for the next read.
+    const text = logLineBuffer + chunk;
+    const lines = text.split('\n');
+    logLineBuffer = lines.pop();
+    parseArmaLog(lines.join('\n'));
   } catch (e) {
     console.error('SPECTRE: log read error:', e.message);
   }
@@ -1169,6 +1198,7 @@ function parseArmaLog(chunk) {
             pendingState.units = {};
             pendingState.contacts = {};
             pendingState.events = [];
+            pendingSpectreCmds = []; // clear stale commands buffer too
           }
           pendingState.missionFolder = meta.mf;
         }
@@ -1462,8 +1492,8 @@ ipcMain.handle('get-paths', async () => {
     missions_dir:         MISSIONS_DIR,
     arma_install:         ARMA_INSTALL || '(not found)',
     mission_folder_path:  config.mission_folder_path || '(auto-detecting...)',
-    spectre_to_arma:      config.mission_folder_path
-      ? path.join(config.mission_folder_path, 'spectre_to_arma.sqf')
+    spectre_to_arma:      ARMA_INSTALL
+      ? path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf')
       : '(waiting for Arma connection)',
     arma_log_watched:     currentLogPath || '(not found — launch Arma first)',
     web_viewer_url:       `http://${getLocalIP()}:${WS_PORT}`,
@@ -1493,9 +1523,14 @@ ipcMain.handle('generate-fpv-waypoints', async (_, { start, target }) => {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stdout = '', stderr = '';
+    const timer = setTimeout(() => {
+      try { py.kill(); } catch (_) {}
+      resolve({ error: 'FPV waypoint generator timed out' });
+    }, 10000);
     py.stdout.on('data', d => { stdout += d.toString(); });
     py.stderr.on('data', d => { stderr += d.toString(); });
     py.on('close', (code) => {
+      clearTimeout(timer);
       let data;
       try { data = JSON.parse(stdout); } catch (_) {}
       if (code === 0) {
@@ -1540,14 +1575,17 @@ ipcMain.handle('set-arma-path', async (_, manualPath) => {
 ipcMain.on('minimize-window', () => mainWindow?.minimize());
 ipcMain.on('maximize-window', () => mainWindow?.isMaximized() ? mainWindow.unmaximize() : mainWindow?.maximize());
 ipcMain.on('close-window',    () => mainWindow?.close());
-ipcMain.on('open-external',   (_, url) => shell.openExternal(url));
+ipcMain.on('open-external',   (_, url) => { if (typeof url === 'string' && /^https?:\/\//i.test(url)) shell.openExternal(url); });
 ipcMain.on('set-vercel-url',  (_, url) => setVercelUrl(url));
-ipcMain.on('relay-connect',   (_, { mode, roomCode, url }) => connectToRelay(mode, roomCode, url));
+ipcMain.on('relay-connect',   (_, opts = {}) => {
+  const mode = opts.mode, roomCode = opts.roomCode || '', url = opts.url;
+  if (mode && roomCode) connectToRelay(mode, roomCode, url);
+});
 ipcMain.on('relay-disconnect', () => disconnectRelay());
 ipcMain.on('relay-command',   (_, cmd) => {
-  // Client sends command through relay to host
-  if (relayWs && relayWs.readyState === WebSocket.OPEN && relayMode === 'client') {
-    relayWs.send(JSON.stringify({ type: 'command', data: cmd }));
+  // Client sends command through relay to host — sanitize cmd to a plain object
+  if (relayWs && relayWs.readyState === WebSocket.OPEN && relayMode === 'client' && cmd && typeof cmd === 'object') {
+    try { relayWs.send(JSON.stringify({ type: 'command', data: cmd })); } catch (_) {}
   }
 });
 ipcMain.on('restart-app',     () => {
@@ -1562,6 +1600,22 @@ ipcMain.on('restart-app',     () => {
 });
 
 // ─── Vault (Ontology Layer) ──────────────────────────────────────────────────
+// Ensure vault paths stay inside VAULTS_DIR to prevent path traversal.
+function safeVaultPath(vaultPath) {
+  try {
+    const resolved = path.resolve(vaultPath || '');
+    const base = path.resolve(VAULTS_DIR);
+    if (resolved === base || resolved.startsWith(base + path.sep)) return resolved;
+  } catch (_) {}
+  return null;
+}
+function safeVaultFilename(filename) {
+  // Only allow simple .md filenames — no path separators or traversal
+  if (!filename || typeof filename !== 'string') return null;
+  const base = path.basename(filename);
+  if (base !== filename || !/^[a-zA-Z0-9_-]+\.md$/.test(base)) return null;
+  return base;
+}
 ipcMain.handle('vault-create', async (_, missionId) => {
   const safeId = (missionId || `mission-${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, '_');
   const vaultPath = path.join(VAULTS_DIR, safeId);
@@ -1576,11 +1630,13 @@ ipcMain.handle('vault-create', async (_, missionId) => {
 });
 
 ipcMain.handle('vault-write-node', async (_, vaultPath, filename, content) => {
-  if (!vaultPath || !filename || !content) return false;
+  const safePath = safeVaultPath(vaultPath);
+  const safeName = safeVaultFilename(filename);
+  if (!safePath || !safeName || !content) return false;
   try {
-    const nodesPath = path.join(vaultPath, 'nodes');
+    const nodesPath = path.join(safePath, 'nodes');
     if (!fs.existsSync(nodesPath)) fs.mkdirSync(nodesPath, { recursive: true });
-    fs.writeFileSync(path.join(nodesPath, filename), content, 'utf8');
+    fs.writeFileSync(path.join(nodesPath, safeName), content, 'utf8');
     return true;
   } catch (e) {
     console.error('SPECTRE: vault write failed:', e.message);
@@ -1589,9 +1645,10 @@ ipcMain.handle('vault-write-node', async (_, vaultPath, filename, content) => {
 });
 
 ipcMain.handle('vault-read-nodes', async (_, vaultPath) => {
-  if (!vaultPath) return [];
+  const safePath = safeVaultPath(vaultPath);
+  if (!safePath) return [];
   try {
-    const nodesPath = path.join(vaultPath, 'nodes');
+    const nodesPath = path.join(safePath, 'nodes');
     if (!fs.existsSync(nodesPath)) return [];
     const files = fs.readdirSync(nodesPath).filter(f => f.endsWith('.md'));
     return files.map(f => {
@@ -1605,10 +1662,12 @@ ipcMain.handle('vault-read-nodes', async (_, vaultPath) => {
 });
 
 ipcMain.handle('vault-update-node', async (_, vaultPath, nodeId, updates) => {
-  if (!vaultPath || !nodeId || !updates) return false;
+  const safePath = safeVaultPath(vaultPath);
+  const safeName = safeVaultFilename(`${nodeId}.md`);
+  if (!safePath || !safeName || !updates) return false;
   try {
-    const nodesPath = path.join(vaultPath, 'nodes');
-    const filename = `${nodeId}.md`;
+    const nodesPath = path.join(safePath, 'nodes');
+    const filename = safeName;
     const filePath = path.join(nodesPath, filename);
     if (!fs.existsSync(filePath)) return false;
 
@@ -1642,10 +1701,12 @@ ipcMain.handle('vault-update-node', async (_, vaultPath, nodeId, updates) => {
 });
 
 ipcMain.handle('vault-add-wikilink', async (_, vaultPath, nodeId, targetTitle) => {
-  if (!vaultPath || !nodeId || !targetTitle) return false;
+  const safePath = safeVaultPath(vaultPath);
+  const safeName = safeVaultFilename(`${nodeId}.md`);
+  if (!safePath || !safeName || !targetTitle) return false;
   try {
-    const nodesPath = path.join(vaultPath, 'nodes');
-    const filename = `${nodeId}.md`;
+    const nodesPath = path.join(safePath, 'nodes');
+    const filename = safeName;
     const filePath = path.join(nodesPath, filename);
     if (!fs.existsSync(filePath)) return false;
 

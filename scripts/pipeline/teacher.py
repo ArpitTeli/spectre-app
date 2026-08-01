@@ -278,7 +278,7 @@ if __name__ == "__main__":
     
     print("Testing teacher generation...")
     try:
-        output, raw = generate_teacher_output(sample_state)
+        output, raw, _usage = generate_teacher_output(sample_state)
         print(f"Generated {len(output['orders'])} orders")
         print(f"Raw response length: {len(raw)} chars")
     except Exception as e:

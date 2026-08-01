@@ -32,7 +32,7 @@ def grid_coord(arma_coord):
 def get_elevation(grid, arma_x, arma_y):
     gx = grid_coord(arma_x)
     gy = grid_coord(arma_y)
-    return grid[gy, gx, 0] / 100.0  # cm to meters
+    return grid[gy, gx, 0] / 10.0  # channel 0 is decimetres; /10 = metres
 
 
 def get_building_count(grid, arma_x, arma_y):

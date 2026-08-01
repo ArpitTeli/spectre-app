@@ -121,13 +121,18 @@ function route(order, unitPos) {
 // evaluate (mirror of kernel.evaluate — coherence subset relevant to the edge)
 // --------------------------------------------------------------------------- //
 function evaluate(state, orders) {
+  if (!state || !orders) {
+    const rep = makeReport();
+    rep.add('INVALID_INPUT', ERROR, SCHEMA, 'state or orders is null', null, {});
+    return rep;
+  }
   const rep = makeReport();
   const contacts = state.known_contacts || [];
   const contactById = {};
-  for (const c of contacts) if (c.contact_id) contactById[c.contact_id] = c;
+  for (const c of contacts) if (c.contact_id) contactById[c.contact_id] = { ...c, type: String(c.type || '').toLowerCase() };
   const units = state.friendly_units || [];
   const unitById = {};
-  for (const u of units) if (u.unit_id) unitById[u.unit_id] = u;
+  for (const u of units) if (u.unit_id) unitById[u.unit_id] = { ...u, type: String(u.type || '').toLowerCase() };
 
   // threat parity (advisory)
   if (state.threat_level != null && contacts.length) {

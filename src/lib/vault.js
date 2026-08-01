@@ -2,6 +2,14 @@
 // .md files with YAML frontmatter + [[wikilinks]] = typed knowledge graph
 // Obsidian-compatible format, Palantir-style Ontology for LLM grounding
 
+// Safely format a date-like value to ISO; never throws on invalid input.
+function safeDateString(value) {
+  if (!value) return new Date().toISOString();
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return new Date().toISOString();
+  return d.toISOString();
+}
+
 // ── YAML Frontmatter Parser ─────────────────────────────────────────────────
 export function parseFrontmatter(content) {
   if (!content || typeof content !== 'string') return { frontmatter: {}, body: content || '' };
@@ -156,7 +164,7 @@ export function createContactNode(contact) {
       position_x: Math.round(contact.position?.x || 0),
       position_y: Math.round(contact.position?.y || 0),
       source: contact.source || 'UNKNOWN',
-      last_seen: contact.last_seen ? new Date(contact.last_seen).toISOString() : new Date().toISOString(),
+      last_seen: safeDateString(contact.last_seen),
       tags: ['hostile', (contact.state || 'unknown').toLowerCase()]
     },
     body

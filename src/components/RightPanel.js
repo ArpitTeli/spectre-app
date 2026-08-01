@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import FireMissionPanel from './FireMissionPanel';
 import FlightPlanPanel from './FlightPlanPanel';
 
-export default function RightPanel({ state, patch, sendArmaCommand, addCommsEntry, selectedUnit, fireMissionUnit, setFireMissionUnit, flightPlanUnit, setFlightPlanUnit, panelClickHandlerRef, activeTab, setActiveTab }) {
+export default function RightPanel({ state, patch, sendArmaCommand, addCommsEntry, selectedUnit, fireMissionUnit, setFireMissionUnit, flightPlanUnit, setFlightPlanUnit, panelClickHandlerRef, activeTab, setActiveTab, endMission }) {
 
   useEffect(() => {
     panelClickHandlerRef.current = null;
@@ -43,6 +43,7 @@ export default function RightPanel({ state, patch, sendArmaCommand, addCommsEntr
             patch={patch}
             sendArmaCommand={sendArmaCommand}
             addCommsEntry={addCommsEntry}
+            endMission={endMission}
           />
         )}
         {activeTab === 'UNIT' && (
@@ -84,7 +85,7 @@ export default function RightPanel({ state, patch, sendArmaCommand, addCommsEntr
   );
 }
 
-function StatusTab({ forceMetrics, rewardData, missionPhase, state, patch, sendArmaCommand, addCommsEntry }) {
+function StatusTab({ forceMetrics, rewardData, missionPhase, state, patch, sendArmaCommand, addCommsEntry, endMission }) {
   const CMDS = [
     { label: 'ALL HOLD', type: 'HOLD_ALL' },
     { label: 'ALL RTB', type: 'RTB_ALL' },
@@ -159,11 +160,26 @@ function StatusTab({ forceMetrics, rewardData, missionPhase, state, patch, sendA
             <>
               <button className="tasks-action-btn" style={{ flex: 1 }} onClick={() => patch({ showCOAPanel: true })}>COA</button>
               <button className="tasks-action-btn primary" style={{ flex: 1 }} onClick={() => {
-                patch({ showAAR: true, missionPhase: 'AAR' });
-                addCommsEntry('SPECTRE', 'ALL', 'Mission complete. AAR.', 'GREEN');
+                patch({ missionPhase: 'AAR' });
+                addCommsEntry('SPECTRE', 'ALL', 'Mission complete. Generating AAR...', 'GREEN');
+                endMission?.(true);
               }}>OBJ</button>
               <button className="tasks-action-btn danger" style={{ flex: 1 }} onClick={() => {
-                patch({ missionPhase: 'ABORTING', abortState: { countdown: 30, auto_select: 'CONTINUE' } });
+                patch({
+                  missionPhase: 'ABORTING',
+                  abortState: {
+                    tier: 1,
+                    reason: 'Commander-initiated emergency abort.',
+                    countdown: 30,
+                    options: [
+                      { id: 'WITHDRAW', label: 'FIGHTING WITHDRAWAL', description: 'Suppress and disengage to nearest safe position', success_pct: 82, risk: 'LOW' },
+                      { id: 'CONSOLIDATE', label: 'CONSOLIDATE & HOLD', description: 'Defensive perimeter, await situation change', success_pct: 61, risk: 'MEDIUM' },
+                      { id: 'CONTINUE', label: 'CONTINUE ASSAULT', description: '⚠ HIGH RISK — not recommended at current strength', success_pct: 12, risk: 'CRITICAL' }
+                    ],
+                    assessment: 'Commander-initiated emergency abort.',
+                    auto_select: 'CONTINUE'
+                  }
+                });
                 addCommsEntry('SPECTRE', 'ALL', 'Emergency abort initiated.', 'RED');
               }}>END</button>
             </>
