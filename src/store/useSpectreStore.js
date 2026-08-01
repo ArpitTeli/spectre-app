@@ -16,6 +16,10 @@ export const REWARD = {
 // two processArmaUpdate calls land in the same render cycle.
 const syncEventIds = new Set();
 
+// Module-level intel cache — updated synchronously so addIntel can save the
+// freshest DB even when React batches/defer the functional updater.
+let intelCache = null;
+
 const INITIAL_STATE = {  armaConnected: false,
   lastArmaUpdate: null,
   missionPhase: 'BRIEFING',
@@ -80,7 +84,7 @@ export function useSpectreStore() {
       patch({ config });
       import('../ai/aiService').then(m => m.aiService.setConfig(config));
     });
-    window.spectreAPI.loadIntel().then(intelDB => patch({ intelDB }));
+    window.spectreAPI.loadIntel().then(intelDB => { intelCache = intelDB; patch({ intelDB }); });
     window.spectreAPI.getPaths().then(bridgePaths => patch({ bridgePaths }));
     return () => { offArma(); };
   }, [patch]);
@@ -180,8 +184,9 @@ export function useSpectreStore() {
 
   // ── Intel ─────────────────────────────────────────────────────────────────
   const addIntel = useCallback((type, data) => {
-    const prevDB = stateRef.current.intelDB;
-    const db = { ...prevDB, locations: [...prevDB.locations], patterns: [...prevDB.patterns], terrain: [...prevDB.terrain] };
+    // Build the new DB from the latest cache synchronously, then save it.
+    const base = intelCache || stateRef.current.intelDB;
+    const db = { ...base, locations: [...base.locations], patterns: [...base.patterns], terrain: [...base.terrain] };
     if (type === 'location') {
       const idx = db.locations.findIndex(l => l.name === data.name);
       if (idx >= 0) {
@@ -194,6 +199,7 @@ export function useSpectreStore() {
     } else if (type === 'terrain') {
       db.terrain.push(data);
     }
+    intelCache = db;
     patch({ intelDB: db });
     window.spectreAPI?.saveIntel(db);
   }, [patch]);
@@ -413,17 +419,18 @@ async function handleArmaEvents(events, stateRef, patch) {
     } else if (event.type === 'UNIT_KIA') {
       patch(prev => ({ ...prev, rewardData: { ...prev.rewardData, friendly_kia: prev.rewardData.friendly_kia + 1, score: prev.rewardData.score + REWARD.FRIENDLY_KIA } }));
     } else if (event.type === 'ENEMY_KILLED') {
+      const victimId = event.contact || event.contact_id || event.id || event.unit || '';
+      const killType = (event.contact_type || '').toUpperCase();
+      const isVehicleKill = ['TANK','IFV','APC','MRAP','TRUCK','CAR','RECON','HELI','PLANE','BOAT','STOMPER','ED1','UGV','UAV','FPV'].includes(killType);
       patch(prev => {
         const newContacts = { ...prev.contacts };
-        const victimId = event.contact || event.contact_id || event.id || event.unit || '';
         // Direct lookup by contact key
         if (victimId && newContacts[victimId]) {
           newContacts[victimId] = { ...newContacts[victimId], state: 'DEAD', last_seen: Date.now() };
         } else {
           // Fallback: scan contacts for type match
-          const killType = event.contact_type || '';
           for (const [id, c] of Object.entries(newContacts)) {
-            if (killType && (c.type || '').toUpperCase() === killType.toUpperCase() && c.state !== 'DEAD') {
+            if (killType && (c.type || '').toUpperCase() === killType && c.state !== 'DEAD') {
               newContacts[id] = { ...c, state: 'DEAD', last_seen: Date.now() };
               break;
             }
@@ -432,15 +439,22 @@ async function handleArmaEvents(events, stateRef, patch) {
         return {
           ...prev,
           contacts: newContacts,
-          rewardData: { ...prev.rewardData, enemy_kills: prev.rewardData.enemy_kills + 1, score: prev.rewardData.score + REWARD.ENEMY_KILL }
+          rewardData: {
+            ...prev.rewardData,
+            enemy_kills: prev.rewardData.enemy_kills + 1,
+            vehicles_destroyed_enemy: prev.rewardData.vehicles_destroyed_enemy + (isVehicleKill ? 1 : 0),
+            score: prev.rewardData.score + (isVehicleKill ? REWARD.VEHICLE_DESTROYED_ENEMY : REWARD.ENEMY_KILL)
+          }
         };
       });
     } else if (event.type === 'CONTACT_SPOTTED') {
       patch(prev => {
         const db = { ...prev.intelDB, patterns: [...prev.intelDB.patterns, { type: 'contact_spotted', ...event, timestamp: new Date().toISOString() }] };
-        window.spectreAPI?.saveIntel(db);
         return { ...prev, intelDB: db };
       });
+      // Save outside the updater (no side effects inside setState)
+      const fresh = stateRef.current.intelDB;
+      window.spectreAPI?.saveIntel(fresh);
       // Don't continue — fall through to vault update, but skip adaptation
     }
 

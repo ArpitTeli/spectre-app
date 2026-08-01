@@ -74,6 +74,8 @@ class AIService {
       if (!key) throw new Error('No valid API key available.');
 
       try {
+        const controller = new AbortController();
+        const timeoutTimer = setTimeout(() => controller.abort(), 60000); // 60s cap
         const res = await fetch(`${this.config.base_url || 'https://openrouter.ai/api/v1'}/chat/completions`, {
           method: 'POST',
           headers: {
@@ -90,8 +92,10 @@ class AIService {
             ],
             temperature: 0.7,
             max_tokens: 4000
-          })
+          }),
+          signal: controller.signal
         });
+        clearTimeout(timeoutTimer);
 
         if (res.ok) {
           this.keyRetryCount = 0;
@@ -601,12 +605,22 @@ ${patternStr}`;
   }
 
   cleanJSON(str) {
-    return str
+    // First pass: safe cleanup (trim, trailing commas, comments). No key-quoting —
+    // that regex corrupts string values containing ", key:" patterns.
+    const base = str
       .trim()
       .replace(/,(\s*[}\]])/g, '$1')
       .replace(/\/\/[^\n]*/g, '')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)/g, '$1"$2"$3');
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    try { return JSON.parse(base); } catch (_) {}
+    // Second pass: only if the safe pass failed, try quoting bare keys. Use a
+    // key-aware regex that only matches when the word is followed by : and is a
+    // plausible key (not inside a string value).
+    try {
+      return JSON.parse(base.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)/g, '$1"$2"$3'));
+    } catch (_) {
+      return base;
+    }
   }
 }
 

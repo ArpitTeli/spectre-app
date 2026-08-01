@@ -205,11 +205,15 @@ async function postToVercel(data) {
   while (vercelPostQueue.length > 0) {
     const payload = vercelPostQueue.shift();
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
       const res = await fetch(`${vercelUrl}/api/state`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: controller.signal
       });
+      clearTimeout(timer);
       if (!res.ok) {
         dbg(`SPECTRE: Vercel POST failed: ${res.status}`);
       }

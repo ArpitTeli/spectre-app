@@ -13,6 +13,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
   const [opord,    setOpord]    = useState(null);
   const [error,    setError]    = useState('');
   const endRef = useRef(null);
+  const thinkingRef = useRef(false);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, thinking]);
 
@@ -27,7 +28,8 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
   const userMessageCount = messages.filter(m => m.role === 'user').length;
 
   const handleSend = async () => {
-    if (!input.trim() || thinking) return;
+    if (!input.trim() || thinkingRef.current) return;
+    thinkingRef.current = true;
     const userMsg = input.trim();
     setInput('');
     setError('');
@@ -51,6 +53,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
         content: `Connection error: ${msg}\n\nCheck your API key in Settings.`
       }]);
     } finally {
+      thinkingRef.current = false;
       setThinking(false);
     }
   };
@@ -112,10 +115,16 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
 
       const coaResult = await aiService.generateCOAs('Initial planning', opord, context, state.vaultPath);
 
+      if (!coaResult?.coas?.length) {
+        setError('AI returned no valid Courses of Action. Please try again.');
+        setThinking(false);
+        return;
+      }
+
       patch({
         opord,
         missionData: { opord, start_time: Date.now(), events: [], decisions: [] },
-        currentCOAs: coaResult?.coas || [],
+        currentCOAs: coaResult.coas,
         missionPhase: 'BRIEFING',
         showCOAPanel: true
       });
