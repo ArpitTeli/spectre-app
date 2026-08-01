@@ -761,9 +761,9 @@ SPECTRE_fnc_broadcastState = {
 // No call compile — uses direct parsing + function call.
 SPECTRE_fnc_readCommands = {
     private _result = "spectre_ext" callExtension ["READ", ["addons\spectre_cmds.sqf"]];
-    if (count _result < 3) exitWith {};
-    private _sqf = _result select 0;
-    if (_sqf isEqualTo "" || { _sqf find "ERR_" == 0 }) exitWith {};
+    // Robust: DLL may return ["content"] (array) or "content" (string)
+    private _sqf = if (typeName _result == "ARRAY") then { if (count _result > 0) then { _result select 0 } else { "" } } else { _result };
+    if (isNil "_sqf" || { _sqf isEqualTo "" || { _sqf find "ERR_" == 0 } }) exitWith {};
 
     // Whole-file dedup: skip re-parsing when the file is byte-identical to last read.
     if (_sqf == SPECTRE_lastSQF) exitWith {};
