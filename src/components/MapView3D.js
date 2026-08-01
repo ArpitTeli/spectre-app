@@ -510,8 +510,11 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
     st.current = { scene, cam, ctrl, renderer, markers, terrainMesh: mesh, buildingsGroup, roadGroup };
 
     const keys = {};
-    function kd(e) { keys[e.key] = true; if (e.key === 'q' || e.key === 'Q') qHeldRef.current = true; if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); }
-    function ku(e) { keys[e.key] = false; if (e.key === 'q' || e.key === 'Q') qHeldRef.current = false; }
+    // e.key returns 'W' when Shift is held and 'w' otherwise — normalize
+    // single-char keys to lowercase so keydown/keyup always match the same flag.
+    const keyOf = (e) => { const k = e.key; return k.length === 1 ? k.toLowerCase() : k; };
+    function kd(e) { const k = keyOf(e); keys[k] = true; if (k === 'q') qHeldRef.current = true; if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); }
+    function ku(e) { const k = keyOf(e); keys[k] = false; if (k === 'q') qHeldRef.current = false; }
     const onBlur = () => { for (const k in keys) delete keys[k]; };
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku); window.addEventListener('blur', onBlur);
 
@@ -530,10 +533,10 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
         if (!document.hasFocus()) { for (const k in keys) delete keys[k]; }
         const spd = (keys['Shift'] ? 400 : 120) / 60;
         let mx = 0, mz = 0;
-        if (keys['w']||keys['W']||keys['ArrowUp'])    { mx += fwd.x * spd; mz += fwd.z * spd; }
-        if (keys['s']||keys['S']||keys['ArrowDown'])  { mx -= fwd.x * spd; mz -= fwd.z * spd; }
-        if (keys['a']||keys['A']||keys['ArrowLeft'])  { mx -= rt.x * spd; mz -= rt.z * spd; }
-        if (keys['d']||keys['D']||keys['ArrowRight']) { mx += rt.x * spd; mz += rt.z * spd; }
+        if (keys['w']||keys['ArrowUp'])         { mx += fwd.x * spd; mz += fwd.z * spd; }
+        if (keys['s']||keys['ArrowDown'])       { mx -= fwd.x * spd; mz -= fwd.z * spd; }
+        if (keys['a']||keys['ArrowLeft'])       { mx -= rt.x * spd; mz -= rt.z * spd; }
+        if (keys['d']||keys['ArrowRight'])      { mx += rt.x * spd; mz += rt.z * spd; }
         if (mx || mz) {
           s.ctrl.target.x = Math.max(-HALF, Math.min(HALF, s.ctrl.target.x + mx));
           s.ctrl.target.z = Math.max(-HALF, Math.min(HALF, s.ctrl.target.z + mz));
