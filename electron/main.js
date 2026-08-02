@@ -709,6 +709,38 @@ function isDuplicateSend(cmd) {
   return false;
 }
 
+// ─── Plain-text command queue (consumption-driven, no ack dependency) ─────────
+// The app writes ONE command per file in a pipe-delimited plain-text format:
+//   <id>|<TYPE>|<unitId>|<x1,y1;x2,y2...>|<roe>|<action>
+// The SQF reader splits the single line (no call compile, no dedup list).
+// The queue advances when the file BECOMES EMPTY (READ_CLEAR truncates after
+// reading) — file consumption IS the acknowledgement. This never depends on
+// the RPT tailer or ack parsing, which proved unreliable.
+function buildPlainCommand(cmd) {
+  const id = parseInt(cmd._id, 10) || Date.now();
+  const type = (cmd.type || '').replace(/[^A-Z0-9_]/g, '');
+  const uid = (cmd.unit_id || 'ALL').replace(/[|;\n\r]/g, '');
+  const wps = cmd.waypoints || [];
+  let wpStr = '';
+  if (wps.length > 0) {
+    wpStr = wps
+      .filter(wp => wp && (Array.isArray(wp) ? wp.length >= 2 : (wp.x !== undefined || wp.y !== undefined)))
+      .map(wp => Array.isArray(wp) ? `${Math.round(wp[0])},${Math.round(wp[1])}` : `${Math.round(wp.x || 0)},${Math.round(wp.y || 0)}`)
+      .join(';');
+  } else if (cmd.x !== undefined || cmd.y !== undefined) {
+    wpStr = `${Math.round(cmd.x || 0)},${Math.round(cmd.y || 0)}`;
+  }
+  const roe = (cmd.target_id || cmd.engagement_rules || '').replace(/[|;\n\r]/g, '');
+  // Contact position fallback for target commands.
+  if (!wpStr && roe && pendingState.contacts[roe] && pendingState.contacts[roe].position) {
+    wpStr = `${Math.round(pendingState.contacts[roe].position.x)},${Math.round(pendingState.contacts[roe].position.y)}`;
+  }
+  let action = cmd.action || '';
+  if (!action && cmd.speed != null) action = `speed:${Math.round(cmd.speed)}`;
+  action = action.replace(/[|;\n\r]/g, '');
+  return `${id}|${type}|${uid}|${wpStr}|${roe}|${action}`;
+}
+
 function writeCommandToFile(cmd) {
   if (!ARMA_INSTALL) return;
   try {
@@ -718,9 +750,8 @@ function writeCommandToFile(cmd) {
     }
     if (!cmd._id) cmd._id = Date.now() + Math.floor(Math.random() * 10000);
     cmd._writtenAt = Date.now();
-    // Drop phantom commands (e.g. ATTACK with no target and no coords) that
-    // produce no executable line — they would only pollute the buffer.
-    if (!buildSQFContent([cmd]).includes('call SPECTRE_fnc_execCmd')) {
+    // Drop phantom commands (no executable payload).
+    if (!buildPlainCommand(cmd).includes('|')) {
       dbg(`SPECTRE: dropped phantom command ${cmd.type}`);
       fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} SKIP ${cmd.type} (no target)\n`);
       return;
@@ -728,90 +759,78 @@ function writeCommandToFile(cmd) {
     pendingSpectreCmds.push(cmd);
     if (pendingSpectreCmds.length > 50) pendingSpectreCmds = pendingSpectreCmds.slice(-50);
     fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} OK ${cmd.type}\n`);
-    // Single-command protocol: write the next pending command ONLY when the
-    // file is empty (the previous one was consumed by Arma). Serialized,
-    // ACK-verified delivery — a multi-command file is never produced.
-    tryWriteNextCommand();
+    advanceQueue();
   } catch (e) {
     try { fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} FAIL ${e.message}\n`); } catch (_) {}
   }
 }
 
-// Writes the oldest pending command into spectre_cmds.sqf as a SINGLE command
-// line (plus the session banner). Never the whole buffer. Skips if the file
-// still has unconsumed content. `force` overwrites regardless (used to break
-// a stuck reader).
-function tryWriteNextCommand(force) {
-  if (!ARMA_INSTALL || pendingSpectreCmds.length === 0) return;
+let cmdsFileNonEmptySince = 0;
+let cmdsInFlight = 0; // 1 while a written command is awaiting consumption
+
+function writePending(index) {
+  const cmd = pendingSpectreCmds[index];
+  const line = buildPlainCommand(cmd);
+  if (!line.includes('|')) {
+    pendingSpectreCmds.splice(index, 1);
+    dbg(`SPECTRE: dropped phantom ${cmd.type}`);
+    return;
+  }
   const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
-  try {
-    if (!force) {
-      let size = -1;
-      try { size = fs.statSync(p).size; } catch (_) {}
-      if (size !== 0 && size !== -1) return; // not consumed yet — wait
+  let wrote = false;
+  for (let a = 1; a <= 4 && !wrote; a++) {
+    try {
+      fs.writeFileSync(p, line, 'utf8');
+      wrote = true;
+    } catch (e2) {
+      if (a === 4) { dbg(`SPECTRE: write failed: ${e2.message}`); return; }
+      if (!['EBUSY', 'EPERM', 'EACCES'].includes(e2.code)) { dbg(`SPECTRE: write failed: ${e2.message}`); return; }
     }
-    const cmd = pendingSpectreCmds[0];
-    const sqf = buildSQFContent([cmd]);
-    if (!sqf.includes('call SPECTRE_fnc_execCmd')) {
-      pendingSpectreCmds.shift();
-      fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} SKIP ${cmd.type} (no target)\n`);
-      tryWriteNextCommand(force);
-      return;
-    }
-    let wrote = false;
-    for (let attempt = 1; attempt <= 4 && !wrote; attempt++) {
-      try {
-        fs.writeFileSync(p, sqf, 'utf8');
-        wrote = true;
-      } catch (e2) {
-        if (attempt === 4) throw e2;
-        if (e2.code !== 'EBUSY' && e2.code !== 'EPERM' && e2.code !== 'EACCES') throw e2;
-      }
-    }
+  }
+  if (wrote) {
+    cmdsInFlight = 1;
     cmd._writtenAt = Date.now();
-    dbg(`SPECTRE: wrote 1 command (${pendingSpectreCmds.length} pending)`);
-  } catch (e) {
-    dbg(`SPECTRE: command write error: ${e.message}`);
+    dbg(`SPECTRE: wrote command ${cmd.type} (${pendingSpectreCmds.length} pending)`);
   }
 }
 
-// Re-send watchdog: guarantees delivery even if an individual write is lost.
-// Every 5s: (a) commands still unacked 15s after being written get fresh ids,
-// (b) write the next pending command when the file is empty, (c) if the file
-// stays non-empty >15s (Arma's reader not consuming), force-recreate it to
-// break whatever Arma-side state is blocking consumption.
-let cmdsFileNonEmptySince = 0;
-function startResendWatchdog() {
-  setInterval(() => {
-    if (pendingSpectreCmds.length === 0) return;
-    const now = Date.now();
-    for (const c of pendingSpectreCmds) {
-      if (!c._writtenAt || now - c._writtenAt > 15000) {
-        c._id = Date.now() + Math.floor(Math.random() * 10000);
-        c._writtenAt = now;
-        dbg(`SPECTRE: fresh id for pending command ${c.type}`);
-      }
+function advanceQueue() {
+  if (!ARMA_INSTALL) return;
+  if (pendingSpectreCmds.length === 0) { cmdsInFlight = 0; return; }
+  const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
+  try {
+    let size = -1;
+    try { size = fs.statSync(p).size; } catch (_) {}
+    if (size === -1) {
+      // Missing (was reset by the stuck-handler) — recreate the current command.
+      writePending(0);
+      return;
     }
-    const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
-    try {
-      let size = -1;
-      try { size = fs.statSync(p).size; } catch (_) {}
-      if (size === 0 || size === -1) {
+    if (size !== 0) {
+      // Not consumed yet. Detect a stuck reader.
+      if (cmdsFileNonEmptySince === 0) cmdsFileNonEmptySince = Date.now();
+      if (Date.now() - cmdsFileNonEmptySince > 15000) {
+        try { fs.rmSync(p, { force: true }); } catch (_) {}
         cmdsFileNonEmptySince = 0;
-      } else {
-        // File has content Arma hasn't consumed yet.
-        if (cmdsFileNonEmptySince === 0) cmdsFileNonEmptySince = now;
-        if (now - cmdsFileNonEmptySince > 15000) {
-          try { fs.rmSync(p, { force: true }); } catch (_) {}
-          cmdsFileNonEmptySince = 0;
-          dbg('SPECTRE: command file stuck >15s — reset reader');
-        }
+        dbg('SPECTRE: command file stuck >15s — reset reader');
       }
-      tryWriteNextCommand();
-    } catch (e) {
-      dbg(`SPECTRE: watchdog write error: ${e.message}`);
+      return;
     }
-  }, 5000);
+    // File is empty → the in-flight command was consumed. Drop it, write next.
+    cmdsFileNonEmptySince = 0;
+    if (cmdsInFlight > 0) {
+      pendingSpectreCmds.shift();
+      cmdsInFlight = 0;
+      dbg(`SPECTRE: command consumed (${pendingSpectreCmds.length} pending)`);
+    }
+    if (pendingSpectreCmds.length > 0) writePending(0);
+  } catch (e) {
+    dbg(`SPECTRE: advanceQueue error: ${e.message}`);
+  }
+}
+
+function startCommandQueue() {
+  setInterval(() => { try { advanceQueue(); } catch (e) { dbg(`SPECTRE: queue error: ${e.message}`); } }, 500);
 }
 
 function queueCommand(cmd) {
@@ -1191,7 +1210,7 @@ ipcMain.on('start-host-services', () => {
   dbg('SPECTRE: Starting host services (bridge watcher, web viewer, mod check)');
   startBridgeWatcher();
   startWebSocketServer();
-  startResendWatchdog();
+  startCommandQueue();
   tryInstallMod();
 });
 
@@ -1343,21 +1362,13 @@ function parseArmaLog(chunk) {
     // malformed broadcast) must NEVER abort the chunk and permanently skip the
     // ack/broadcast lines that follow it.
     try {
-    // Command acks from Arma ("SPECTRE: Executed OK: [id, ..."): drop acked
-    // commands from the pending buffer. Anything unacked stays in the buffer,
-    // so it is re-sent on every write — self-healing against missed reads.
+    // Command acks from Arma are logged for diagnostics only; the command
+    // queue advances on FILE CONSUMPTION (the file emptying after READ_CLEAR),
+    // so it does not depend on the RPT tailer or ack parsing.
     const ackMatch = line.match(/Executed OK: \[(\d+)/);
     if (ackMatch) {
       const ackId = parseInt(ackMatch[1], 10);
-      if (ackId && pendingSpectreCmds.length > 0) {
-        const before = pendingSpectreCmds.length;
-        pendingSpectreCmds = pendingSpectreCmds.filter(c => parseInt(c._id, 10) !== ackId);
-        if (pendingSpectreCmds.length !== before) {
-          dbg(`SPECTRE: acked command ${ackId}, pending=${pendingSpectreCmds.length}`);
-          // Advance the queue: send the next pending command immediately.
-          tryWriteNextCommand();
-        }
-      }
+      if (ackId) dbg(`SPECTRE: ack ${ackId} seen`);
       continue;
     }
 
