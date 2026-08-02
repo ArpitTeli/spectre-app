@@ -1220,6 +1220,22 @@ function parseArmaLog(chunk) {
   let legacyFlushed = false;
 
   for (const line of lines) {
+    // Command acks from Arma ("SPECTRE: Executed OK: [id, ..."): drop acked
+    // commands from the pending buffer. Anything unacked stays in the buffer,
+    // so it is re-sent on every write — self-healing against missed reads.
+    const ackMatch = line.match(/Executed OK: \[(\d+)/);
+    if (ackMatch) {
+      const ackId = parseInt(ackMatch[1], 10);
+      if (ackId && pendingSpectreCmds.length > 0) {
+        const before = pendingSpectreCmds.length;
+        pendingSpectreCmds = pendingSpectreCmds.filter(c => parseInt(c._id, 10) !== ackId);
+        if (pendingSpectreCmds.length !== before) {
+          dbg(`SPECTRE: acked command ${ackId}, pending=${pendingSpectreCmds.length}`);
+        }
+      }
+      continue;
+    }
+
     // New per-line format: SPECTRE_META, SPECTRE_UNIT, SPECTRE_CONTACT, SPECTRE_EVENTS
     const metaMatch = line.match(/SPECTRE_META:(\{.+\})/);
     if (metaMatch) {
