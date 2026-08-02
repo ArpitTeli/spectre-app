@@ -1,0 +1,6 @@
+LIBRARY spectre_ext_x64.dll
+
+EXPORTS
+RVExtension
+RVExtensionArgs
+RVExtensionVersion

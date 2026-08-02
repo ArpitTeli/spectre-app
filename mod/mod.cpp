@@ -1,5 +1,5 @@
-name = "SPECTRE C2"
-description = "SPECTRE Command & Control - AI-powered tactical planning and unit management"
-action = "https://github.com/spectre-c2/spectre"
-tooltip = "SPECTRE C2"
-author = "SPECTRE"
+name = "SPECTRE C2";
+description = "SPECTRE Command & Control - AI-powered tactical planning and unit management";
+action = "https://github.com/spectre-c2/spectre";
+tooltip = "SPECTRE C2";
+author = "SPECTRE";
