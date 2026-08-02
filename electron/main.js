@@ -718,22 +718,46 @@ function writeCommandToFile(cmd) {
     }
     if (!cmd._id) cmd._id = Date.now() + Math.floor(Math.random() * 10000);
     cmd._writtenAt = Date.now();
-    pendingSpectreCmds.push(cmd);
-    if (pendingSpectreCmds.length > 50) pendingSpectreCmds = pendingSpectreCmds.slice(-50);
-    let sqf = buildSQFContent(pendingSpectreCmds);
     // Drop phantom commands (e.g. ATTACK with no target and no coords) that
     // produce no executable line — they would only pollute the buffer.
-    if (!sqf.includes('call SPECTRE_fnc_execCmd')) {
-      pendingSpectreCmds.pop();
+    if (!buildSQFContent([cmd]).includes('call SPECTRE_fnc_execCmd')) {
       dbg(`SPECTRE: dropped phantom command ${cmd.type}`);
       fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} SKIP ${cmd.type} (no target)\n`);
       return;
     }
-    const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
-    // Consume-once protocol: the DLL truncates the file after reading it, so a
-    // command can never be lost or duplicated (the SQF id list guards against
-    // the rare force-overwrite case). Write immediately — NEVER block the main
-    // process (a synchronous wait here froze the app and killed the RPT tailer).
+    pendingSpectreCmds.push(cmd);
+    if (pendingSpectreCmds.length > 50) pendingSpectreCmds = pendingSpectreCmds.slice(-50);
+    fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} OK ${cmd.type}\n`);
+    // Single-command protocol: write the next pending command ONLY when the
+    // file is empty (the previous one was consumed by Arma). Serialized,
+    // ACK-verified delivery — a multi-command file is never produced.
+    tryWriteNextCommand();
+  } catch (e) {
+    try { fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} FAIL ${e.message}\n`); } catch (_) {}
+  }
+}
+
+// Writes the oldest pending command into spectre_cmds.sqf as a SINGLE command
+// line (plus the session banner). Never the whole buffer. Skips if the file
+// still has unconsumed content. `force` overwrites regardless (used to break
+// a stuck reader).
+function tryWriteNextCommand(force) {
+  if (!ARMA_INSTALL || pendingSpectreCmds.length === 0) return;
+  const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
+  try {
+    if (!force) {
+      let size = -1;
+      try { size = fs.statSync(p).size; } catch (_) {}
+      if (size !== 0 && size !== -1) return; // not consumed yet — wait
+    }
+    const cmd = pendingSpectreCmds[0];
+    const sqf = buildSQFContent([cmd]);
+    if (!sqf.includes('call SPECTRE_fnc_execCmd')) {
+      pendingSpectreCmds.shift();
+      fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} SKIP ${cmd.type} (no target)\n`);
+      tryWriteNextCommand(force);
+      return;
+    }
     let wrote = false;
     for (let attempt = 1; attempt <= 4 && !wrote; attempt++) {
       try {
@@ -744,58 +768,46 @@ function writeCommandToFile(cmd) {
         if (e2.code !== 'EBUSY' && e2.code !== 'EPERM' && e2.code !== 'EACCES') throw e2;
       }
     }
-    fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} OK ${cmd.type}\n`);
-    dbg(`SPECTRE: wrote ${sqf.length} bytes (${pendingSpectreCmds.length} pending) to spectre_cmds.sqf`);
+    cmd._writtenAt = Date.now();
+    dbg(`SPECTRE: wrote 1 command (${pendingSpectreCmds.length} pending)`);
   } catch (e) {
-    try { fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} FAIL ${e.message}\n`); } catch (_) {}
+    dbg(`SPECTRE: command write error: ${e.message}`);
   }
 }
 
 // Re-send watchdog: guarantees delivery even if an individual write is lost.
 // Every 5s: (a) commands still unacked 15s after being written get fresh ids,
-// (b) if any commands are pending and the command file is empty (consumed or
-// never landed), re-write the whole buffer, (c) if the file stays non-empty
-// (Arma's reader not consuming), delete + re-create it to break any stuck
-// reader state.
+// (b) write the next pending command when the file is empty, (c) if the file
+// stays non-empty >15s (Arma's reader not consuming), force-recreate it to
+// break whatever Arma-side state is blocking consumption.
 let cmdsFileNonEmptySince = 0;
 function startResendWatchdog() {
   setInterval(() => {
     if (pendingSpectreCmds.length === 0) return;
     const now = Date.now();
-    let resent = false;
     for (const c of pendingSpectreCmds) {
       if (!c._writtenAt || now - c._writtenAt > 15000) {
         c._id = Date.now() + Math.floor(Math.random() * 10000);
         c._writtenAt = now;
-        resent = true;
+        dbg(`SPECTRE: fresh id for pending command ${c.type}`);
       }
     }
     const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
     try {
       let size = -1;
       try { size = fs.statSync(p).size; } catch (_) {}
-      if (size === 0) {
+      if (size === 0 || size === -1) {
         cmdsFileNonEmptySince = 0;
-        const sqf = buildSQFContent(pendingSpectreCmds);
-        if (sqf.includes('call SPECTRE_fnc_execCmd')) {
-          fs.writeFileSync(p, sqf, 'utf8');
-          pendingSpectreCmds.forEach(c => { c._writtenAt = now; });
-          dbg(`SPECTRE: watchdog wrote ${pendingSpectreCmds.length} pending command(s) to empty file`);
-        }
       } else {
         // File has content Arma hasn't consumed yet.
         if (cmdsFileNonEmptySince === 0) cmdsFileNonEmptySince = now;
         if (now - cmdsFileNonEmptySince > 15000) {
-          // Stuck reader: delete + rewrite to break whatever Arma-side state
-          // is preventing consumption.
           try { fs.rmSync(p, { force: true }); } catch (_) {}
-          const sqf = buildSQFContent(pendingSpectreCmds);
-          fs.writeFileSync(p, sqf, 'utf8');
           cmdsFileNonEmptySince = 0;
-          pendingSpectreCmds.forEach(c => { c._writtenAt = now; });
-          dbg('SPECTRE: command file stuck >15s — deleted + rewrote to reset reader');
+          dbg('SPECTRE: command file stuck >15s — reset reader');
         }
       }
+      tryWriteNextCommand();
     } catch (e) {
       dbg(`SPECTRE: watchdog write error: ${e.message}`);
     }
@@ -1338,6 +1350,8 @@ function parseArmaLog(chunk) {
         pendingSpectreCmds = pendingSpectreCmds.filter(c => parseInt(c._id, 10) !== ackId);
         if (pendingSpectreCmds.length !== before) {
           dbg(`SPECTRE: acked command ${ackId}, pending=${pendingSpectreCmds.length}`);
+          // Advance the queue: send the next pending command immediately.
+          tryWriteNextCommand();
         }
       }
       continue;

@@ -70,9 +70,16 @@ void readFile(const char* path, char* output, int outputSize) {
 void readFileAndClear(const char* path, char* output, int outputSize) {
     readFile(path, output, outputSize);
     if (output[0] != '\0' && strncmp(output, "ERR_", 4) != 0) {
-        FILE* f = fopen(path, "wb");
-        if (f != NULL) {
-            fclose(f);
+        // The app may hold the file open briefly during its write; retry the
+        // truncate so unconsumed content never accumulates toward the output
+        // cap (which would otherwise end in ERR_SIZE and drop every command).
+        for (int i = 0; i < 5; i++) {
+            FILE* f = fopen(path, "wb");
+            if (f != NULL) {
+                fclose(f);
+                break;
+            }
+            Sleep(50);
         }
     }
 }
