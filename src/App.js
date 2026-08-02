@@ -321,8 +321,7 @@ export default function App() {
                   setPendingAction({ id: 'MOVE_TO', unitId: null, label: 'MOVE TO (ALL)' });
                 }}>MOVE TO</button>
                 <button className="selection-action-btn" onClick={() => {
-                  state.selectedUnits.forEach(id => sendArmaCommand({ type: 'ATTACK', unit_id: id }));
-                  addCommsEntry('SPECTRE', 'SELECTED', 'ATTACK', 'BLUE');
+                  setPendingAction({ id: 'ATTACK', unitId: null, label: 'ATTACK (ALL)' });
                 }}>ATTACK</button>
               </div>
               <button className="selection-clear-btn" onClick={clearSelection}>✕</button>

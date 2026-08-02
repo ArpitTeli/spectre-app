@@ -19,7 +19,8 @@ void ensureBasePath() {
     }
     if (dllPath[0] == 0) {
         // Last resort: try Arma install directory
-        strncpy_s(basePath, MAX_PATH, "E:\\Games\\Arma 3\\@SPECTRE\\", _TRUNCATE);
+        strncpy(basePath, "E:\\Games\\Arma 3\\@SPECTRE\\", MAX_PATH - 1);
+        basePath[MAX_PATH - 1] = '\0';
         return;
     }
     char* spectre = strstr(dllPath, "@SPECTRE");
@@ -29,18 +30,20 @@ void ensureBasePath() {
         // yielding "...@SPECTREaddons\..." and ERR_OPEN on every read).
         spectre += 9;
         int len = (int)(spectre - dllPath);
-        strncpy_s(basePath, MAX_PATH, dllPath, len);
+        if (len >= MAX_PATH) len = MAX_PATH - 1;
+        strncpy(basePath, dllPath, len);
+        basePath[len] = '\0';
     } else {
         // Not found in path — try Arma install directory as fallback
-        strncpy_s(basePath, MAX_PATH, "E:\\Games\\Arma 3\\@SPECTRE\\", _TRUNCATE);
+        strncpy(basePath, "E:\\Games\\Arma 3\\@SPECTRE\\", MAX_PATH - 1);
+        basePath[MAX_PATH - 1] = '\0';
     }
 }
 
 void readFile(const char* path, char* output, int outputSize) {
-    FILE* f = NULL;
-    errno_t err = fopen_s(&f, path, "rb");
-    if (err != 0 || f == NULL) {
-        snprintf(output, outputSize, "ERR_OPEN:%d:%s", err, path);
+    FILE* f = fopen(path, "rb");
+    if (f == NULL) {
+        snprintf(output, outputSize, "ERR_OPEN:%s", path);
         return;
     }
     fseek(f, 0, SEEK_END);
@@ -55,6 +58,21 @@ void readFile(const char* path, char* output, int outputSize) {
     fclose(f);
 }
 
+// Consume-once read: returns the file content, then truncates the file so the
+// command is executed exactly once and can never be re-read (or lost to a
+// stale-copy desync). The app only writes when the file is empty (write-if-
+// empty), and re-sends unacked commands with fresh ids, so a lost write is
+// self-healing and double execution is impossible by construction.
+void readFileAndClear(const char* path, char* output, int outputSize) {
+    readFile(path, output, outputSize);
+    if (output[0] != '\0' && strncmp(output, "ERR_", 4) != 0) {
+        FILE* f = fopen(path, "wb");
+        if (f != NULL) {
+            fclose(f);
+        }
+    }
+}
+
 void stripQuotes(char* dest, const char* src, int maxLen) {
     if (!src || !*src || maxLen <= 0) { if (maxLen > 0) dest[0] = '\0'; return; }
     const char* start = src;
@@ -64,11 +82,13 @@ void stripQuotes(char* dest, const char* src, int maxLen) {
     int len = (int)(end - start + 1);
     if (len < 0) len = 0;
     if (len >= maxLen) len = maxLen - 1;
-    strncpy_s(dest, maxLen, start, len);
+    strncpy(dest, start, len);
+    dest[len] = '\0';
 }
 
 __declspec(dllexport) void __stdcall RVExtensionVersion(char *output, int outputSize) {
-    strncpy_s(output, outputSize, "SPECTRE Ext v1.0", _TRUNCATE);
+    strncpy(output, "SPECTRE Ext v2.0", outputSize - 1);
+    output[outputSize - 1] = '\0';
 }
 
 __declspec(dllexport) void __stdcall RVExtension(char *output, int outputSize, const char *function) {
@@ -78,27 +98,36 @@ __declspec(dllexport) void __stdcall RVExtension(char *output, int outputSize, c
     stripQuotes(stripped, function, sizeof(stripped));
     char fullPath[MAX_PATH];
     if (stripped[1] == ':' || stripped[0] == '\\') {
-        strncpy_s(fullPath, MAX_PATH, stripped, _TRUNCATE);
+        strncpy(fullPath, stripped, MAX_PATH - 1);
+        fullPath[MAX_PATH - 1] = '\0';
     } else {
-        strncpy_s(fullPath, MAX_PATH, basePath, _TRUNCATE);
-        strncat_s(fullPath, MAX_PATH, stripped, _TRUNCATE);
+        strncpy(fullPath, basePath, MAX_PATH - 1);
+        fullPath[MAX_PATH - 1] = '\0';
+        strncat(fullPath, stripped, MAX_PATH - strlen(fullPath) - 1);
     }
     readFile(fullPath, output, outputSize);
 }
 
 __declspec(dllexport) int __stdcall RVExtensionArgs(char *output, int outputSize, const char *function, const char **args, int argc) {
-    if (function && strcmp(function, "READ") == 0 && argc >= 1 && args[0]) {
+    if (function && argc >= 1 && args[0] &&
+        (strcmp(function, "READ") == 0 || strcmp(function, "READ_CLEAR") == 0)) {
         ensureBasePath();
         char stripped[256];
         stripQuotes(stripped, args[0], sizeof(stripped));
         char fullPath[MAX_PATH];
         if (stripped[1] == ':' || stripped[0] == '\\') {
-            strncpy_s(fullPath, MAX_PATH, stripped, _TRUNCATE);
+            strncpy(fullPath, stripped, MAX_PATH - 1);
+            fullPath[MAX_PATH - 1] = '\0';
         } else {
-            strncpy_s(fullPath, MAX_PATH, basePath, _TRUNCATE);
-            strncat_s(fullPath, MAX_PATH, stripped, _TRUNCATE);
+            strncpy(fullPath, basePath, MAX_PATH - 1);
+            fullPath[MAX_PATH - 1] = '\0';
+            strncat(fullPath, stripped, MAX_PATH - strlen(fullPath) - 1);
         }
-        readFile(fullPath, output, outputSize);
+        if (strcmp(function, "READ_CLEAR") == 0) {
+            readFileAndClear(fullPath, output, outputSize);
+        } else {
+            readFile(fullPath, output, outputSize);
+        }
         return output[0] != '\0' ? 1 : 0;
     }
     snprintf(output, outputSize, "ERR_BAD_CALL:func=%s argc=%d", function ? function : "NULL", argc);

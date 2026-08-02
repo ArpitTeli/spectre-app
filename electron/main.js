@@ -615,7 +615,16 @@ function buildSQFContent(commands) {
         const ax = cmd.x !== undefined ? Math.round(cmd.x) : '';
         const ay = cmd.y !== undefined ? Math.round(cmd.y) : '';
         if (targetId) {
-          lines.push(`[${id}, "ATTACK", "${uid}", [], "${targetId}"] call SPECTRE_fnc_execCmd;`);
+          // Always carry the contact's last-known position ([[x,y]]) so the SQF
+          // can fall back to it if the target object is gone by execution time.
+          const contact = pendingState.contacts[targetId];
+          const px = ax !== '' ? ax : (contact && contact.position ? Math.round(contact.position.x) : '');
+          const py = ay !== '' ? ay : (contact && contact.position ? Math.round(contact.position.y) : '');
+          if (px !== '' && py !== '') {
+            lines.push(`[${id}, "ATTACK", "${uid}", [[${px},${py}]], "${targetId}"] call SPECTRE_fnc_execCmd;`);
+          } else {
+            lines.push(`[${id}, "ATTACK", "${uid}", [], "${targetId}"] call SPECTRE_fnc_execCmd;`);
+          }
         } else if (ax || ay) {
           lines.push(`[${id}, "ATTACK_POS", "${uid}", [[${ax},${ay}]]] call SPECTRE_fnc_execCmd;`);
         }
@@ -625,8 +634,15 @@ function buildSQFContent(commands) {
       case 'KAMIKAZE': {
         const targetId = sqfSafe(cmd.target_id);
         const wps = (cmd.waypoints || []);
-        if (wps.length > 0) {
-          const wpStr = wps
+        // Last-known target position fallback ([[x,y]]) appended to the waypoint
+        // list so the chase can still dive on the spot if the object dies.
+        const contact = pendingState.contacts[targetId];
+        const fallbackWp = (contact && contact.position)
+          ? [[Math.round(contact.position.x), Math.round(contact.position.y), 0]]
+          : [];
+        const allWps = wps.concat(fallbackWp);
+        if (allWps.length > 0) {
+          const wpStr = allWps
             .filter(wp => wp && wp.length >= 2)
             .map(wp => `[${Math.round(wp[0])},${Math.round(wp[1])},${Math.round(wp[2] || 0)}]`)
             .join(',');
@@ -681,39 +697,101 @@ function buildSQFContent(commands) {
 }
 
 // ─── Write a single command to the SQF file ───────────────────────────────────
+// Dedupe double-sends: the 2D + 3D maps can both fire the same contact click.
+let lastCmdKey = '';
+let lastCmdTime = 0;
+function isDuplicateSend(cmd) {
+  const key = `${cmd.type}|${cmd.unit_id || ''}|${cmd.target_id || ''}|${Math.round(cmd.x || 0)}|${Math.round(cmd.y || 0)}`;
+  const now = Date.now();
+  if (key === lastCmdKey && now - lastCmdTime < 600) return true;
+  lastCmdKey = key;
+  lastCmdTime = now;
+  return false;
+}
+
 function writeCommandToFile(cmd) {
   if (!ARMA_INSTALL) return;
   try {
+    if (isDuplicateSend(cmd)) {
+      dbg(`SPECTRE: dropped duplicate send ${cmd.type}`);
+      return;
+    }
     if (!cmd._id) cmd._id = Date.now() + Math.floor(Math.random() * 10000);
+    cmd._writtenAt = Date.now();
     pendingSpectreCmds.push(cmd);
     if (pendingSpectreCmds.length > 50) pendingSpectreCmds = pendingSpectreCmds.slice(-50);
     let sqf = buildSQFContent(pendingSpectreCmds);
-    // DLL output cap is 10240 bytes; keep the file safely under it so Arma
-    // never receives ERR_SIZE and drops every command.
-    const SAFE_CAP = 8192;
-    while (sqf.length > SAFE_CAP && pendingSpectreCmds.length > 1) {
-      pendingSpectreCmds.shift();
-      sqf = buildSQFContent(pendingSpectreCmds);
+    // Drop phantom commands (e.g. ATTACK with no target and no coords) that
+    // produce no executable line — they would only pollute the buffer.
+    if (!sqf.includes('call SPECTRE_fnc_execCmd')) {
+      pendingSpectreCmds.pop();
+      dbg(`SPECTRE: dropped phantom command ${cmd.type}`);
+      fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} SKIP ${cmd.type} (no target)\n`);
+      return;
     }
-    if (sqf.length > SAFE_CAP) sqf = sqf.slice(0, SAFE_CAP) + '\n';
     const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
-    // The Arma DLL opens the file briefly on every poll (every ~0.3s); a write
-    // landing exactly on top of that can hit EBUSY. Retry a few times — the
-    // lock is transient and a dropped write would wedge the bridge.
+    // Consume-once protocol: the DLL truncates the file after reading it, so
+    // only write when the file is empty (nothing pending for Arma to consume).
+    // Force-overwrite after ~12s as a failsafe against a wedged DLL.
     let wrote = false;
-    for (let attempt = 1; attempt <= 4 && !wrote; attempt++) {
+    const deadline = Date.now() + 12000;
+    while (!wrote && Date.now() < deadline) {
       try {
-        fs.writeFileSync(p, sqf, 'utf8');
-        wrote = true;
+        let size = 0;
+        try { size = fs.statSync(p).size; } catch (_) {}
+        if (size === 0) {
+          fs.writeFileSync(p, sqf, 'utf8');
+          wrote = true;
+        } else {
+          // Not yet consumed — wait a beat and retry.
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);
+        }
       } catch (e2) {
-        if (attempt === 4) throw e2;
-        if (e2.code !== 'EBUSY' && e2.code !== 'EPERM' && e2.code !== 'EACCES') throw e2;
+        if (e2.code === 'EBUSY' || e2.code === 'EPERM' || e2.code === 'EACCES') {
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);
+        } else {
+          throw e2;
+        }
       }
+    }
+    if (!wrote) {
+      // Failsafe: force-overwrite anyway.
+      fs.writeFileSync(p, sqf, 'utf8');
+      dbg('SPECTRE: force-overwrote command file (was not consumed in 12s)');
     }
     fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} OK ${cmd.type}\n`);
   } catch (e) {
     try { fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} FAIL ${e.message}\n`); } catch (_) {}
   }
+}
+
+// Re-send watchdog: commands still unacked 15s after being written get fresh
+// ids so they are forced through even if a consumption/ack was lost.
+function startResendWatchdog() {
+  setInterval(() => {
+    if (pendingSpectreCmds.length === 0) return;
+    const now = Date.now();
+    let resent = false;
+    for (const c of pendingSpectreCmds) {
+      if (!c._writtenAt || now - c._writtenAt > 15000) {
+        c._id = Date.now() + Math.floor(Math.random() * 10000);
+        c._writtenAt = now;
+        resent = true;
+      }
+    }
+    if (resent) {
+      pendingSpectreCmds.forEach(c => { c._writtenAt = now; });
+      dbg(`SPECTRE: re-sending ${pendingSpectreCmds.length} unacked command(s) with fresh ids`);
+      const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
+      try {
+        let size = 0;
+        try { size = fs.statSync(p).size; } catch (_) {}
+        if (size === 0) {
+          fs.writeFileSync(p, buildSQFContent(pendingSpectreCmds), 'utf8');
+        }
+      } catch (_) {}
+    }
+  }, 5000);
 }
 
 function queueCommand(cmd) {
@@ -1093,6 +1171,7 @@ ipcMain.on('start-host-services', () => {
   dbg('SPECTRE: Starting host services (bridge watcher, web viewer, mod check)');
   startBridgeWatcher();
   startWebSocketServer();
+  startResendWatchdog();
   tryInstallMod();
 });
 
