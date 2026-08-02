@@ -754,7 +754,10 @@ function writeCommandToFile(cmd) {
 // Re-send watchdog: guarantees delivery even if an individual write is lost.
 // Every 5s: (a) commands still unacked 15s after being written get fresh ids,
 // (b) if any commands are pending and the command file is empty (consumed or
-// never landed), re-write the whole buffer so Arma always gets them.
+// never landed), re-write the whole buffer, (c) if the file stays non-empty
+// (Arma's reader not consuming), delete + re-create it to break any stuck
+// reader state.
+let cmdsFileNonEmptySince = 0;
 function startResendWatchdog() {
   setInterval(() => {
     if (pendingSpectreCmds.length === 0) return;
@@ -772,11 +775,25 @@ function startResendWatchdog() {
       let size = -1;
       try { size = fs.statSync(p).size; } catch (_) {}
       if (size === 0) {
+        cmdsFileNonEmptySince = 0;
         const sqf = buildSQFContent(pendingSpectreCmds);
         if (sqf.includes('call SPECTRE_fnc_execCmd')) {
           fs.writeFileSync(p, sqf, 'utf8');
           pendingSpectreCmds.forEach(c => { c._writtenAt = now; });
           dbg(`SPECTRE: watchdog wrote ${pendingSpectreCmds.length} pending command(s) to empty file`);
+        }
+      } else {
+        // File has content Arma hasn't consumed yet.
+        if (cmdsFileNonEmptySince === 0) cmdsFileNonEmptySince = now;
+        if (now - cmdsFileNonEmptySince > 15000) {
+          // Stuck reader: delete + rewrite to break whatever Arma-side state
+          // is preventing consumption.
+          try { fs.rmSync(p, { force: true }); } catch (_) {}
+          const sqf = buildSQFContent(pendingSpectreCmds);
+          fs.writeFileSync(p, sqf, 'utf8');
+          cmdsFileNonEmptySince = 0;
+          pendingSpectreCmds.forEach(c => { c._writtenAt = now; });
+          dbg('SPECTRE: command file stuck >15s — deleted + rewrote to reset reader');
         }
       }
     } catch (e) {
