@@ -529,9 +529,17 @@ connect();
 // ─── Command queue ───────────────────────────────────────────────────────────
 let pendingSpectreCmds = [];   // local bridge command buffer (prevents overwrite)
 let pendingCommands = [];
+// Stable per-app-run session banner. The bridge resets its executed-id list
+// whenever the banner in the command file changes, so a fresh app session can
+// never be confused with stale commands left by a previous one.
+const APP_SESSION_EPOCH = Date.now();
+
+function spectreBannerLine() {
+  return `// session=${APP_SESSION_EPOCH}\n`;
+}
 
 function buildSQFContent(commands) {
-  if (commands.length === 0) return '// SPECTRE — no pending commands\n';
+  if (commands.length === 0) return spectreBannerLine() + '// SPECTRE — no pending commands\n';
 
   const sqfSafe = (s) => (s || '').replace(/["'\[\];\n\r]/g, '').substring(0, 100);
 
@@ -669,7 +677,7 @@ function buildSQFContent(commands) {
     }
   }
 
-  return lines.join('\n') + '\n';
+  return spectreBannerLine() + lines.join('\n') + '\n';
 }
 
 // ─── Write a single command to the SQF file ───────────────────────────────────
@@ -689,7 +697,19 @@ function writeCommandToFile(cmd) {
     }
     if (sqf.length > SAFE_CAP) sqf = sqf.slice(0, SAFE_CAP) + '\n';
     const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
-    fs.writeFileSync(p, sqf, 'utf8');
+    // The Arma DLL opens the file briefly on every poll (every ~0.3s); a write
+    // landing exactly on top of that can hit EBUSY. Retry a few times — the
+    // lock is transient and a dropped write would wedge the bridge.
+    let wrote = false;
+    for (let attempt = 1; attempt <= 4 && !wrote; attempt++) {
+      try {
+        fs.writeFileSync(p, sqf, 'utf8');
+        wrote = true;
+      } catch (e2) {
+        if (attempt === 4) throw e2;
+        if (e2.code !== 'EBUSY' && e2.code !== 'EPERM' && e2.code !== 'EACCES') throw e2;
+      }
+    }
     fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} OK ${cmd.type}\n`);
   } catch (e) {
     try { fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} FAIL ${e.message}\n`); } catch (_) {}
@@ -1081,6 +1101,18 @@ app.on('window-all-closed', () => {
 });
 
 // ─── Bridge Watchers ─────────────────────────────────────────────────────────
+function clearSpectreCommandFile(reason) {
+  if (!ARMA_INSTALL) return;
+  try {
+    const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
+    fs.writeFileSync(p, spectreBannerLine(), 'utf8');
+    dbg(`SPECTRE: cleared command file (${reason})`);
+  } catch (e) {
+    dbg(`SPECTRE: clear command file failed: ${e.message}`);
+  }
+  pendingSpectreCmds = [];
+}
+
 function startBridgeWatcher() {
   // Tail Arma RPT log using fs.watchFile + polling fallback
   initWatchArmaLog();
@@ -1160,6 +1192,11 @@ function initWatchArmaLog() {
     }
     currentLogPath = logPath;
     try { logFilePos = fs.statSync(logPath).size; } catch (_) { logFilePos = 0; }
+    logLineBuffer = '';
+    // New Arma session (or app just started): wipe stale commands left in the
+    // file by a previous session so they can never be re-executed by the new
+    // session's bridge (the intro scene bridge starts before the real mission).
+    clearSpectreCommandFile('new Arma session detected');
     dbg('SPECTRE: tailing Arma log: ' + logPath + ' at offset ' + logFilePos);
   }
 
@@ -1175,7 +1212,7 @@ function initWatchArmaLog() {
 }
 
 // Accumulator for multi-line state
-let pendingState = { units: {}, contacts: {}, events: [], mapName: null, missionFolder: null, fullMissionPath: null, timestamp: 0 };
+let pendingState = { units: {}, contacts: {}, events: [], mapName: null, missionFolder: null, fullMissionPath: null, timestamp: 0, isScene: false };
 
 function parseArmaLog(chunk) {
   const lines = chunk.split('\n');
@@ -1191,11 +1228,14 @@ function parseArmaLog(chunk) {
         const meta = JSON.parse(jsonStr);
         if (meta.map) pendingState.mapName = meta.map;
         if (meta.mf) {
+          // Arma intro scenes broadcast from "scenes\..." — ignore their data
+          // so the cinematic's placeholder units never reach the map.
+          pendingState.isScene = meta.mf.indexOf('scenes\\') === 0 || meta.mf.indexOf('scenes/') === 0;
           // Mission changed — clear stale commands from previous mission
           if (pendingState.missionFolder && pendingState.missionFolder !== meta.mf) {
             try {
               const cmdsPath = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
-              fs.writeFileSync(cmdsPath, '// SPECTRE — mission restarted\n', 'utf8');
+              fs.writeFileSync(cmdsPath, spectreBannerLine() + '// SPECTRE — mission restarted\n', 'utf8');
               dbg('SPECTRE: Mission changed, cleared stale commands');
             } catch (_) {}
             // Clear stale units/contacts from previous mission
@@ -1276,7 +1316,7 @@ function parseArmaLog(chunk) {
   }
 
   // After processing all lines in this chunk, flush the accumulated state
-  if (!legacyFlushed && gotData && (Object.keys(pendingState.units).length > 0 || Object.keys(pendingState.contacts).length > 0 || pendingState.events.length > 0 || pendingState.mapName)) {
+  if (!legacyFlushed && gotData && !pendingState.isScene && (Object.keys(pendingState.units).length > 0 || Object.keys(pendingState.contacts).length > 0 || pendingState.events.length > 0 || pendingState.mapName)) {
     const data = {
       missionFolder: pendingState.missionFolder || '',
       fullMissionPath: pendingState.fullMissionPath || '',

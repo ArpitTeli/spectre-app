@@ -24,7 +24,10 @@ void ensureBasePath() {
     }
     char* spectre = strstr(dllPath, "@SPECTRE");
     if (spectre) {
-        spectre += 8;
+        // "@SPECTRE" is 8 chars; step past it AND the trailing backslash so
+        // basePath keeps the separator (v1.11.50 accidentally used += 8,
+        // yielding "...@SPECTREaddons\..." and ERR_OPEN on every read).
+        spectre += 9;
         int len = (int)(spectre - dllPath);
         strncpy_s(basePath, MAX_PATH, dllPath, len);
     } else {
