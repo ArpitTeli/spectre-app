@@ -163,13 +163,7 @@ Failure to resolve logs `SPECTRE ATTACK FAIL: ...` (never silent).
 
 ### 1.6 FPV manual flight (`SPECTRE_fnc_fpvFlyTo`)
 
-The D37 FPV config (`B_FPV_UAV`) empties `class Turrets {}` and sets `hasGunner = 0`, so there is no AI pilot and `doMove`/`flyInHeight` are no-ops. The helper steers with:
-```sqf
-_drone setVelocity [dx*speed, dy*speed, vz];       // vz holds altitude toward target
-_drone setVectorDirAndUp [horizontalDir, [0,0,1]];
-_drone flyInHeight 0;
-```
-Real-time loop (`uiSleep 0.2`), ends when within 15m or timeout.
+The D37 FPV config (`B_FPV_UAV`) empties `class Turrets {}` and sets `hasGunner = 0`, so there is no AI pilot and `doMove`/`flyInHeight` are no-ops. `setVelocity` alone bobs the drone against the ground physics. The helper instead: forces the engine on, lifts the drone clear of the ground (`setPosATL` to 10m), then steps it toward the target every 0.2s with `setPosATL` (speed × 0.2 per step) at the target altitude, zeroing velocity each step. Real-time loop (`uiSleep 0.2`), ends within 8m of the target or at timeout. The KAMIKAZE FPV chase uses the same stepping with a dive profile (<150m → target altitude) and `triggerAmmo` detonation within 6m.
 
 ---
 
