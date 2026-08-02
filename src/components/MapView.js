@@ -143,7 +143,7 @@ function makeUnitIcon(unit, selected) {
     iconSize: [64, 54],
     iconAnchor: [32, 27],
     html: `<div style="display:flex;flex-direction:column;align-items:center">
-      <div style="background:rgba(10,10,10,0.95);border:1px solid ${borderColor};border-radius:0;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:var(--text-primary);letter-spacing:0.5px;white-space:nowrap;margin-bottom:2px">${unit.callsign || unit.id}</div>
+      <div style="background:rgba(11,14,21,0.95);border:1px solid ${borderColor};border-radius:0;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:var(--text-primary);letter-spacing:0.5px;white-space:nowrap;margin-bottom:2px">${unit.callsign || unit.id}</div>
       <div style="font-size:16px;line-height:1;color:${borderColor}">${symbol}</div>
       <div style="width:28px;height:3px;background:var(--border-default);border-radius:0;overflow:hidden;margin-top:2px">
         <div style="width:${hp}%;height:100%;background:${hpColor};border-radius:0"></div>
@@ -155,9 +155,9 @@ function makeUnitIcon(unit, selected) {
 function makeContactIcon(contact, selected) {
   const symbol = CONTACT_SYMBOL[contact.type] || CONTACT_SYMBOL.UNKNOWN;
   const colors = {
-    CONFIRMED:  { border: 'var(--red)', text: '#f5a6a6', opacity: 1.0 },
-    LAST_KNOWN: { border: 'var(--orange)', text: '#f5c4a0', opacity: 0.7 },
-    SUSPECTED:  { border: 'var(--yellow)', text: '#f5d48a', opacity: 0.6 }
+    CONFIRMED:  { border: 'var(--red)', text: '#f2545b', opacity: 1.0 },
+    LAST_KNOWN: { border: 'var(--orange)', text: '#d96a2a', opacity: 0.7 },
+    SUSPECTED:  { border: 'var(--yellow)', text: '#f0a53a', opacity: 0.6 }
   };
   const c = colors[contact.state] || colors.SUSPECTED;
   const label = contact.state === 'SUSPECTED' ? '?' : (contact.id || '?').split('-').pop();
@@ -167,7 +167,7 @@ function makeContactIcon(contact, selected) {
     iconSize: [52, 42],
     iconAnchor: [26, 21],
     html: `<div style="opacity:${c.opacity};display:flex;flex-direction:column;align-items:center">
-      <div style="background:rgba(10,10,10,0.95);border:1px solid ${c.border};border-radius:0;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:${c.text};letter-spacing:0.5px;margin-bottom:2px">${label}</div>
+      <div style="background:rgba(11,14,21,0.95);border:1px solid ${c.border};border-radius:0;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:${c.text};letter-spacing:0.5px;margin-bottom:2px">${label}</div>
       <div style="font-size:14px;line-height:1;color:${c.border}">${symbol}</div>
     </div>`
   });
@@ -412,7 +412,7 @@ export default function MapView({
         }}>
           <div style={{
             fontFamily: 'var(--font-mono)', fontSize: '12px',
-            color: 'var(--text-muted)', background: 'rgba(10,10,10,0.95)',
+            color: 'var(--text-muted)', background: 'rgba(11,14,21,0.95)',
             padding: '20px 30px', borderRadius: '0',
             border: '1px solid var(--border-default)',
             position: 'relative'
@@ -437,7 +437,7 @@ export default function MapView({
 
       <div style={{
         position: 'absolute', bottom: '10px', left: '10px',
-        background: 'rgba(10,10,10,0.95)', border: '1px solid var(--border-default)',
+        background: 'rgba(11,14,21,0.95)', border: '1px solid var(--border-default)',
         borderRadius: '0', padding: '8px 12px', zIndex: 1000,
         fontFamily: 'var(--font-mono)', fontSize: '10px', pointerEvents: 'none'
       }}>
@@ -451,7 +451,7 @@ export default function MapView({
       {mapName && (
         <div style={{
           position: 'absolute', top: '10px', left: '10px',
-          background: 'rgba(10,10,10,0.95)', border: '1px solid var(--border-default)',
+          background: 'rgba(11,14,21,0.95)', border: '1px solid var(--border-default)',
           borderRadius: '0', padding: '6px 10px', zIndex: 1000,
           fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-primary)',
           letterSpacing: '1px', fontWeight: 600

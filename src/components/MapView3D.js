@@ -603,7 +603,7 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
     }
 
     const BLUE = 0x3b82f6;
-    const SELECTED = 0x00d4ff;
+    const SELECTED = 0xc75b1f;
     const DEAD = 0x585870;
     const lineMat = new THREE.LineBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.4 });
     const groundDotGeo = new THREE.RingGeometry(2, 4, 16);
@@ -623,7 +623,7 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
       const dead = u.status === 'DESTROYED' || u.status === 'DEAD';
       const isSelected = selectedUnits && selectedUnits.includes(u.id);
       const color = dead ? DEAD : (isSelected ? SELECTED : BLUE);
-      const emissive = dead ? 0x222233 : (isSelected ? 0x00d4ff : 0x1a4a8a);
+      const emissive = dead ? 0x222233 : (isSelected ? 0xc75b1f : 0x2a6db5);
       const opacity = dead ? 0.4 : 1;
 
       const modelType = getUnitModelType(u);
@@ -725,7 +725,7 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
         <span className="badge badge-primary">3D</span>
         <span className={`badge ${status.startsWith('ready')?'badge-success':''}`}>{status}</span>
       </div>
-      <div style={{ position:'absolute', bottom:12, left:12, zIndex:10, fontFamily:'var(--font-mono)', fontSize:9, color:'var(--text-muted)', background:'rgba(0,0,0,0.7)', padding:'5px 10px', borderRadius:3, pointerEvents:'none' }}>
+      <div style={{ position:'absolute', bottom:12, left:12, zIndex:10, fontFamily:'var(--font-mono)', fontSize:9, color:'var(--text-muted)', background:'rgba(7,9,15,0.7)', padding:'5px 10px', borderRadius:3, pointerEvents:'none' }}>
         WASD+Shift=fly · Scroll=zoom · Left-drag=pan · Right/Mid-drag=orbit · M=2D
       </div>
     </div>

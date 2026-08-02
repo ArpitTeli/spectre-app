@@ -20,7 +20,7 @@ export default function AbortModal({ abortState, forceMetrics, rewardData, onCho
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 500,
-      background: 'rgba(0,0,0,0.8)',
+      background: 'rgba(7,9,15,0.85)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
     }}>
       <div style={{
@@ -29,7 +29,7 @@ export default function AbortModal({ abortState, forceMetrics, rewardData, onCho
       }}>
         {/* Header */}
         <div style={{
-          background: 'rgba(239,68,68,0.15)', borderBottom: '1px solid var(--color-red)',
+          background: 'rgba(242,84,91,0.15)', borderBottom: '1px solid var(--color-red)',
           padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px'
         }}>
           <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-red)' }} />
@@ -74,7 +74,7 @@ export default function AbortModal({ abortState, forceMetrics, rewardData, onCho
               <button key={opt.id}
                 onClick={() => onChoice(opt.id)}
                 style={{
-                  background: opt.id === auto_select ? 'rgba(13,127,204,0.1)' : 'var(--bg-secondary)',
+                  background: opt.id === auto_select ? 'rgba(199,91,31,0.1)' : 'var(--bg-secondary)',
                   border: `1px solid ${opt.id === auto_select ? 'var(--accent-bright)' : 'var(--border-primary)'}`,
                   borderLeft: `4px solid ${RISK_COLORS[opt.risk] || 'var(--text-muted)'}`,
                   borderRadius: '3px', padding: '10px 14px', cursor: 'pointer',

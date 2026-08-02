@@ -13,7 +13,7 @@ export default function AARPanel({ aar, rewardData, onClose, onNewMission }) {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 500,
-      background: 'rgba(0,0,0,0.8)',
+      background: 'rgba(7,9,15,0.85)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
     }}>
       <div style={{

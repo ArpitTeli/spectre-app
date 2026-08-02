@@ -3,12 +3,12 @@ import cytoscape from 'cytoscape';
 import { readVaultNodes, buildGraphFromWikilinks } from '../lib/vault';
 
 const NODE_COLORS = {
-  unit:      '#2a7de1',
-  contact:   '#db3838',
-  objective: '#23d160',
-  phase:     '#f5a623',
-  intel:     '#a687e5',
-  mission:   '#525252'
+  unit:      '#c75b1f',
+  contact:   '#f2545b',
+  objective: '#3dd68c',
+  phase:     '#f0a53a',
+  intel:     '#a78bfa',
+  mission:   '#3a4557'
 };
 
 const NODE_SHAPES = {
@@ -73,7 +73,7 @@ export default function VaultGraph({ vaultPath, units, contacts }) {
             label: label,
             type: type,
             status: status,
-            color: NODE_COLORS[type] || '#525252',
+            color: NODE_COLORS[type] || '#3a4557',
             shape: NODE_SHAPES[type] || 'ellipse',
             health: fm.health,
             threat_level: fm.threat_level,
@@ -116,13 +116,13 @@ export default function VaultGraph({ vaultPath, units, contacts }) {
             style: {
               'background-color': 'data(color)',
               'label': 'data(label)',
-              'color': '#f5f6f7',
+              'color': '#e6e8ec',
               'font-size': '10px',
               'font-family': 'Inter, sans-serif',
               'font-weight': 600,
               'text-valign': 'bottom',
               'text-margin-y': 6,
-              'text-outline-color': '#1b1b1b',
+              'text-outline-color': '#10141d',
               'text-outline-width': 2,
               'width': 28,
               'height': 28,
@@ -158,8 +158,8 @@ export default function VaultGraph({ vaultPath, units, contacts }) {
             selector: 'edge',
             style: {
               'width': 1.5,
-              'line-color': '#3a3a3a',
-              'target-arrow-color': '#3a3a3a',
+              'line-color': '#2a3342',
+              'target-arrow-color': '#2a3342',
               'target-arrow-shape': 'triangle',
               'arrow-scale': 0.8,
               'curve-style': 'bezier',
@@ -287,7 +287,7 @@ export default function VaultGraph({ vaultPath, units, contacts }) {
 
       {/* Graph container */}
       <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-        <div ref={containerRef} style={{ width: '100%', height: '100%', background: '#141414' }} />
+        <div ref={containerRef} style={{ width: '100%', height: '100%', background: '#0b0e15' }} />
 
         {/* Selected node detail */}
         {selectedNode && (

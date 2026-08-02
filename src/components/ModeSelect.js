@@ -21,7 +21,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
-      background: '#1b1b1b',
+      background: '#0b0e15',
       display: 'flex', alignItems: 'center', justifyContent: 'center'
     }}>
       <div style={{ textAlign: 'center', maxWidth: 480, padding: '0 24px' }}>
@@ -31,7 +31,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
           fontWeight: 700,
           fontSize: 28,
           letterSpacing: 6,
-          color: '#2a7de1',
+          color: '#c75b1f',
           marginBottom: 8
         }}>
           SPECTRE
@@ -39,7 +39,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
         <div style={{
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: 11,
-          color: '#888',
+          color: '#8a93a3',
           letterSpacing: 2,
           marginBottom: 48
         }}>
@@ -52,7 +52,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
             <div style={{
               fontFamily: "'Inter', sans-serif",
               fontSize: 14,
-              color: '#a0a0a0',
+              color: '#8a93a3',
               marginBottom: 24
             }}>
               How do you want to connect?
@@ -64,22 +64,22 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
                 onClick={() => setMode('host')}
                 style={{
                   flex: 1, padding: '24px 16px',
-                  background: '#212121',
+                  background: '#10141d',
                   border: '1px solid #3a3a3a',
                   borderRadius: 4,
                   cursor: 'pointer',
                   textAlign: 'center',
                   transition: 'border-color 0.15s'
                 }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = '#2a7de1'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = '#3a3a3a'}
+                onMouseEnter={e => e.currentTarget.style.borderColor = '#c75b1f'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = '#2a3342'}
               >
-                <div style={{ fontSize: 24, marginBottom: 8, color: '#2a7de1' }}>🖥</div>
+                <div style={{ fontSize: 24, marginBottom: 8, color: '#c75b1f' }}>🖥</div>
                 <div style={{
                   fontFamily: "'Inter', sans-serif",
                   fontSize: 15,
                   fontWeight: 700,
-                  color: '#f5f6f7',
+                  color: '#e6e8ec',
                   marginBottom: 6
                 }}>
                   HOST
@@ -87,7 +87,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
                 <div style={{
                   fontFamily: "'JetBrains Mono', monospace",
                   fontSize: 10,
-                  color: '#888',
+                  color: '#8a93a3',
                   lineHeight: 1.5
                 }}>
                   Play Arma 3 on this PC<br />
@@ -100,22 +100,22 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
                 onClick={() => setMode('client')}
                 style={{
                   flex: 1, padding: '24px 16px',
-                  background: '#212121',
+                  background: '#10141d',
                   border: '1px solid #3a3a3a',
                   borderRadius: 4,
                   cursor: 'pointer',
                   textAlign: 'center',
                   transition: 'border-color 0.15s'
                 }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = '#2a7de1'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = '#3a3a3a'}
+                onMouseEnter={e => e.currentTarget.style.borderColor = '#c75b1f'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = '#2a3342'}
               >
-                <div style={{ fontSize: 24, marginBottom: 8, color: '#f5a623' }}>📡</div>
+                <div style={{ fontSize: 24, marginBottom: 8, color: '#f0a53a' }}>📡</div>
                 <div style={{
                   fontFamily: "'Inter', sans-serif",
                   fontSize: 15,
                   fontWeight: 700,
-                  color: '#f5f6f7',
+                  color: '#e6e8ec',
                   marginBottom: 6
                 }}>
                   COMMAND
@@ -123,7 +123,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
                 <div style={{
                   fontFamily: "'JetBrains Mono', monospace",
                   fontSize: 10,
-                  color: '#888',
+                  color: '#8a93a3',
                   lineHeight: 1.5
                 }}>
                   Connect to a host PC<br />
@@ -138,7 +138,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
             <div style={{
               fontFamily: "'Inter', sans-serif",
               fontSize: 14,
-              color: '#a0a0a0',
+              color: '#8a93a3',
               marginBottom: 24
             }}>
               Host mode will start the Arma 3 bridge.
@@ -149,13 +149,13 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
               onClick={handleHost}
               style={{
                 padding: '12px 48px',
-                background: '#2a7de1',
+                background: '#c75b1f',
                 border: 'none',
                 borderRadius: 3,
                 fontFamily: "'Inter', sans-serif",
                 fontSize: 13,
                 fontWeight: 700,
-                color: '#fff',
+                color: '#0b0e15',
                 cursor: 'pointer',
                 letterSpacing: 1,
                 textTransform: 'uppercase',
@@ -170,7 +170,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
                 onClick={() => setMode(null)}
                 style={{
                   background: 'none', border: 'none',
-                  color: '#888', cursor: 'pointer',
+                  color: '#8a93a3', cursor: 'pointer',
                   fontFamily: "'JetBrains Mono', monospace",
                   fontSize: 10
                 }}
@@ -185,7 +185,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
             <div style={{
               fontFamily: "'Inter', sans-serif",
               fontSize: 14,
-              color: '#a0a0a0',
+              color: '#8a93a3',
               marginBottom: 24
             }}>
               Enter the room code from the host PC
@@ -200,10 +200,10 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
               style={{
                 width: '100%',
                 padding: '12px 16px',
-                background: '#212121',
+                background: '#10141d',
                 border: '1px solid #3a3a3a',
                 borderRadius: 3,
-                color: '#f5f6f7',
+                color: '#e6e8ec',
                 fontFamily: "'JetBrains Mono', monospace",
                 fontSize: 18,
                 letterSpacing: 3,
@@ -212,15 +212,15 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
                 marginBottom: 8,
                 textTransform: 'uppercase'
               }}
-              onFocus={e => e.target.style.borderColor = '#2a7de1'}
-              onBlur={e => e.target.style.borderColor = '#3a3a3a'}
+              onFocus={e => e.target.style.borderColor = '#c75b1f'}
+              onBlur={e => e.target.style.borderColor = '#2a3342'}
             />
 
             {error && (
               <div style={{
                 fontFamily: "'JetBrains Mono', monospace",
                 fontSize: 11,
-                color: '#db3838',
+                color: '#f2545b',
                 marginBottom: 12
               }}>
                 {error}
@@ -231,13 +231,13 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
               onClick={handleClient}
               style={{
                 padding: '12px 48px',
-                background: '#2a7de1',
+                background: '#c75b1f',
                 border: 'none',
                 borderRadius: 3,
                 fontFamily: "'Inter', sans-serif",
                 fontSize: 13,
                 fontWeight: 700,
-                color: '#fff',
+                color: '#0b0e15',
                 cursor: 'pointer',
                 letterSpacing: 1,
                 textTransform: 'uppercase',
@@ -252,7 +252,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
                 onClick={() => setMode(null)}
                 style={{
                   background: 'none', border: 'none',
-                  color: '#888', cursor: 'pointer',
+                  color: '#8a93a3', cursor: 'pointer',
                   fontFamily: "'JetBrains Mono', monospace",
                   fontSize: 10
                 }}

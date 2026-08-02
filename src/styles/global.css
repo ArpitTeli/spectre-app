@@ -1,52 +1,56 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
 
+/* ─── Anduril Lattice design tokens ───────────────────────────────────────────
+   Deep blue-black surfaces, cool gray-blue hairlines, burnt-orange signal
+   accent. Sans body (Inter) with mono reserved for data readouts.
+   Change these tokens to re-skin the whole app. */
 :root {
-  --bg-deepest: #000000;
-  --bg-primary: #0a0a0a;
-  --bg-surface: #111111;
-  --bg-elevated: #161616;
-  --bg-hover: #1c1c1c;
-  --bg-active: #222222;
+  --bg-deepest: #07090f;
+  --bg-primary: #0b0e15;
+  --bg-surface: #10141d;
+  --bg-elevated: #151a25;
+  --bg-hover: #1a2030;
+  --bg-active: #202840;
 
-  --border-hairline: #1a1a1a;
-  --border-subtle: #222222;
-  --border-default: #2a2a2a;
-  --border-strong: #333333;
-  --border-focus: #00d4ff;
+  --border-hairline: #1a202b;
+  --border-subtle: #212936;
+  --border-default: #2a3342;
+  --border-strong: #3a4557;
+  --border-focus: #d96a2a;
 
-  --text-primary: #e0e0e0;
-  --text-secondary: #888888;
-  --text-muted: #555555;
-  --text-inverse: #0a0a0a;
+  --text-primary: #e6e8ec;
+  --text-secondary: #8a93a3;
+  --text-muted: #5a6270;
+  --text-inverse: #07090f;
 
-  --accent: #00d4ff;
-  --accent-hover: #33dfff;
-  --accent-dim: rgba(0, 212, 255, 0.06);
-  --accent-glow: rgba(0, 212, 255, 0.12);
+  --accent: #c75b1f;
+  --accent-hover: #d96a2a;
+  --accent-dim: rgba(199, 91, 31, 0.10);
+  --accent-glow: rgba(199, 91, 31, 0.18);
 
-  --blue: #00d4ff;
-  --blue-dim: rgba(0, 212, 255, 0.06);
-  --green: #00e676;
-  --green-dim: rgba(0, 230, 118, 0.06);
-  --yellow: #ffab00;
-  --yellow-dim: rgba(255, 171, 0, 0.06);
-  --red: #ff1744;
-  --red-dim: rgba(255, 23, 68, 0.06);
-  --orange: #ff6d00;
-  --purple: #b388ff;
-  --purple-dim: rgba(179, 136, 255, 0.06);
-  --cyan: #00d4ff;
+  --blue: #56b6ff;
+  --blue-dim: rgba(86, 182, 255, 0.08);
+  --green: #3dd68c;
+  --green-dim: rgba(61, 214, 140, 0.08);
+  --yellow: #f0a53a;
+  --yellow-dim: rgba(240, 165, 58, 0.08);
+  --red: #f2545b;
+  --red-dim: rgba(242, 84, 91, 0.08);
+  --orange: #c75b1f;
+  --purple: #a78bfa;
+  --purple-dim: rgba(167, 139, 250, 0.08);
+  --cyan: #3dd8c4;
 
-  --color-friendly: var(--blue);
+  --color-friendly: var(--cyan);
   --color-hostile: var(--red);
   --color-suspected: var(--yellow);
-  --color-neutral: #555555;
+  --color-neutral: #5a6270;
   --color-last-known: var(--orange);
 
-  --font-display: 'JetBrains Mono', monospace;
+  --font-display: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
-  --font-body: 'JetBrains Mono', monospace;
-  --font-condensed: 'JetBrains Mono', monospace;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-condensed: 'Inter', system-ui, sans-serif;
 
   --color-red: var(--red);
   --color-yellow: var(--yellow);
@@ -67,12 +71,12 @@
   --space-8: 32px;
 
   --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
 
   --shadow-sm: none;
   --shadow-md: none;
-  --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.8);
+  --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.55);
 
   --titlebar-height: 32px;
   --statusbar-height: 24px;
@@ -103,7 +107,7 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--border-default); }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
-::selection { background: var(--accent-dim); color: var(--accent); }
+::selection { background: var(--accent-dim); color: var(--accent-hover); }
 
 /* ─── App Layout ──────────────────────────────────────── */
 
@@ -160,8 +164,8 @@ body {
 }
 
 @keyframes pulse-border {
-  0%, 100% { border-color: var(--accent); box-shadow: 0 0 8px rgba(0, 212, 255, 0.2); }
-  50% { border-color: rgba(0, 212, 255, 0.4); box-shadow: 0 0 16px rgba(0, 212, 255, 0.4); }
+  0%, 100% { border-color: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+  50% { border-color: var(--accent-hover); box-shadow: 0 0 16px var(--accent-glow); }
 }
 
 .view-toggle {
@@ -294,7 +298,7 @@ body {
   transition: background var(--duration-normal) var(--ease-out);
 }
 
-.titlebar__connection-dot.connected { background: var(--accent); }
+.titlebar__connection-dot.connected { background: var(--green); }
 
 .titlebar__spacer { flex: 1; }
 
@@ -729,13 +733,13 @@ body {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 9px;
+  font-family: var(--font-display);
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-out);
-  text-transform: capitalize;
+  text-transform: uppercase;
   border-bottom: 2px solid transparent;
 }
 
@@ -744,6 +748,7 @@ body {
 .right-panel__tab.active {
   color: var(--text-primary);
   border-bottom-color: var(--accent);
+  background: linear-gradient(0deg, var(--accent-dim), transparent 70%);
 }
 
 .right-panel__content {
@@ -1476,17 +1481,18 @@ body {
   border-radius: 50%;
 }
 
-.statusbar__dot.connected { background: var(--accent); }
+.statusbar__dot.connected { background: var(--green); }
 .statusbar__dot.disconnected { background: var(--red); }
 
 .statusbar__value {
   color: var(--text-secondary);
   font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .statusbar__value.danger { color: var(--red); }
 .statusbar__value.warning { color: var(--yellow); }
-.statusbar__value.good { color: var(--accent); }
+.statusbar__value.good { color: var(--green); }
 
 .statusbar__divider {
   width: 1px;
@@ -1541,13 +1547,15 @@ body {
 }
 
 .panel-section__title {
-  font-family: var(--font-mono);
-  font-size: 8px;
+  font-family: var(--font-display);
+  font-size: 9px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   letter-spacing: 1.5px;
   text-transform: uppercase;
   margin-bottom: var(--space-1);
+  border-bottom: 1px solid var(--border-hairline);
+  padding-bottom: 2px;
 }
 
 /* ─── Data Display ────────────────────────────────────── */
@@ -1874,11 +1882,13 @@ body {
 .coa-card.selected { border-color: var(--accent); background: var(--accent-dim); }
 
 .coa-card__title {
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-weight: 600;
   font-size: 10px;
   color: var(--text-primary);
   margin-bottom: var(--space-1);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .coa-card__description {
@@ -1907,13 +1917,13 @@ body {
 }
 
 .settings-section__title {
-  font-family: var(--font-mono);
-  font-size: 9px;
+  font-family: var(--font-display);
+  font-size: 10px;
   font-weight: 600;
   color: var(--accent);
   margin-bottom: var(--space-1);
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
 }
 
 .settings-field {

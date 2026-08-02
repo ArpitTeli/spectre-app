@@ -23,7 +23,7 @@ function PhaseBar({ selectedCOA, showCOAOverlay, activePhaseIdx, onAdvancePhase 
   return (
     <div style={{
       margin: '0 0 16px', padding: '12px 14px',
-      background: 'rgba(13,127,204,0.08)', border: '1px solid var(--border-accent)',
+      background: 'rgba(199,91,31,0.08)', border: '1px solid var(--border-accent)',
       borderRadius: '4px'
     }}>
         <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '2px', marginBottom: '8px' }}>
