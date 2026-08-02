@@ -745,13 +745,16 @@ function writeCommandToFile(cmd) {
       }
     }
     fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} OK ${cmd.type}\n`);
+    dbg(`SPECTRE: wrote ${sqf.length} bytes (${pendingSpectreCmds.length} pending) to spectre_cmds.sqf`);
   } catch (e) {
     try { fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} FAIL ${e.message}\n`); } catch (_) {}
   }
 }
 
-// Re-send watchdog: commands still unacked 15s after being written get fresh
-// ids so they are forced through even if a consumption/ack was lost.
+// Re-send watchdog: guarantees delivery even if an individual write is lost.
+// Every 5s: (a) commands still unacked 15s after being written get fresh ids,
+// (b) if any commands are pending and the command file is empty (consumed or
+// never landed), re-write the whole buffer so Arma always gets them.
 function startResendWatchdog() {
   setInterval(() => {
     if (pendingSpectreCmds.length === 0) return;
@@ -764,13 +767,20 @@ function startResendWatchdog() {
         resent = true;
       }
     }
-    if (resent) {
-      pendingSpectreCmds.forEach(c => { c._writtenAt = now; });
-      dbg(`SPECTRE: re-sending ${pendingSpectreCmds.length} unacked command(s) with fresh ids`);
-      const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
-      try {
-        fs.writeFileSync(p, buildSQFContent(pendingSpectreCmds), 'utf8');
-      } catch (_) {}
+    const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
+    try {
+      let size = -1;
+      try { size = fs.statSync(p).size; } catch (_) {}
+      if (size === 0) {
+        const sqf = buildSQFContent(pendingSpectreCmds);
+        if (sqf.includes('call SPECTRE_fnc_execCmd')) {
+          fs.writeFileSync(p, sqf, 'utf8');
+          pendingSpectreCmds.forEach(c => { c._writtenAt = now; });
+          dbg(`SPECTRE: watchdog wrote ${pendingSpectreCmds.length} pending command(s) to empty file`);
+        }
+      }
+    } catch (e) {
+      dbg(`SPECTRE: watchdog write error: ${e.message}`);
     }
   }, 5000);
 }
@@ -1177,16 +1187,31 @@ function startBridgeWatcher() {
   // Tail Arma RPT log using fs.watchFile + polling fallback
   initWatchArmaLog();
 
-  // Periodic: check for newer RPT files (log rotation) + polling fallback
+  // Periodic: check for newer RPT files (log rotation) + polling fallback.
+  // The whole tick is guarded: an exception in any single call (e.g. a
+  // transient fs error) must NEVER silently kill the tailer again.
   setInterval(() => {
-    const newer = findLatestRptLog(ARMA_DOCS);
-    if (newer && newer !== currentLogPath) {
-      dbg('SPECTRE: newer RPT detected, switching: ' + newer);
-      initWatchArmaLog();
+    try {
+      let newer = null;
+      try { newer = findLatestRptLog(ARMA_DOCS); } catch (e) {
+        dbg(`SPECTRE: findLatestRptLog error: ${e.message}`);
+      }
+      if (newer && newer !== currentLogPath) {
+        dbg('SPECTRE: newer RPT detected, switching: ' + newer);
+        initWatchArmaLog();
+      }
+      // Polling fallback: even if fs.watchFile misses events, we catch changes here
+      readNewLogData();
+    } catch (e) {
+      console.error('SPECTRE: tailer tick error:', e);
+      dbg(`SPECTRE: tailer tick error: ${e.message}`);
     }
-    // Polling fallback: even if fs.watchFile misses events, we catch changes here
-    readNewLogData();
   }, 1000);
+
+  // Tailer heartbeat so a dead tailer is visible in debug.log immediately.
+  setInterval(() => {
+    dbg(`SPECTRE: TAIL alive - path=${currentLogPath ? currentLogPath.split('\\').pop() : '(none)'} pos=${logFilePos}`);
+  }, 5000);
 
   dbg('SPECTRE: bridge watching Arma log files');
 }
@@ -1265,7 +1290,12 @@ function initWatchArmaLog() {
     watchFileRegisteredPath = logPath;
     fs.watchFile(logPath, { interval: 500 }, (curr, prev) => {
       if (curr.size === prev.size) return;
-      readNewLogData();
+      try {
+        readNewLogData();
+      } catch (e) {
+        console.error('SPECTRE: watchFile callback error:', e);
+        dbg(`SPECTRE: watchFile callback error: ${e.message}`);
+      }
     });
     dbg('SPECTRE: registered fs.watchFile on ' + logPath);
   }
@@ -1405,11 +1435,18 @@ function parseArmaLog(chunk) {
     dbg(`SPECTRE: FLUSH — units: ${data.units.length}, map: ${data.mapName}`);
     data.units.forEach(u => dbg(`  UNIT: id=${u.id}, pos=${JSON.stringify(u.position)}, hp=${u.health}`));
 
-        if (data.missionFolder) autoSetMissionFolder(data.missionFolder, data.fullMissionPath || '');
-    sendToRenderer('arma-state-update', data);
-    broadcastToWebClients(data);
-    postToVercel(data);
-    sendStateToRelay(data);
+    // Each downstream call is individually guarded: a throw in one must never
+    // kill the flush (which would silently stop the whole tailer).
+    try { if (data.missionFolder) autoSetMissionFolder(data.missionFolder, data.fullMissionPath || ''); }
+    catch (e) { dbg(`SPECTRE: autoSetMissionFolder error: ${e.message}`); }
+    try { sendToRenderer('arma-state-update', data); }
+    catch (e) { dbg(`SPECTRE: sendToRenderer error: ${e.message}`); }
+    try { broadcastToWebClients(data); }
+    catch (e) { dbg(`SPECTRE: broadcastToWebClients error: ${e.message}`); }
+    try { postToVercel(data); }
+    catch (e) { dbg(`SPECTRE: postToVercel error: ${e.message}`); }
+    try { sendStateToRelay(data); }
+    catch (e) { dbg(`SPECTRE: sendStateToRelay error: ${e.message}`); }
 
     // Reset accumulator (keep mapName and missionFolder for next chunk)
     pendingState.units = {};
@@ -1508,7 +1545,11 @@ function autoSetMissionFolder(missionPath, fullPath) {
 
 function sendToRenderer(channel, data) {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send(channel, data);
+    try {
+      mainWindow.webContents.send(channel, data);
+    } catch (e) {
+      dbg(`SPECTRE: IPC send failed (${channel}): ${e.message}`);
+    }
   } else {
     dbg(`SPECTRE: IPC skipped (no window), channel: ${channel}`);
   }

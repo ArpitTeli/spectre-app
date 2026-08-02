@@ -49,7 +49,11 @@ void readFile(const char* path, char* output, int outputSize) {
     fseek(f, 0, SEEK_END);
     long fsize = ftell(f);
     fseek(f, 0, SEEK_SET);
-    if (fsize > 0 && fsize < outputSize - 1) {
+    if (fsize == 0) {
+        // Empty file is the normal state (consume-once protocol) — return an
+        // empty string, NOT an error, so the reader exits quietly.
+        output[0] = '\0';
+    } else if (fsize > 0 && fsize < outputSize - 1) {
         size_t bytes = fread(output, 1, fsize, f);
         output[bytes] = '\0';
     } else {
