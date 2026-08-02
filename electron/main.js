@@ -730,34 +730,19 @@ function writeCommandToFile(cmd) {
       return;
     }
     const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
-    // Consume-once protocol: the DLL truncates the file after reading it, so
-    // only write when the file is empty (nothing pending for Arma to consume).
-    // Force-overwrite after ~12s as a failsafe against a wedged DLL.
+    // Consume-once protocol: the DLL truncates the file after reading it, so a
+    // command can never be lost or duplicated (the SQF id list guards against
+    // the rare force-overwrite case). Write immediately — NEVER block the main
+    // process (a synchronous wait here froze the app and killed the RPT tailer).
     let wrote = false;
-    const deadline = Date.now() + 12000;
-    while (!wrote && Date.now() < deadline) {
+    for (let attempt = 1; attempt <= 4 && !wrote; attempt++) {
       try {
-        let size = 0;
-        try { size = fs.statSync(p).size; } catch (_) {}
-        if (size === 0) {
-          fs.writeFileSync(p, sqf, 'utf8');
-          wrote = true;
-        } else {
-          // Not yet consumed — wait a beat and retry.
-          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);
-        }
+        fs.writeFileSync(p, sqf, 'utf8');
+        wrote = true;
       } catch (e2) {
-        if (e2.code === 'EBUSY' || e2.code === 'EPERM' || e2.code === 'EACCES') {
-          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);
-        } else {
-          throw e2;
-        }
+        if (attempt === 4) throw e2;
+        if (e2.code !== 'EBUSY' && e2.code !== 'EPERM' && e2.code !== 'EACCES') throw e2;
       }
-    }
-    if (!wrote) {
-      // Failsafe: force-overwrite anyway.
-      fs.writeFileSync(p, sqf, 'utf8');
-      dbg('SPECTRE: force-overwrote command file (was not consumed in 12s)');
     }
     fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} OK ${cmd.type}\n`);
   } catch (e) {
@@ -784,11 +769,7 @@ function startResendWatchdog() {
       dbg(`SPECTRE: re-sending ${pendingSpectreCmds.length} unacked command(s) with fresh ids`);
       const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
       try {
-        let size = 0;
-        try { size = fs.statSync(p).size; } catch (_) {}
-        if (size === 0) {
-          fs.writeFileSync(p, buildSQFContent(pendingSpectreCmds), 'utf8');
-        }
+        fs.writeFileSync(p, buildSQFContent(pendingSpectreCmds), 'utf8');
       } catch (_) {}
     }
   }, 5000);
