@@ -1339,6 +1339,10 @@ function parseArmaLog(chunk) {
   let legacyFlushed = false;
 
   for (const line of lines) {
+    // Each line is processed in isolation: a throw on one line (e.g. a
+    // malformed broadcast) must NEVER abort the chunk and permanently skip the
+    // ack/broadcast lines that follow it.
+    try {
     // Command acks from Arma ("SPECTRE: Executed OK: [id, ..."): drop acked
     // commands from the pending buffer. Anything unacked stays in the buffer,
     // so it is re-sent on every write — self-healing against missed reads.
@@ -1449,6 +1453,9 @@ function parseArmaLog(chunk) {
       } catch (e) {
         dbg('SPECTRE: legacy parse error: ' + e.message);
       }
+    }
+    } catch (e) {
+      dbg(`SPECTRE: line parse error: ${e.message}`);
     }
   }
 
