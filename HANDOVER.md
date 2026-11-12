@@ -1,6 +1,6 @@
 # SPECTRE C2 — Project Handover Document
 
-> **Version:** 1.2.0  
+> **Version:** 1.12.42  
 > **Last Updated:** 2026-07-20  
 > **Repository:** `spectre-fixed` (GitHub: ArpitTeli/spectre-app)  
 > **License:** Proprietary  

@@ -1,4 +1,4 @@
-# SPECTRE C2 — Current Architecture (v1.12.40)
+# SPECTRE C2 — Current Architecture (v1.12.42)
 
 > **This document describes the EXACT current implementation.** Update it whenever the bridge or pipeline changes. It is the reference for debugging command/connection issues.
 

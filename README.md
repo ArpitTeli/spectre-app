@@ -2,6 +2,16 @@
 
 AI-powered Command & Control system for Arma 3. Real-time tactical map, AI mission planning, live unit command, and after-action reviews.
 
+Part of a three-repo project:
+
+| Repo | Role |
+|---|---|
+| **spectre-app** (this repo) | The C2 desktop app, plus the terrain tooling in `scripts/` (cost grid, path planner, OAKOC extractor) |
+| [spectre-mod](https://github.com/ArpitTeli/spectre-mod) | The standalone Arma 3 mod (a copy of `mod/addons/` with its own README and releases) |
+| [spectre-terrain-intelligence](https://github.com/ArpitTeli/spectre-terrain-intelligence) | Training-data pipeline for the Tasking Layer model |
+
+Requires Windows and Arma 3. Proprietary, all rights reserved (see [License](#license)).
+
 ---
 
 ## First-Time Setup
@@ -22,10 +32,11 @@ React starts on port 3000, Electron opens automatically.
 On first launch, SPECTRE auto-detects your Arma 3 installation and installs the `@SPECTRE` mod. If auto-install fails:
 
 1. Open **Settings** (bottom-right of the Status tab)
-2. Click **Install @SPECTRE Mod** (or **Install CBA_A3** if needed)
+2. Click **Install @SPECTRE Mod**
 3. Restart Arma 3 with the mod enabled
 
-The mod requires **CBA_A3** as a dependency.
+**CBA_A3 is not required.** The mod starts through vanilla `postInit`. Settings can still install
+CBA_A3 for other mods that need it. FPV drones need the **D37_FPV** mod.
 
 ### 4. Start Arma 3
 
@@ -45,9 +56,10 @@ When SPECTRE opens, choose a connection mode:
 | Direction | Method |
 |---|---|
 | **Arma → SPECTRE** | The SPECTRE mod uses `diag_log` to write structured JSON lines (`SPECTRE_META:`, `SPECTRE_UNIT:`, `SPECTRE_CONTACT:`, `SPECTRE_EVENTS:`) to the Arma RPT log every 0.5s. SPECTRE tails this file and parses the lines. |
-| **SPECTRE → Arma** | SPECTRE writes `spectre_to_arma.sqf` into the active mission folder. The mod reads it every 0.3s via `callExtension` (DLL file reader) and executes the parsed commands. |
+| **SPECTRE → Arma** | SPECTRE writes one command at a time to `<Arma 3>\@SPECTRE\addons\spectre_cmds.sqf`. The mod reads and clears it every 0.3s via `callExtension` (DLL file reader) and executes it. Format: `<id>|<TYPE>|<unitId>|<x,y;x,y>|<roe>|<action>`. |
 
-No DLL injection. No BattlEye concerns. No manual init.sqf editing.
+No DLL injection and no manual init.sqf editing. The mod ships a `callExtension` DLL, so run it on a
+trusted local setup. The command file has no authentication: anything that can write it can command your units.
 
 ---
 
@@ -118,7 +130,7 @@ No DLL injection. No BattlEye concerns. No manual init.sqf editing.
 
 ### Mod Management
 - Auto-detect Arma 3 installation (Windows registry, Steam VDF, 10 fallback paths)
-- Auto-install `@SPECTRE` mod and `@CBA_A3` dependency
+- Auto-install `@SPECTRE` mod (and optionally `@CBA_A3`)
 - Mod status detection
 
 ---
@@ -167,56 +179,44 @@ Tile source: [jetelain/Arma3Map](https://jetelain.github.io/Arma3Map/)
 
 ```
 ├── electron/
-│   ├── main.js            # Electron main process (1599 lines)
-│   ├── preload.js          # Context bridge (16 APIs)
-│   └── armaDetector.js     # Auto-detect Arma 3 install
+│   ├── main.js              # Electron main process (log tail, command writer, relay, web viewer, mod installer)
+│   ├── preload.js           # Context bridge (window.spectreAPI)
+│   ├── armaDetector.js      # Auto-detect Arma 3 install
+│   └── guardrails/          # JS mirror of the shared guardrail kernel (edge_guardrail.js, policy.json)
 ├── src/
-│   ├── App.js              # Root component
-│   ├── store/
-│   │   └── useSpectreStore.js   # State management (489 lines)
-│   ├── ai/
-│   │   └── aiService.js    # LLM interactions (606 lines)
-│   ├── lib/
-│   │   └── vault.js        # Knowledge graph system (370 lines)
-│   ├── components/
-│   │   ├── MapView.js       # 2D Leaflet map
-│   │   ├── MapView3D.js     # 3D Three.js viewer
-│   │   ├── SidePanel.js     # Unit list, contacts, intel
-│   │   ├── RightPanel.js    # Status, unit detail, commands
-│   │   ├── RadialMenu.js    # Right-click unit actions
-│   │   ├── PlanningModal.js # AI planning chat
-│   │   ├── COAPanel.js      # Course of Action display
-│   │   ├── FireMissionPanel.js  # Artillery overlay
-│   │   ├── FlightPlanPanel.js   # Helicopter overlay
-│   │   ├── AARPanel.js      # After-Action Review
-│   │   ├── AbortModal.js    # Emergency abort
-│   │   ├── AdaptationModal.js   # Mid-mission adaptation
-│   │   ├── ModeSelect.js    # Host/Command mode picker
-│   │   ├── VaultGraph.js    # Cytoscape knowledge graph
-│   │   ├── TitleBar.js      # Custom title bar
-│   │   ├── StatusBar.js     # Bottom bar + settings
-│   │   └── ErrorBoundary.js
-│   └── styles/
-│       └── global.css       # Full design system (1185 lines)
-├── mod/
-│   └── addons/
-│       ├── config.cpp       # CBA addon config
-│       ├── XEH_postInit.sqf # Auto-init entry point
-│       └── functions/
-│           └── fn_bridgeInit.sqf  # Arma bridge (768 lines)
-├── spectre_ext/
-│   ├── spectre_ext.c        # DLL source (file reader)
-│   └── spectre_ext_x64.dll  # Compiled DLL
-├── relay-server/
-│   └── server.js            # WebSocket relay for multiplayer
-├── web-viewer/
-│   └── app/
-│       ├── page.js          # Next.js live map viewer
-│       └── api/state/route.js  # State API endpoint
-├── scripts/                 # Python terrain export tools
+│   ├── App.js               # Root component
+│   ├── store/useSpectreStore.js   # State management
+│   ├── ai/aiService.js      # LLM interactions
+│   ├── lib/vault.js         # Knowledge graph system
+│   ├── components/          # Map (2D/3D), panels, radial menu, planning, COA, AAR, modals
+│   └── styles/global.css    # Design system
+├── mod/                     # Arma mod source and built PBO
+│   ├── mod.cpp
+│   ├── spectre_ext_x64.dll
+│   └── addons/              # config.cpp, $PBOPREFIX$, spectre_bridge.pbo, functions/ (fn_bridgeInit.sqf, export_*)
+├── spectre_ext/             # DLL source (spectre_ext.c) and prebuilt DLL
+├── relay-server/server.js   # WebSocket relay for multiplayer
+├── web-viewer/              # Next.js live map viewer (app/page.js, app/api/state/route.js)
+├── scripts/                 # Python terrain tooling: WRP parsing, cost grid, path planner, OAKOC, training pipeline
 ├── public/                  # Static assets (maps, models, terrain worker)
-└── create_pbo.py            # PBO packager for Arma mod
+├── batches/, spectre_dataset.json, doctrine.py, validate.py   # Training data and doctrine validation
+├── Models for C2/           # Source 3D model assets (see Third-party assets)
+├── create_pbo.py            # PBO packager for the Arma mod
+└── *.md                     # Design and reference docs (see Documentation)
 ```
+
+---
+
+## Documentation
+
+| File | What it covers |
+|---|---|
+| [current-architecture.md](current-architecture.md) | Exact current bridge and app implementation, the debugging reference |
+| [HANDOVER.md](HANDOVER.md) | Project handover: overview, setup, internals |
+| [pipeline.md](pipeline.md) | End-to-end flow from Arma terrain to AI orders and training data |
+| [model-training-pipeline.md](model-training-pipeline.md) | Terrain intelligence, model selection, synthetic data generation |
+| [spectre-lattice-gameplan.md](spectre-lattice-gameplan.md) | Full build spec |
+| [todo.md](todo.md), [future-plans-todo.md](future-plans-todo.md) | Tasking Layer decisions and roadmap |
 
 ---
 
@@ -252,7 +252,7 @@ npm start
 npm run build
 
 # Build Arma mod PBO
-python create_pbo.py "mod\addons" SPECTREBridge.pbo
+python create_pbo.py "mod\addons" "mod\addons\spectre_bridge.pbo"
 ```
 
 ---
@@ -262,12 +262,12 @@ python create_pbo.py "mod\addons" SPECTREBridge.pbo
 **Units don't appear on map**
 - Is Arma 3 running with the SPECTRE mod enabled?
 - Check the Arma RPT log for `SPECTRE: Initialized — tracking N blufor assets`
-- If absent, the mod isn't loading — verify CBA_A3 is also enabled
+- If absent, the mod isn't loading: check Arma was launched with `-mod=@SPECTRE`
 
 **Commands not reaching Arma**
-- Confirm `mission_folder_path` is set in Settings (or auto-detected)
-- Check the mission folder for `spectre_to_arma.sqf` after sending a command
-- Check RPT for `SPECTRE CMD:` lines
+- Confirm `<Arma 3>\@SPECTRE\addons\spectre_cmds.sqf` is written after you send a command (it is cleared once read)
+- Confirm `spectre_ext_x64.dll` is in the `@SPECTRE\` root
+- Check the RPT for `SPECTRE: Executed OK:` or `SPECTRE read: malformed command`
 
 **AI errors**
 - Verify at least one API key is configured in Settings
@@ -282,3 +282,19 @@ python create_pbo.py "mod\addons" SPECTREBridge.pbo
 - Host must be running for clients to connect
 - Default relay: `wss://spectre-relay.onrender.com`
 - Check relay status in the title bar
+
+---
+
+## Third-party assets
+
+`Models for C2/` and `public/models/` contain third-party 3D models and textures. For example,
+the Recon Tank is by Mophs, based on work by MNDV.ecb (CC-BY 4.0, see its `credits.txt`). Check
+each asset's license before redistributing this repo.
+
+Map tiles come from [jetelain/Arma3Map](https://jetelain.github.io/Arma3Map/).
+
+---
+
+## License
+
+Proprietary, all rights reserved. Third-party assets keep their own licenses.
