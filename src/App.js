@@ -280,7 +280,7 @@ export default function App() {
           </span>
           <button
             className="btn btn-primary"
-            style={{ fontSize: '10px', padding: '3px 12px' }}
+            style={{ fontSize: '11px', padding: '3px 12px' }}
             onClick={() => window.spectreAPI?.restartApp?.()}
           >
             RESTART NOW

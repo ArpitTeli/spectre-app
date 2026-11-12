@@ -50,7 +50,7 @@ export default function TitleBar({ missionPhase, missionElapsedSec, armaConnecte
           <div className="titlebar__divider" />
           <span className="badge badge-primary">{mode === 'client' ? 'ROOM' : 'HOST'}: {roomCode}</span>
           {mode === 'host' && relayClients > 0 && (
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-muted)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
               {relayClients} CLIENT{(relayClients !== 1 ? 'S' : '')}
             </span>
           )}

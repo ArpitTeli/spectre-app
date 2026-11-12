@@ -6,7 +6,7 @@ export default function RightPanel({ state, patch, sendArmaCommand, addCommsEntr
 
   useEffect(() => {
     panelClickHandlerRef.current = null;
-  }, [activeTab]);
+  }, [activeTab, panelClickHandlerRef]);
 
   const forceMetrics = state.forceMetrics || { firepower_index: 0, vehicles_active: 0, vehicles_total: 0, mobility: 'UNKNOWN' };
   const rewardData = state.rewardData || { score: 0, friendly_kia: 0, enemy_kills: 0 };
@@ -249,7 +249,7 @@ function UnitDetailTab({ unit, state, sendArmaCommand, addCommsEntry }) {
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.5px' }}>
           {unit.callsign || unit.id}
         </div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
           {unit.vehicle_type || 'Unknown'} · {unit.status || 'UNKNOWN'}
         </div>
       </div>
@@ -286,14 +286,14 @@ function UnitDetailTab({ unit, state, sendArmaCommand, addCommsEntry }) {
               <div className="unit-bar__track">
                 <div className={`unit-bar__fill health ${hp < 30 ? 'critical' : hp < 60 ? 'low' : ''}`} style={{ width: `${hp}%` }} />
               </div>
-              <span style={{ fontSize: '8px', color: 'var(--text-muted)' }}>{hp}%</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{hp}%</span>
             </div>
             <div className="unit-bar" style={{ marginBottom: '4px' }}>
               <span className="unit-bar__label">FUEL</span>
               <div className="unit-bar__track">
                 <div className="unit-bar__fill fuel" style={{ width: `${fuel}%` }} />
               </div>
-              <span style={{ fontSize: '8px', color: 'var(--text-muted)' }}>{fuel}%</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{fuel}%</span>
             </div>
           </div>
         </div>
@@ -304,7 +304,7 @@ function UnitDetailTab({ unit, state, sendArmaCommand, addCommsEntry }) {
           <div className="health-section__header">
             <span className="health-section__title">Current Order</span>
           </div>
-          <div style={{ padding: '0 12px 8px', fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-secondary)' }}>
+          <div style={{ padding: '0 12px 8px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-secondary)' }}>
             {unit.current_order}
           </div>
         </div>
@@ -317,7 +317,7 @@ function UnitDetailTab({ unit, state, sendArmaCommand, addCommsEntry }) {
           </div>
           <div style={{ padding: '0 12px 8px' }}>
             {crew.map(c => (
-              <div key={c.id} style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-secondary)', padding: '2px 0' }}>
+              <div key={c.id} style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-secondary)', padding: '2px 0' }}>
                 {c.callsign || c.id} · {c.vehicle_role || 'CARGO'}
               </div>
             ))}
@@ -330,7 +330,7 @@ function UnitDetailTab({ unit, state, sendArmaCommand, addCommsEntry }) {
           <div className="health-section__header">
             <span className="health-section__title">Embedded In</span>
           </div>
-          <div style={{ padding: '0 12px 8px', fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--accent)' }}>
+          <div style={{ padding: '0 12px 8px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)' }}>
             {unit.vehicle} ({unit.vehicle_role || 'CARGO'})
           </div>
         </div>

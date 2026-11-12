@@ -257,6 +257,15 @@ python create_pbo.py "mod\addons" "mod\addons\spectre_bridge.pbo"
 
 ---
 
+## Fresh-machine notes
+
+- `npm install` now works on current npm (the unused `@react-three` packages were removed).
+- npm 10+ blocks package install scripts, so Electron's binary is not downloaded. Run
+  `node node_modules/electron/install.js` once after `npm install`, or approve it with
+  `npm install-scripts approve electron`.
+
+---
+
 ## Troubleshooting
 
 **Units don't appear on map**
@@ -280,7 +289,9 @@ python create_pbo.py "mod\addons" "mod\addons\spectre_bridge.pbo"
 
 **Relay connection issues**
 - Host must be running for clients to connect
-- Default relay: `wss://spectre-relay.onrender.com`
+- The default relay `wss://spectre-relay.onrender.com` (Render free tier) is currently **offline** (HTTP 404).
+  Remote Host/Command mode needs your own relay: deploy `relay-server/` anywhere that supports WebSockets and
+  set `relay_url` in the config file. The local web viewer on port 3721 works without a relay.
 - Check relay status in the title bar
 
 ---

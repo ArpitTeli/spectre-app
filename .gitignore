@@ -9,3 +9,6 @@ __pycache__/
 *.pyc
 .hemttout/
 __MACOSX/
+*.db
+Models for C2/*.zip
+/SPECTREBridge.pbo

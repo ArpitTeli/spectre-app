@@ -38,7 +38,10 @@ function loadSatTiles() {
     for (let ty = 0; ty < tpr; ty++) {
       for (let tx = 0; tx < tpr; tx++) {
         const img = new Image();
+        // n is a shared async completion counter, so the closure is intentional.
+        // eslint-disable-next-line no-loop-func
         img.onload = () => { ctx.drawImage(img, tx * TS, ty * TS, TS, TS); n++; if (n === total) resolve(c); };
+        // eslint-disable-next-line no-loop-func
         img.onerror = () => { n++; if (n === total) resolve(c); };
         img.src = `https://jetelain.github.io/Arma3Map/maps/stratis/${SAT_ZOOM}/${tx}/${ty}.png`;
       }
@@ -725,7 +728,7 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
         <span className="badge badge-primary">3D</span>
         <span className={`badge ${status.startsWith('ready')?'badge-success':''}`}>{status}</span>
       </div>
-      <div style={{ position:'absolute', bottom:12, left:12, zIndex:10, fontFamily:'var(--font-mono)', fontSize:9, color:'var(--text-muted)', background:'rgba(7,9,15,0.7)', padding:'5px 10px', borderRadius:3, pointerEvents:'none' }}>
+      <div style={{ position:'absolute', bottom:12, left:12, zIndex:10, fontFamily:'var(--font-mono)', fontSize:11, color:'var(--text-muted)', background:'rgba(7,9,15,0.7)', padding:'5px 10px', borderRadius:3, pointerEvents:'none' }}>
         WASD+Shift=fly · Scroll=zoom · Left-drag=pan · Right/Mid-drag=orbit · M=2D
       </div>
     </div>

@@ -428,8 +428,8 @@ export default function MapView({
             >✕</button>
             <div style={{ fontSize: '24px', marginBottom: '8px', color: 'var(--text-muted)' }}>◎</div>
             <div style={{ fontWeight: 600, letterSpacing: '1px' }}>AWAITING ARMA CONNECTION</div>
-            <div style={{ marginTop: '6px', fontSize: '10px', color: 'var(--text-muted)' }}>
-              Load SPECTRE_bridge.sqf in your Arma 3 mission
+            <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
+              Start Arma 3 with @SPECTRE enabled and load a mission with BLUFOR units
             </div>
           </div>
         </div>
@@ -439,7 +439,7 @@ export default function MapView({
         position: 'absolute', bottom: '10px', left: '10px',
         background: 'rgba(11,14,21,0.95)', border: '1px solid var(--border-default)',
         borderRadius: '0', padding: '8px 12px', zIndex: 1000,
-        fontFamily: 'var(--font-mono)', fontSize: '10px', pointerEvents: 'none'
+        fontFamily: 'var(--font-mono)', fontSize: '11px', pointerEvents: 'none'
       }}>
         <div style={{ color: 'var(--text-muted)', marginBottom: '5px', letterSpacing: '1px', fontWeight: 600 }}>LEGEND</div>
         <div style={{ color: 'var(--color-friendly)',  marginBottom: '2px' }}>○ FRIENDLY</div>

@@ -238,7 +238,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
                 padding: '10px 16px', borderTop: '1px solid var(--border-primary)',
                 display: 'flex', gap: '8px', alignItems: 'center'
               }}>
-                <div style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)' }}>
+                <div style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
                   {userMessageCount === 1
                     ? 'Ready to generate OPORD, or keep briefing SPECTRE for a more tailored plan.'
                     : `${userMessageCount} exchanges — click when you're ready to commit.`}
@@ -272,7 +272,7 @@ function OPORDView({ opord, thinking, onApprove, onRevise }) {
             color: 'var(--accent-bright)', letterSpacing: '2px', marginBottom: '16px'
           }}>
             OPERATIONS ORDER — {opord.mission_name || 'UNTITLED'}
-            <span style={{ marginLeft: '12px', fontSize: '10px', color: 'var(--text-muted)' }}>
+            <span style={{ marginLeft: '12px', fontSize: '11px', color: 'var(--text-muted)' }}>
               {opord.classification}
             </span>
           </div>
@@ -346,7 +346,7 @@ function Section({ title, children }) {
 function SubSection({ title, children }) {
   return (
     <div style={{ marginBottom: '8px' }}>
-      <div style={{ color: 'var(--text-secondary)', fontSize: '10px', letterSpacing: '1px', marginBottom: '3px' }}>{title}</div>
+      <div style={{ color: 'var(--text-secondary)', fontSize: '11px', letterSpacing: '1px', marginBottom: '3px' }}>{title}</div>
       <div style={{ color: 'var(--text-primary)', paddingLeft: '8px', lineHeight: 1.5 }}>{children}</div>
     </div>
   );

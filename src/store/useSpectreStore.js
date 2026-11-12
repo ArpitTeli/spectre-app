@@ -152,6 +152,8 @@ export function useSpectreStore() {
       adaptationLockRef.current = true;
       triggerAbortCheck(state, patch).finally(() => { adaptationLockRef.current = false; });
     }
+  // Intentionally narrow dependencies: the abort check should only run when these slices change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.forceMetrics, state.rewardData, state.abortState, state.missionPhase]);
 
   // ── Comms logger ──────────────────────────────────────────────────────────
@@ -331,8 +333,6 @@ export function useSpectreStore() {
 }
 
 // ─── Process Arma state update ────────────────────────────────────────────────
-const dbg = (...args) => console.log('[SPECTRE]', ...args);
-
 function processArmaUpdate(data, stateRef, patch) {
   if (!data || typeof data !== 'object') return;
   const { units = [], contacts = [], events = [], timestamp, mapName, missionFolder } = data;

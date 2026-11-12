@@ -164,7 +164,7 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
           <div className="coa-container__header">
             <div>
               <div className="coa-container__title">{steppingCOA.name}</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                 STEP THROUGH — Phase {stepIndex + 1} of {phases.length}
               </div>
             </div>
@@ -199,7 +199,7 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>ROE: {order.engagement_rules}</div>
                     )}
                     {order.waypoints?.length > 0 && (
-                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '3px', fontFamily: 'var(--font-mono)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px', fontFamily: 'var(--font-mono)' }}>
                         {order.waypoints.map((wp, j) => `WP${j + 1}: ${wp.description || `(${wp.x},${wp.y})`}`).join(' → ')}
                       </div>
                     )}
@@ -238,7 +238,7 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
         <div className="coa-container__header">
           <div>
             <div className="coa-container__title">Courses of Action</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
               SELECT AND EXECUTE A COURSE OF ACTION
             </div>
           </div>
@@ -257,7 +257,7 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
                 <div>
                   <div className="coa-card__name">COA {coa.id}: {coa.name}</div>
                   {coa.recommended && (
-                    <div style={{ fontSize: '10px', color: 'var(--accent)', marginTop: '3px', fontWeight: 600 }}>RECOMMENDED</div>
+                    <div style={{ fontSize: '11px', color: 'var(--accent)', marginTop: '3px', fontWeight: 600 }}>RECOMMENDED</div>
                   )}
                 </div>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: RISK_COLORS[coa.risk_level] || 'var(--text-muted)' }}>
@@ -313,7 +313,7 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
                     <div key={i} className="coa-phase-item">
                       <b style={{ color: 'var(--text-primary)' }}>Phase {ph.number || i + 1}: {ph.name}</b>
                       <br />{ph.description}
-                      <span style={{ color: 'var(--text-muted)', marginLeft: '6px', fontSize: '10px' }}>
+                      <span style={{ color: 'var(--text-muted)', marginLeft: '6px', fontSize: '11px' }}>
                         ~{Math.round((ph.duration_sec || 120) / 60)}min
                       </span>
                     </div>
@@ -336,7 +336,7 @@ export default function COAPanel({ coas, selectedCOA, state, patch, addCommsEntr
                     </button>
                     <button className="btn" onClick={() => { setModifyingId(null); setModifyError(''); }}>✕</button>
                     {modifyError && (
-                      <div style={{ padding: '4px 8px', marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-red)' }}>
+                      <div style={{ padding: '4px 8px', marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--color-red)' }}>
                         {modifyError}
                       </div>
                     )}

@@ -175,7 +175,7 @@ function UnitCard({ unit, crew = [], selected, onSelect, sendArmaCommand, addCom
               <div className="unit-bar__track">
                 <div className={`unit-bar__fill health ${hp < 30 ? 'critical' : hp < 60 ? 'low' : ''}`} style={{ width: `${hp}%` }} />
               </div>
-              <span style={{ fontSize: '8px', color: 'var(--text-muted)', minWidth: '24px' }}>{hp}%</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', minWidth: '24px' }}>{hp}%</span>
             </div>
           </div>
           <div className="track-card__meta">
@@ -198,7 +198,7 @@ function UnitCard({ unit, crew = [], selected, onSelect, sendArmaCommand, addCom
           <div style={{ display: 'flex', gap: '3px' }}>
             <input
               className="sidebar-input"
-              style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '9px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', padding: '3px 6px', color: 'var(--text-primary)', outline: 'none' }}
+              style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '11px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', padding: '3px 6px', color: 'var(--text-primary)', outline: 'none' }}
               placeholder="order..."
               value={orderText}
               onChange={e => setOrderText(e.target.value)}
@@ -216,7 +216,7 @@ function UnitCard({ unit, crew = [], selected, onSelect, sendArmaCommand, addCom
 
       {selected && !dead && crew.length > 0 && (
         <div className="track-card__meta" style={{ padding: '4px 12px 6px' }}>
-          <span style={{ fontSize: '8px', color: 'var(--text-muted)' }}>CREW: {crew.map(c => c.callsign || c.id).join(', ')}</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>CREW: {crew.map(c => c.callsign || c.id).join(', ')}</span>
         </div>
       )}
     </div>
@@ -293,7 +293,7 @@ function IntelTab({ intelDB, addIntel }) {
   return (
     <div className="tracks-list">
       <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-hairline)' }}>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>Report Intel</div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>Report Intel</div>
         <textarea
           className="sidebar-input"
           rows={2}
@@ -301,14 +301,14 @@ function IntelTab({ intelDB, addIntel }) {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) submit(); }}
-          style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', padding: '4px 8px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '9px', outline: 'none', resize: 'vertical' }}
+          style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', padding: '4px 8px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '11px', outline: 'none', resize: 'vertical' }}
         />
         <button className={`btn btn-sm ${saved ? 'btn-primary' : ''}`} style={{ marginTop: '4px', width: '100%' }} onClick={submit}>
           {saved ? 'LOGGED' : 'LOG INTEL'}
         </button>
       </div>
       <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border-hairline)' }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Database · {locs.length} locations</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Database · {locs.length} locations</span>
       </div>
       {locs.map((loc, i) => (
         <div key={i} className="track-card">
@@ -325,7 +325,7 @@ function IntelTab({ intelDB, addIntel }) {
             </div>
           </div>
           {loc.raw_intel && (
-            <div style={{ paddingLeft: '34px', paddingRight: '12px', paddingBottom: '6px', fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+            <div style={{ paddingLeft: '34px', paddingRight: '12px', paddingBottom: '6px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
               "{loc.raw_intel}"
             </div>
           )}
@@ -359,11 +359,11 @@ function OrdersTab({ state, sendArmaCommand, addCommsEntry }) {
   return (
     <div className="tracks-list">
       <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-hairline)' }}>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>All Units</div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>All Units</div>
         <div style={{ display: 'flex', gap: '4px' }}>
           <input
             className="sidebar-input"
-            style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '9px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', padding: '4px 8px', color: 'var(--text-primary)', outline: 'none' }}
+            style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '11px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', padding: '4px 8px', color: 'var(--text-primary)', outline: 'none' }}
             placeholder="Custom order..."
             value={massOrder}
             onChange={e => setMassOrder(e.target.value)}

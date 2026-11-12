@@ -88,27 +88,27 @@ export default function FlightPlanPanel({ unit, onClose, onSubmit, onMapClick })
 
       <div className="fire-mission-section">
         <div className="fire-mission-label">WAYPOINTS ({waypoints.length})</div>
-        <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginBottom: '4px' }}>Click map to add</div>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginBottom: '4px' }}>Click map to add</div>
         {waypoints.length === 0 && (
-          <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', padding: '8px 0' }}>No waypoints</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', padding: '8px 0' }}>No waypoints</div>
         )}
         {waypoints.map((wp, idx) => (
-          <div key={wp.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 0', borderBottom: '1px solid var(--border-hairline)', fontFamily: 'var(--font-mono)', fontSize: '9px' }}>
+          <div key={wp.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 0', borderBottom: '1px solid var(--border-hairline)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
             <span style={{ color: 'var(--accent)', width: '16px' }}>{idx + 1}</span>
             <span style={{ flex: 1, color: 'var(--text-secondary)' }}>{wp.x},{wp.y} <span style={{ color: 'var(--text-muted)' }}>ALT:{wp.altitude}</span></span>
-            <button className="flight-plan-wp-btn" onClick={() => moveWaypoint(wp.id, 'up')} disabled={idx === 0} style={{ fontSize: '8px', padding: '1px 3px' }}>↑</button>
-            <button className="flight-plan-wp-btn" onClick={() => moveWaypoint(wp.id, 'down')} disabled={idx === waypoints.length - 1} style={{ fontSize: '8px', padding: '1px 3px' }}>↓</button>
-            <button className="flight-plan-wp-btn" onClick={() => setEditingWp(editingWp === wp.id ? null : wp.id)} style={{ fontSize: '8px', padding: '1px 3px' }}>✎</button>
-            <button className="flight-plan-wp-btn danger" onClick={() => removeWaypoint(wp.id)} style={{ fontSize: '8px', padding: '1px 3px' }}>✕</button>
+            <button className="flight-plan-wp-btn" onClick={() => moveWaypoint(wp.id, 'up')} disabled={idx === 0} style={{ fontSize: '11px', padding: '1px 3px' }}>↑</button>
+            <button className="flight-plan-wp-btn" onClick={() => moveWaypoint(wp.id, 'down')} disabled={idx === waypoints.length - 1} style={{ fontSize: '11px', padding: '1px 3px' }}>↓</button>
+            <button className="flight-plan-wp-btn" onClick={() => setEditingWp(editingWp === wp.id ? null : wp.id)} style={{ fontSize: '11px', padding: '1px 3px' }}>✎</button>
+            <button className="flight-plan-wp-btn danger" onClick={() => removeWaypoint(wp.id)} style={{ fontSize: '11px', padding: '1px 3px' }}>✕</button>
             {editingWp === wp.id && (
               <div style={{ width: '100%', display: 'flex', gap: '4px', paddingTop: '4px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <label style={{ fontSize: '8px', color: 'var(--text-muted)' }}>ALT</label>
-                  <input type="number" value={wp.altitude} onChange={e => updateWaypoint(wp.id, { altitude: parseInt(e.target.value) || 0 })} style={{ width: '40px', fontSize: '9px', padding: '2px', background: 'var(--bg-panel)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>ALT</label>
+                  <input type="number" value={wp.altitude} onChange={e => updateWaypoint(wp.id, { altitude: parseInt(e.target.value) || 0 })} style={{ width: '40px', fontSize: '11px', padding: '2px', background: 'var(--bg-panel)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <label style={{ fontSize: '8px', color: 'var(--text-muted)' }}>HOVER</label>
-                  <input type="number" value={wp.hoverTime} onChange={e => updateWaypoint(wp.id, { hoverTime: parseInt(e.target.value) || 0 })} style={{ width: '30px', fontSize: '9px', padding: '2px', background: 'var(--bg-panel)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>HOVER</label>
+                  <input type="number" value={wp.hoverTime} onChange={e => updateWaypoint(wp.id, { hoverTime: parseInt(e.target.value) || 0 })} style={{ width: '30px', fontSize: '11px', padding: '2px', background: 'var(--bg-panel)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
                 </div>
               </div>
             )}

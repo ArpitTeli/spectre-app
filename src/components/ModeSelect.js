@@ -86,7 +86,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
                 </div>
                 <div style={{
                   fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: 10,
+                  fontSize: 11,
                   color: '#8a93a3',
                   lineHeight: 1.5
                 }}>
@@ -122,7 +122,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
                 </div>
                 <div style={{
                   fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: 10,
+                  fontSize: 11,
                   color: '#8a93a3',
                   lineHeight: 1.5
                 }}>
@@ -172,7 +172,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
                   background: 'none', border: 'none',
                   color: '#8a93a3', cursor: 'pointer',
                   fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: 10
+                  fontSize: 11
                 }}
               >
                 ← Back
@@ -254,7 +254,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
                   background: 'none', border: 'none',
                   color: '#8a93a3', cursor: 'pointer',
                   fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: 10
+                  fontSize: 11
                 }}
               >
                 ← Back

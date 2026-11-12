@@ -41,7 +41,7 @@ export default function AdaptationModal({ adaptation, onAccept, onDismiss, onSho
           borderLeft: `3px solid ${color}`, borderRadius: '3px',
           padding: '8px 12px', marginBottom: '10px'
         }}>
-          <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '2px', marginBottom: '4px' }}>
+          <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '2px', marginBottom: '4px' }}>
             RECOMMENDED ACTION
           </div>
           <div style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--text-bright)' }}>
@@ -52,7 +52,7 @@ export default function AdaptationModal({ adaptation, onAccept, onDismiss, onSho
         {/* Modified orders preview */}
         {adaptation.modified_orders?.length > 0 && (
           <div style={{ marginBottom: '10px' }}>
-            <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '2px', marginBottom: '6px' }}>
+            <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '2px', marginBottom: '6px' }}>
               UNIT ORDER CHANGES
             </div>
             {adaptation.modified_orders.map((o, i) => (

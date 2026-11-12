@@ -20,7 +20,7 @@
 
   --text-primary: #e6e8ec;
   --text-secondary: #8a93a3;
-  --text-muted: #5a6270;
+  --text-muted: #78839a;
   --text-inverse: #07090f;
 
   --accent: #c75b1f;
@@ -173,7 +173,7 @@ body {
   bottom: 12px;
   left: 12px;
   z-index: 1000;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 /* ─── Selection Indicator ─────────────────────────────── */
@@ -215,7 +215,7 @@ body {
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   padding: 4px 10px;
   cursor: pointer;
@@ -259,7 +259,7 @@ body {
 .titlebar__logo {
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 3px;
   color: var(--accent);
   text-transform: uppercase;
@@ -273,7 +273,7 @@ body {
 
 .titlebar__phase {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
   letter-spacing: 1.5px;
@@ -285,7 +285,7 @@ body {
   align-items: center;
   gap: 6px;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-muted);
   letter-spacing: 0.5px;
 }
@@ -317,7 +317,7 @@ body {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -373,7 +373,7 @@ body {
   border: none;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.5px;
   cursor: pointer;
@@ -409,7 +409,7 @@ body {
   border: none;
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   outline: none;
 }
 
@@ -422,7 +422,7 @@ body {
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   padding: 2px 8px;
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-out);
@@ -467,7 +467,7 @@ body {
   align-items: center;
   gap: 8px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-primary);
   text-transform: capitalize;
@@ -484,12 +484,12 @@ body {
   align-items: center;
   gap: 4px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
 .unit-section__arrow {
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
@@ -550,7 +550,7 @@ body {
 
 .track-card__callsign {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: 0.3px;
@@ -558,7 +558,7 @@ body {
 
 .track-card__you-badge {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 500;
   padding: 1px 5px;
   background: var(--accent-dim);
@@ -571,7 +571,7 @@ body {
   align-items: center;
   gap: 4px;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
@@ -596,7 +596,7 @@ body {
 
 .track-card__live-badge {
   font-family: var(--font-mono);
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 500;
   padding: 1px 4px;
   background: var(--green-dim);
@@ -607,7 +607,7 @@ body {
 
 .track-card__tracking-badge {
   font-family: var(--font-mono);
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 500;
   padding: 1px 4px;
   background: var(--accent-dim);
@@ -620,7 +620,7 @@ body {
   margin-top: 4px;
   padding-left: 22px;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .track-card__task-label {
@@ -645,7 +645,7 @@ body {
   align-items: center;
   gap: 4px;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -655,7 +655,7 @@ body {
 }
 
 .track-card__assign-arrow {
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .track-card__menu-btn {
@@ -663,7 +663,7 @@ body {
   border: none;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   cursor: pointer;
   padding: 2px 4px;
 }
@@ -681,7 +681,7 @@ body {
 
 .track-card__action-btn {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 500;
   padding: 3px 8px;
   background: var(--bg-surface);
@@ -734,7 +734,7 @@ body {
   border: none;
   color: var(--text-muted);
   font-family: var(--font-display);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 1px;
   cursor: pointer;
@@ -769,7 +769,7 @@ body {
 
 .tasks-section__title {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -786,7 +786,7 @@ body {
 .tasks-action-btn {
   flex: 1;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   padding: 6px 8px;
   background: var(--bg-surface);
@@ -822,7 +822,7 @@ body {
 
 .tasks-cmd-btn {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 500;
   padding: 5px 6px;
   background: var(--bg-surface);
@@ -873,7 +873,7 @@ body {
 
 .tasks-track-name {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text-primary);
   flex: 1;
@@ -881,7 +881,7 @@ body {
 
 .tasks-track-type {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
@@ -915,7 +915,7 @@ body {
 
 .health-stat-label {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -936,13 +936,13 @@ body {
 
 .health-section__title {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .health-section__arrow {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
@@ -971,20 +971,20 @@ body {
 
 .health-ammo-name {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .health-ammo-subtitle {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
 .health-ammo-count {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   flex-shrink: 0;
 }
 
@@ -1016,20 +1016,20 @@ body {
 
 .health-sensor-category {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .health-sensor-name {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-primary);
 }
 
 .health-sensor-status {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 600;
   padding: 2px 6px;
 }
@@ -1057,12 +1057,12 @@ body {
 
 .health-external-name {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-primary);
 }
 
 .health-external-status {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .health-external-status.connected {
@@ -1080,7 +1080,7 @@ body {
 .health-report-btn {
   width: 100%;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   padding: 6px 12px;
   background: var(--bg-surface);
@@ -1140,14 +1140,14 @@ body {
 .unit-card__callsign {
   font-family: var(--font-mono);
   font-weight: 600;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-primary);
   letter-spacing: 0.5px;
 }
 
 .unit-card__type {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
   letter-spacing: 0.5px;
@@ -1164,7 +1164,7 @@ body {
   align-items: center;
   gap: var(--space-2);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
@@ -1195,7 +1195,7 @@ body {
 
 .unit-card__status {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-secondary);
   margin-top: 3px;
   white-space: nowrap;
@@ -1219,7 +1219,7 @@ body {
 
 .unit-card__crew-label {
   font-family: var(--font-mono);
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
   letter-spacing: 1px;
@@ -1230,7 +1230,7 @@ body {
 
 .unit-card__crew-member {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-secondary);
   margin-right: 6px;
 }
@@ -1245,7 +1245,7 @@ body {
 
 .force-metrics__title {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
   letter-spacing: 1.5px;
@@ -1279,7 +1279,7 @@ body {
 
 .metric-box__label {
   font-family: var(--font-mono);
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -1309,7 +1309,7 @@ body {
   justify-content: space-between;
   padding: 5px var(--space-2);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-hairline);
@@ -1330,7 +1330,7 @@ body {
   padding: 3px var(--space-2);
   border-left: 2px solid var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.4;
 }
 
@@ -1343,7 +1343,7 @@ body {
   display: flex;
   justify-content: space-between;
   color: var(--text-muted);
-  font-size: 8px;
+  font-size: 11px;
   margin-bottom: 1px;
 }
 
@@ -1384,13 +1384,13 @@ body {
 .contact-card__type {
   font-family: var(--font-mono);
   font-weight: 600;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-primary);
 }
 
 .contact-card__confidence {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   padding: 1px 5px;
   color: var(--text-muted);
 }
@@ -1400,7 +1400,7 @@ body {
 
 .contact-card__position {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
@@ -1412,7 +1412,7 @@ body {
   justify-content: center;
   gap: 4px;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   padding: 4px 10px;
   cursor: pointer;
@@ -1447,8 +1447,8 @@ body {
 .btn-success { background: var(--green); color: var(--bg-deepest); border-color: var(--green); }
 .btn-success:hover { opacity: 0.9; }
 
-.btn-sm { font-size: 8px; padding: 3px 7px; }
-.btn-lg { font-size: 10px; padding: 6px 14px; }
+.btn-sm { font-size: 11px; padding: 3px 7px; }
+.btn-lg { font-size: 11px; padding: 6px 14px; }
 .btn-icon { padding: 3px; min-width: 22px; }
 
 /* ─── Status Bar ──────────────────────────────────────── */
@@ -1469,7 +1469,7 @@ body {
   align-items: center;
   gap: 4px;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-muted);
   white-space: nowrap;
   letter-spacing: 0.3px;
@@ -1513,7 +1513,7 @@ body {
   align-items: center;
   gap: 3px;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 500;
   padding: 1px 6px;
   text-transform: uppercase;
@@ -1530,7 +1530,7 @@ body {
   border: none;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   cursor: pointer;
   padding: 2px 5px;
   transition: all var(--duration-fast) var(--ease-out);
@@ -1548,7 +1548,7 @@ body {
 
 .panel-section__title {
   font-family: var(--font-display);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-secondary);
   letter-spacing: 1.5px;
@@ -1585,7 +1585,7 @@ body {
 
 .data-cell__label {
   font-family: var(--font-mono);
-  font-size: 7px;
+  font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1606,7 +1606,7 @@ body {
   border: 1px solid var(--border-hairline);
   padding: 5px var(--space-2);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .intel-item__header {
@@ -1622,7 +1622,7 @@ body {
 
 .intel-item__time {
   color: var(--text-muted);
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .intel-item__content {
@@ -1641,7 +1641,7 @@ body {
 
 .orders-section__title {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
   letter-spacing: 1.5px;
@@ -1657,7 +1657,7 @@ body {
 
 .order-btn {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 600;
   padding: 5px 6px;
   border: 1px solid var(--border-subtle);
@@ -1723,7 +1723,7 @@ body {
   justify-content: space-between;
   padding: 8px var(--space-3);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-hairline);
@@ -1781,7 +1781,7 @@ body {
   max-width: 80%;
   padding: var(--space-2);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.5;
 }
 
@@ -1814,7 +1814,7 @@ body {
   padding: 5px var(--space-2);
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   outline: none;
   transition: border-color var(--duration-fast) var(--ease-out);
 }
@@ -1884,7 +1884,7 @@ body {
 .coa-card__title {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-primary);
   margin-bottom: var(--space-1);
   letter-spacing: 0.5px;
@@ -1893,7 +1893,7 @@ body {
 
 .coa-card__description {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-secondary);
   line-height: 1.5;
 }
@@ -1905,7 +1905,7 @@ body {
   margin-top: var(--space-1);
   padding: 2px 6px;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   background: var(--bg-elevated);
   color: var(--text-muted);
 }
@@ -1918,7 +1918,7 @@ body {
 
 .settings-section__title {
   font-family: var(--font-display);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--accent);
   margin-bottom: var(--space-1);
@@ -1935,7 +1935,7 @@ body {
 
 .settings-field__label {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1950,7 +1950,7 @@ body {
   padding: 5px 8px;
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   outline: none;
   transition: border-color var(--duration-fast) var(--ease-out);
 }
@@ -1971,7 +1971,7 @@ body {
 .aar-tab {
   padding: 5px var(--space-2);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;
@@ -2015,7 +2015,7 @@ body {
 
 .mode-select__subtitle {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   text-align: center;
   max-width: 360px;
@@ -2054,7 +2054,7 @@ body {
 
 .mode-select__option-desc {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-muted);
   line-height: 1.5;
 }
@@ -2079,7 +2079,7 @@ body {
 
 .adaptation-banner__title {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--yellow);
   text-transform: uppercase;
@@ -2088,7 +2088,7 @@ body {
 
 .adaptation-banner__message {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-secondary);
   line-height: 1.5;
 }
@@ -2106,7 +2106,7 @@ body {
   align-items: center;
   gap: 3px;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 600;
   padding: 2px 6px;
   text-transform: uppercase;
@@ -2121,7 +2121,7 @@ body {
 
 .timer-display {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--accent);
   letter-spacing: 0.5px;
@@ -2137,7 +2137,7 @@ body {
   padding: var(--space-6) var(--space-3);
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   text-align: center;
   gap: var(--space-1);
   letter-spacing: 0.5px;
@@ -2159,9 +2159,9 @@ body {
 .text-muted { color: var(--text-muted); }
 .text-accent { color: var(--accent); }
 .text-primary { color: var(--text-primary); }
-.text-sm { font-size: 8px; }
-.text-xs { font-size: 9px; }
-.text-base { font-size: 10px; }
+.text-sm { font-size: 11px; }
+.text-xs { font-size: 11px; }
+.text-base { font-size: 11px; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .p-2 { padding: var(--space-2); }
 .p-3 { padding: var(--space-3); }
@@ -2180,7 +2180,7 @@ body {
   padding: 4px 8px;
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   outline: none;
 }
 
@@ -2193,7 +2193,7 @@ body {
   padding: 4px 8px;
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   outline: none;
 }
 .sidebar-input:focus { border-color: var(--accent); }
@@ -2202,7 +2202,7 @@ body {
 
 .intel-tag {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 500;
   padding: 1px 5px;
   text-transform: uppercase;
@@ -2227,7 +2227,7 @@ body {
   gap: var(--space-2);
   padding: 3px var(--space-2);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-out);
@@ -2243,12 +2243,12 @@ body {
 
 .unit-select-item__type {
   color: var(--text-muted);
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .unit-select-item__status {
   margin-left: auto;
-  font-size: 8px;
+  font-size: 11px;
 }
 
 /* ─── Fire Mission Panel ─────────────────────────────── */
@@ -2266,7 +2266,7 @@ body {
 
 .fire-mission-label {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -2286,7 +2286,7 @@ body {
 .fire-mission-input-group label {
   display: block;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-muted);
   margin-bottom: 4px;
 }
@@ -2310,7 +2310,7 @@ body {
 
 .fire-mission-hint {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-muted);
   margin-top: var(--space-1);
 }
@@ -2342,7 +2342,7 @@ body {
 
 .fire-mission-option-label {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 2px;
@@ -2354,7 +2354,7 @@ body {
 
 .fire-mission-option-desc {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
@@ -2371,7 +2371,7 @@ body {
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-out);
@@ -2421,13 +2421,13 @@ body {
 
 .fire-mission-summary-label {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
 .fire-mission-summary-value {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--accent);
 }
@@ -2447,7 +2447,7 @@ body {
 
 .flight-plan-label {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -2482,7 +2482,7 @@ body {
 
 .flight-plan-option-label {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 2px;
@@ -2494,13 +2494,13 @@ body {
 
 .flight-plan-option-desc {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
 .flight-plan-hint {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-muted);
   margin-bottom: var(--space-2);
 }
@@ -2512,7 +2512,7 @@ body {
 
 .flight-plan-empty {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-muted);
   text-align: center;
   padding: var(--space-3);
@@ -2536,7 +2536,7 @@ body {
   border: 1px solid var(--accent);
   color: var(--accent);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -2550,14 +2550,14 @@ body {
 
 .flight-plan-wp-coords {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .flight-plan-wp-details {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--text-muted);
   display: flex;
   gap: var(--space-2);
@@ -2575,7 +2575,7 @@ body {
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-out);
   display: flex;
@@ -2614,7 +2614,7 @@ body {
 
 .flight-plan-input-row label {
   font-family: var(--font-mono);
-  font-size: 7px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
@@ -2625,7 +2625,7 @@ body {
   padding: 4px 8px;
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   outline: none;
 }
 
@@ -2663,20 +2663,20 @@ body {
 
 .flight-plan-summary-label {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
 .flight-plan-summary-value {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--accent);
 }
 
 .flight-plan-summary-wp {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-secondary);
   padding: 4px 0;
   border-bottom: 1px solid var(--border-hairline);

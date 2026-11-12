@@ -39,7 +39,7 @@ export default function AARPanel({ aar, rewardData, onClose, onNewMission }) {
           <div style={{ textAlign: 'center', background: 'var(--bg-secondary)', border: `2px solid ${scoreColor}`, borderRadius: '4px', padding: '8px 16px' }}>
             <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '36px', fontWeight: 900, color: scoreColor, lineHeight: 1 }}>{scoreLetter}</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: scoreColor, marginTop: '2px' }}>{score.toFixed(0)} pts</div>
-            <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '9px', color: 'var(--text-muted)', letterSpacing: '1px', marginTop: '2px' }}>OVERALL</div>
+            <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '1px', marginTop: '2px' }}>OVERALL</div>
           </div>
         </div>
 
@@ -64,7 +64,7 @@ export default function AARPanel({ aar, rewardData, onClose, onNewMission }) {
 
         {/* Footer */}
         <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border-primary)', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-          <div style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span>✓</span> Mission data saved to training dataset
           </div>
           <button className="btn" onClick={onClose}>CLOSE</button>
@@ -127,16 +127,16 @@ function DecisionsTab({ aar }) {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ fontFamily: 'var(--font-condensed)', fontSize: '14px', fontWeight: 700, color: 'var(--text-bright)' }}>{d.event}</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)' }}>{d.timestamp}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>{d.timestamp}</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '8px' }}>
             <div>
-              <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '1px', marginBottom: '3px' }}>DECISION MADE</div>
+              <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '1px', marginBottom: '3px' }}>DECISION MADE</div>
               <div style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--text-primary)' }}>{d.decision_made}</div>
             </div>
             {d.better_alternative && (
               <div>
-                <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '10px', color: 'var(--color-yellow)', letterSpacing: '1px', marginBottom: '3px' }}>BETTER ALTERNATIVE</div>
+                <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', color: 'var(--color-yellow)', letterSpacing: '1px', marginBottom: '3px' }}>BETTER ALTERNATIVE</div>
                 <div style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--text-secondary)' }}>{d.better_alternative}</div>
               </div>
             )}
@@ -209,7 +209,7 @@ function TrainingDataTab({ rewardData }) {
         </pre>
       </div>
 
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)', lineHeight: 1.8 }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.8 }}>
         Full record saved to:<br />
         <span style={{ color: 'var(--accent-bright)' }}>%LOCALAPPDATA%\spectre-arma\missions\mission_{'{timestamp}'}.json</span>
       </div>
@@ -223,7 +223,7 @@ function OutcomeBox({ label, value, good, bad, neutral }) {
   return (
     <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '4px', padding: '10px', textAlign: 'center' }}>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '18px', fontWeight: 'bold', color }}>{value}</div>
-      <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '9px', color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', marginTop: '3px' }}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', marginTop: '3px' }}>{label}</div>
     </div>
   );
 }

@@ -37,7 +37,7 @@ export default function AbortModal({ abortState, forceMetrics, rewardData, onCho
             <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '18px', fontWeight: 700, color: 'var(--color-red)', letterSpacing: '2px' }}>
               EMERGENCY — MISSION ABORT RECOMMENDED
             </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
               SPECTRE has detected critical force degradation
             </div>
           </div>
@@ -84,7 +84,7 @@ export default function AbortModal({ abortState, forceMetrics, rewardData, onCho
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontFamily: 'var(--font-condensed)', fontSize: '14px', fontWeight: 700, color: 'var(--text-bright)' }}>
                     {opt.label}
-                    {opt.id === auto_select && <span style={{ marginLeft: '8px', fontSize: '10px', color: 'var(--accent-bright)', fontWeight: 400 }}>AUTO-SELECT</span>}
+                    {opt.id === auto_select && <span style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--accent-bright)', fontWeight: 400 }}>AUTO-SELECT</span>}
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     {opt.success_pct !== undefined && (
@@ -92,7 +92,7 @@ export default function AbortModal({ abortState, forceMetrics, rewardData, onCho
                         {opt.success_pct}%
                       </span>
                     )}
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: RISK_COLORS[opt.risk], border: `1px solid ${RISK_COLORS[opt.risk]}`, padding: '1px 6px', borderRadius: '2px' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: RISK_COLORS[opt.risk], border: `1px solid ${RISK_COLORS[opt.risk]}`, padding: '1px 6px', borderRadius: '2px' }}>
                       {opt.risk}
                     </span>
                   </div>
@@ -129,7 +129,7 @@ function Stat({ label, value, danger }) {
   return (
     <div style={{ background: 'var(--bg-tertiary)', borderRadius: '3px', padding: '6px 8px', textAlign: 'center' }}>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 'bold', color: danger ? 'var(--color-red)' : 'var(--text-bright)' }}>{value}</div>
-      <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '9px', color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', marginTop: '2px' }}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-condensed)', fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', marginTop: '2px' }}>{label}</div>
     </div>
   );
 }

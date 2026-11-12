@@ -256,7 +256,7 @@ export default function VaultGraph({ vaultPath, units, contacts }) {
         display: 'flex',
         gap: '12px',
         fontFamily: 'var(--font-mono)',
-        fontSize: '10px',
+        fontSize: '11px',
         color: 'var(--text-muted)',
         flexShrink: 0
       }}>
@@ -277,7 +277,7 @@ export default function VaultGraph({ vaultPath, units, contacts }) {
         {Object.entries(NODE_COLORS).map(([type, color]) => (
           <span key={type} style={{
             display: 'flex', alignItems: 'center', gap: '3px',
-            fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase'
+            fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase'
           }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, display: 'inline-block' }} />
             {type}
@@ -298,7 +298,7 @@ export default function VaultGraph({ vaultPath, units, contacts }) {
             borderRadius: '3px',
             padding: '8px 10px',
             fontFamily: 'var(--font-mono)',
-            fontSize: '10px'
+            fontSize: '11px'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span style={{ fontWeight: 700, color: selectedNode.color }}>{selectedNode.label}</span>

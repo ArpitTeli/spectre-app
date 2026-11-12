@@ -80,7 +80,7 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
       <div className="statusbar__spacer" />
       {roomCode && (
         <div className="statusbar__item">
-          <span className="badge badge-primary" style={{ fontSize: '8px', padding: '1px 6px' }}>
+          <span className="badge badge-primary" style={{ fontSize: '11px', padding: '1px 6px' }}>
             {mode === 'client' ? 'ROOM' : 'HOST'}: {roomCode}
           </span>
           {mode === 'host' && relayClients > 0 && (
@@ -92,7 +92,7 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
         <button className="statusbar__btn" onClick={() => window.spectreAPI?.openExternal?.(webUrl)}>◎ WEB</button>
       )}
       <button className="statusbar__btn" onClick={onCommsToggle}>◈ COMMS</button>
-      <div className="statusbar__value" style={{ fontSize: '8px', letterSpacing: '1px', color: 'var(--text-muted)' }}>v{window.__APP_VERSION || '?'}</div>
+      <div className="statusbar__value" style={{ fontSize: '11px', letterSpacing: '1px', color: 'var(--text-muted)' }}>v{window.__APP_VERSION || '?'}</div>
     </div>
   );
 }
@@ -102,6 +102,8 @@ export function CommsLog({ entries, onClose }) {
   React.useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [entries]);
   React.useEffect(() => {
     if (entries.length > 0) speakCommsEntry(entries[entries.length - 1]);
+    // Intentionally keyed on the count: speak each new entry once, not on every array identity change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries.length]);
 
   return (
@@ -238,7 +240,7 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
             <div className="settings-section__title">API Keys</div>
             <div className="settings-field">
               <div className="settings-field__label">One per line — last key used on rate limit</div>
-              <textarea style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-hairline)', borderRadius: '2px', padding: '6px 10px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '10px', outline: 'none', resize: 'vertical', minHeight: '60px', maxHeight: '120px' }}
+              <textarea style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-hairline)', borderRadius: '2px', padding: '6px 10px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '11px', outline: 'none', resize: 'vertical', minHeight: '60px', maxHeight: '120px' }}
                 rows={3} placeholder={'sk-or-v1-...'}
                 value={(form.api_keys || []).join('\n')}
                 onChange={e => setForm(prev => ({ ...prev, api_keys: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) }))} />
@@ -256,7 +258,7 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
                 <div className="settings-field__label">{f.label}</div>
                 <input type="text" placeholder={f.ph} value={form[f.key] || ''}
                   onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-hairline)', borderRadius: '2px', padding: '4px 8px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '10px', outline: 'none' }} />
+                  style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-hairline)', borderRadius: '2px', padding: '4px 8px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '11px', outline: 'none' }} />
               </div>
             ))}
           </div>
@@ -266,7 +268,7 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
               <div className="settings-field__label">Vercel URL (optional)</div>
               <input type="text" placeholder="https://spectre-viewer.vercel.app" value={form.vercel_url || ''}
                 onChange={e => setForm(prev => ({ ...prev, vercel_url: e.target.value }))}
-                style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-hairline)', borderRadius: '2px', padding: '4px 8px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '10px', outline: 'none' }} />
+                style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-hairline)', borderRadius: '2px', padding: '4px 8px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '11px', outline: 'none' }} />
               <div className="settings-field__label">{form.vercel_url ? 'Relayed to URL' : 'Local only (ws://3721)'}</div>
             </div>
           </div>
@@ -277,7 +279,7 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
               <div style={{ display: 'flex', gap: '4px' }}>
                 <input type="text" placeholder="E:\Games\Arma 3" value={armaPath}
                   onChange={e => setArmaPath(e.target.value)}
-                  style={{ flex: 1, background: 'var(--bg-elevated)', border: '1px solid var(--border-hairline)', borderRadius: '2px', padding: '4px 8px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '10px', outline: 'none' }} />
+                  style={{ flex: 1, background: 'var(--bg-elevated)', border: '1px solid var(--border-hairline)', borderRadius: '2px', padding: '4px 8px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '11px', outline: 'none' }} />
                 <button className="btn btn-sm" onClick={async () => {
                   setBrowsing(true);
                   try { const r = await window.spectreAPI?.setArmaPath?.(armaPath || undefined); if (r?.success) setArmaPath(r.path); } catch (_) {}
@@ -298,7 +300,7 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
                 </button>
                 </div>
                 {armaPathStatus && (
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--accent)' }}>{armaPathStatus}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)' }}>{armaPathStatus}</div>
                 )}
               </div>
             )}
@@ -307,7 +309,7 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
               <div style={{ display: 'flex', gap: '4px' }}>
                 <input type="text" placeholder="...missions\SPECTRETEST2.Stratis" value={form.mission_folder_path || ''}
                   onChange={e => setForm(prev => ({ ...prev, mission_folder_path: e.target.value }))}
-                  style={{ flex: 1, background: 'var(--bg-elevated)', border: '1px solid var(--border-hairline)', borderRadius: '2px', padding: '4px 8px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '10px', outline: 'none' }} />
+                  style={{ flex: 1, background: 'var(--bg-elevated)', border: '1px solid var(--border-hairline)', borderRadius: '2px', padding: '4px 8px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '11px', outline: 'none' }} />
                 <button className="btn btn-sm" onClick={handleAutoDetect} disabled={detecting}>{detecting ? '...' : 'SCAN'}</button>
               </div>
               {showFolderList && (
@@ -315,7 +317,7 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
                   {detectedFolders.length === 0
                     ? <div className="text-muted text-sm" style={{ padding: '8px' }}>No folders found.</div>
                     : detectedFolders.map((f, i) => (
-                      <div key={i} onClick={() => selectFolder(f.path)} className="cursor-pointer" style={{ padding: '4px 8px', fontFamily: 'var(--font-mono)', fontSize: '10px', borderBottom: i < detectedFolders.length - 1 ? '1px solid var(--border-hairline)' : 'none' }}
+                      <div key={i} onClick={() => selectFolder(f.path)} className="cursor-pointer" style={{ padding: '4px 8px', fontFamily: 'var(--font-mono)', fontSize: '11px', borderBottom: i < detectedFolders.length - 1 ? '1px solid var(--border-hairline)' : 'none' }}
                         onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                         onMouseLeave={e => e.currentTarget.style.background = ''}>
                         <div style={{ color: 'var(--text-primary)' }}>{f.name}</div>
@@ -337,7 +339,7 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
               ].map(([label, val]) => (
                 <div key={label} className="settings-field">
                   <div className="settings-field__label">{label}</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--accent)', wordBreak: 'break-all' }}>{val}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)', wordBreak: 'break-all' }}>{val}</div>
                 </div>
               ))}
             </div>
