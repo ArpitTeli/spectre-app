@@ -5,6 +5,8 @@ const os   = require('os');
 const http = require('http');
 const WebSocket = require('ws');
 const { detectArma3, detectArmaDocuments, findLatestRptLog } = require('./armaDetector');
+const { createCommandQueue } = require('./commandQueue');
+const { createCommandLink, generateCode, formatCode } = require('./commandLink');
 
 // ─── Single instance lock ────────────────────────────────────────────────────
 const gotTheLock = app.requestSingleInstanceLock();
@@ -127,6 +129,12 @@ function getLocalIP() {
   return '127.0.0.1';
 }
 
+// A PC often has several adapters (VPN, virtual machines): list them all.
+function getLocalIPs() {
+  return Object.entries(os.networkInterfaces()).flatMap(([name, list]) =>
+    list.filter(i => i.family === 'IPv4' && !i.internal).map(i => ({ name, address: i.address })));
+}
+
 function startWebSocketServer() {
   // HTTP server that serves the web viewer HTML
   const server = http.createServer((req, res) => {
@@ -142,10 +150,11 @@ function startWebSocketServer() {
     }
   });
 
-  wss = new WebSocket.Server({ server });
+  wss = new WebSocket.Server({ server, maxPayload: 8192 }); // limits what clients may send
 
   wss.on('connection', (ws) => {
     wsClients.add(ws);
+    commandLink.handleConnection(ws);
     dbg(`SPECTRE: WebSocket client connected (${wsClients.size} total)`);
 
     // Send current state immediately on connect
@@ -176,6 +185,7 @@ function startWebSocketServer() {
 
 function broadcastToWebClients(data) {
   lastBroadcastState = data;
+  commandLink.observe(data);
   if (wsClients.size === 0) return;
   const msg = JSON.stringify(data);
   for (const ws of wsClients) {
@@ -184,6 +194,46 @@ function broadcastToWebClients(data) {
     }
   }
 }
+
+// ─── Pairing and orders from paired commanders ───────────────────────────────
+function pairingCode(renew) {
+  const file = path.join(USER_DATA, 'pairing.json');
+  if (!renew) {
+    try {
+      const saved = JSON.parse(fs.readFileSync(file, 'utf8')).code;
+      if (saved) return saved;
+    } catch (_) {}
+  }
+  const code = generateCode();
+  fs.writeFileSync(file, JSON.stringify({ code }), 'utf8');
+  return code;
+}
+
+const commandLink = createCommandLink({
+  getCode: () => pairingCode(false),
+  log: msg => dbg(msg),
+  execute: command => {
+    // Tell the host operator what a paired commander ordered and what happened.
+    const reply = command._notify;
+    command._notify = (stage, reason) => {
+      sendToRenderer('remote-order', { type: command.type, unit_id: command.unit_id || 'ALL', stage, reason });
+      reply(stage, reason);
+    };
+    queueCommand(command);
+  },
+});
+
+ipcMain.handle('get-pairing-info', () => ({
+  code: formatCode(pairingCode(false)),
+  addresses: getLocalIPs(),
+  port: WS_PORT,
+  commanders: commandLink.count(),
+}));
+
+ipcMain.handle('reset-pairing', () => {
+  pairingCode(true);
+  commandLink.disconnectAll('the host changed the pairing code');
+});
 
 // ─── Vercel Relay (POST state to hosted web viewer) ─────────────────────────
 let vercelUrl = null;
@@ -285,12 +335,14 @@ function connectToRelay(mode, roomCode, url, _isReconnect) {
       sendToRenderer('arma-state-update', msg.data);
     }
 
-    // Host receives commands from relay
-    if (msg.type === 'command' && relayMode === 'host') {
-      if (msg.data) {
-        queueCommand(msg.data);
-        dbg(`SPECTRE: Relay command received: ${msg.data.type}`);
-      }
+    // Orders over the relay are disabled: it cannot tell who sent them, since
+    // anyone with the room code can join. They must come from a paired commander
+    // (commandLink.js). Never queue them; tell the operator once per connection.
+    if (msg.type === 'command' && relayMode === 'host' && !thisSocket.warnedCommand) {
+      thisSocket.warnedCommand = true;
+      const type = String(msg.data?.type || 'ORDER').replace(/[^A-Z_]/g, '').slice(0, 30) || 'ORDER';
+      dbg(`SPECTRE: ignored an order from the relay (${type}); relay orders are disabled`);
+      sendToRenderer('remote-order', { type, unit_id: 'RELAY', stage: 'rejected', reason: 'orders over the internet relay are disabled' });
     }
 
     if (msg.type === 'host_disconnected') {
@@ -527,7 +579,6 @@ connect();
 }
 
 // ─── Command queue ───────────────────────────────────────────────────────────
-let pendingSpectreCmds = [];   // local bridge command buffer (prevents overwrite)
 let pendingCommands = [];
 // Stable per-app-run session banner. The bridge resets its executed-id list
 // whenever the banner in the command file changes, so a fresh app session can
@@ -742,10 +793,14 @@ function buildPlainCommand(cmd) {
 }
 
 function writeCommandToFile(cmd) {
-  if (!ARMA_INSTALL) return;
+  if (!ARMA_INSTALL) {
+    cmd._notify?.('failed', 'the host has not found Arma 3');
+    return;
+  }
   try {
     if (isDuplicateSend(cmd)) {
       dbg(`SPECTRE: dropped duplicate send ${cmd.type}`);
+      cmd._notify?.('rejected', 'the same order was just sent');
       return;
     }
     if (!cmd._id) cmd._id = Date.now() + Math.floor(Math.random() * 10000);
@@ -754,83 +809,26 @@ function writeCommandToFile(cmd) {
     if (!buildPlainCommand(cmd).includes('|')) {
       dbg(`SPECTRE: dropped phantom command ${cmd.type}`);
       fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} SKIP ${cmd.type} (no target)\n`);
+      cmd._notify?.('failed', 'order had nothing to execute');
       return;
     }
-    pendingSpectreCmds.push(cmd);
-    if (pendingSpectreCmds.length > 50) pendingSpectreCmds = pendingSpectreCmds.slice(-50);
+    // All Hold goes next. Anything still waiting would otherwise run after it and undo it.
+    if (cmd.type === 'HOLD_ALL') commandQueue.pushUrgent(cmd, other => other.type !== 'WEAPONS_SAFE');
+    else commandQueue.push(cmd);
     fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} OK ${cmd.type}\n`);
-    advanceQueue();
   } catch (e) {
     try { fs.appendFileSync(path.join(USER_DATA, 'cmdlog.txt'), `${Date.now()} FAIL ${e.message}\n`); } catch (_) {}
   }
 }
 
-let cmdsFileNonEmptySince = 0;
-let cmdsInFlight = 0; // 1 while a written command is awaiting consumption
-
-function writePending(index) {
-  const cmd = pendingSpectreCmds[index];
-  const line = buildPlainCommand(cmd);
-  if (!line.includes('|')) {
-    pendingSpectreCmds.splice(index, 1);
-    dbg(`SPECTRE: dropped phantom ${cmd.type}`);
-    return;
-  }
-  const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
-  let wrote = false;
-  for (let a = 1; a <= 4 && !wrote; a++) {
-    try {
-      fs.writeFileSync(p, line, 'utf8');
-      wrote = true;
-    } catch (e2) {
-      if (a === 4) { dbg(`SPECTRE: write failed: ${e2.message}`); return; }
-      if (!['EBUSY', 'EPERM', 'EACCES'].includes(e2.code)) { dbg(`SPECTRE: write failed: ${e2.message}`); return; }
-    }
-  }
-  if (wrote) {
-    cmdsInFlight = 1;
-    cmd._writtenAt = Date.now();
-    dbg(`SPECTRE: wrote command ${cmd.type} (${pendingSpectreCmds.length} pending)`);
-  }
-}
-
-function advanceQueue() {
-  if (!ARMA_INSTALL) return;
-  if (pendingSpectreCmds.length === 0) { cmdsInFlight = 0; return; }
-  const p = path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf');
-  try {
-    let size = -1;
-    try { size = fs.statSync(p).size; } catch (_) {}
-    if (size === -1) {
-      // Missing (was reset by the stuck-handler) — recreate the current command.
-      writePending(0);
-      return;
-    }
-    if (size !== 0) {
-      // Not consumed yet. Detect a stuck reader.
-      if (cmdsFileNonEmptySince === 0) cmdsFileNonEmptySince = Date.now();
-      if (Date.now() - cmdsFileNonEmptySince > 15000) {
-        try { fs.rmSync(p, { force: true }); } catch (_) {}
-        cmdsFileNonEmptySince = 0;
-        dbg('SPECTRE: command file stuck >15s — reset reader');
-      }
-      return;
-    }
-    // File is empty → the in-flight command was consumed. Drop it, write next.
-    cmdsFileNonEmptySince = 0;
-    if (cmdsInFlight > 0) {
-      pendingSpectreCmds.shift();
-      cmdsInFlight = 0;
-      dbg(`SPECTRE: command consumed (${pendingSpectreCmds.length} pending)`);
-    }
-    if (pendingSpectreCmds.length > 0) writePending(0);
-  } catch (e) {
-    dbg(`SPECTRE: advanceQueue error: ${e.message}`);
-  }
-}
+const commandQueue = createCommandQueue({
+  filePath: () => (ARMA_INSTALL ? path.join(ARMA_INSTALL, '@SPECTRE', 'addons', 'spectre_cmds.sqf') : null),
+  buildLine: buildPlainCommand,
+  log: msg => dbg(msg),
+});
 
 function startCommandQueue() {
-  setInterval(() => { try { advanceQueue(); } catch (e) { dbg(`SPECTRE: queue error: ${e.message}`); } }, 500);
+  setInterval(() => commandQueue.tick(), 500);
 }
 
 function queueCommand(cmd) {
@@ -1228,7 +1226,7 @@ function clearSpectreCommandFile(reason) {
   } catch (e) {
     dbg(`SPECTRE: clear command file failed: ${e.message}`);
   }
-  pendingSpectreCmds = [];
+  commandQueue.clear(reason);
 }
 
 function startBridgeWatcher() {
@@ -1394,7 +1392,7 @@ function parseArmaLog(chunk) {
             pendingState.units = {};
             pendingState.contacts = {};
             pendingState.events = [];
-            pendingSpectreCmds = []; // clear stale commands buffer too
+            commandQueue.clear('the mission changed'); // clear stale commands too
           }
           pendingState.missionFolder = meta.mf;
         }
@@ -1792,12 +1790,6 @@ ipcMain.on('relay-connect',   (_, opts = {}) => {
   if (mode && roomCode) connectToRelay(mode, roomCode, url);
 });
 ipcMain.on('relay-disconnect', () => disconnectRelay());
-ipcMain.on('relay-command',   (_, cmd) => {
-  // Client sends command through relay to host — sanitize cmd to a plain object
-  if (relayWs && relayWs.readyState === WebSocket.OPEN && relayMode === 'client' && cmd && typeof cmd === 'object') {
-    try { relayWs.send(JSON.stringify({ type: 'command', data: cmd })); } catch (_) {}
-  }
-});
 ipcMain.on('restart-app',     () => {
   try {
     const { autoUpdater } = require('electron-updater');

@@ -145,6 +145,12 @@ export default function App() {
       addCommsEntry('SPECTRE', 'ALL', `No update available. Version ${info.version} is current.`, 'BLUE');
     });
 
+    // Orders sent by a paired commander
+    window.spectreAPI?.onRemoteOrder?.(({ type, unit_id, stage, reason }) => {
+      const result = { delivered: 'picked up by the game', expired: 'expired', failed: 'failed', rejected: 'rejected' }[stage] || stage;
+      addCommsEntry('COMMANDER', unit_id, `${type}: ${result}${reason ? ` (${reason})` : ''}`, stage === 'delivered' ? 'GREEN' : 'RED');
+    });
+
     // Listen for relay status updates
     window.spectreAPI?.onRelayStatus?.((data) => {
       setRelayStatus(data);
@@ -264,6 +270,16 @@ export default function App() {
         onMaximize={() => window.spectreAPI?.maximize()}
         onClose={() => window.spectreAPI?.close()}
       />
+
+      {appMode === 'client' && (
+        <div role="status" style={{
+          padding: '4px 16px', flexShrink: 0, textAlign: 'center',
+          background: 'var(--accent-dim)', borderBottom: '1px solid var(--accent)',
+          color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: '11px'
+        }}>
+          VIEW ONLY: orders from this window are not sent. To command remotely, pair the SPECTRE Android app with the host.
+        </div>
+      )}
 
       {updateDownloaded && (
         <div style={{

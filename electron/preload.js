@@ -49,8 +49,10 @@ contextBridge.exposeInMainWorld('spectreAPI', {
   setVercelUrl: (url) => ipcRenderer.send('set-vercel-url', url),
   relayConnect: (opts) => ipcRenderer.send('relay-connect', opts),
   relayDisconnect: () => ipcRenderer.send('relay-disconnect'),
-  relayCommand: (cmd) => ipcRenderer.send('relay-command', cmd),
   onRelayStatus: (cb) => onEvent('relay-status', cb),
   startHostServices: () => ipcRenderer.send('start-host-services'),
+  getPairingInfo: () => ipcRenderer.invoke('get-pairing-info'),
+  resetPairing: () => ipcRenderer.invoke('reset-pairing'),
+  onRemoteOrder: (cb) => onEvent('remote-order', cb),
   generateFpvWaypoints: (start, target) => ipcRenderer.invoke('generate-fpv-waypoints', { start, target }),
 });

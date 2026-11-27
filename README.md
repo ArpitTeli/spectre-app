@@ -47,7 +47,9 @@ Launch Arma 3 with the SPECTRE mod enabled. Start or load a mission on any of th
 When SPECTRE opens, choose a connection mode:
 
 - **HOST** — You're running Arma 3 on this PC. SPECTRE connects to the local Arma process and generates a room code for remote viewers.
-- **COMMAND** — Connect to a host PC remotely by entering their room code. Command troops from a second screen.
+- **COMMAND** — Connect to a host PC remotely by entering their room code. **View only:** orders over the relay are disabled, because anyone with the room code could send them.
+
+To command from another device, pair the SPECTRE Android app: press **PAIR** in the host's bottom bar and enter the address and code in the app (same network).
 
 ---
 
@@ -290,7 +292,7 @@ python create_pbo.py "mod\addons" "mod\addons\spectre_bridge.pbo"
 **Relay connection issues**
 - Host must be running for clients to connect
 - The default relay `wss://spectre-relay.onrender.com` (Render free tier) is currently **offline** (HTTP 404).
-  Remote Host/Command mode needs your own relay: deploy `relay-server/` anywhere that supports WebSockets and
+  Remote viewing (Host/Command mode) needs your own relay: deploy `relay-server/` anywhere that supports WebSockets and
   set `relay_url` in the config file. The local web viewer on port 3721 works without a relay.
 - Check relay status in the title bar
 

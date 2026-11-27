@@ -93,15 +93,7 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    // ── Client sends command ──
-    if (msg.type === 'command' && role === 'client' && roomCode) {
-      const room = rooms.get(roomCode);
-      if (!room || !room.host) return;
-      if (room.host.readyState === WebSocket.OPEN) {
-        try { room.host.send(JSON.stringify({ type: 'command', data: msg.data })); } catch {}
-      }
-      return;
-    }
+    // Commands from clients are not forwarded: the relay cannot tell who sent them.
   });
 
   ws.on('close', () => {

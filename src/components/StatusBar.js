@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import PairModal from './PairModal';
 
 function formatElapsed(sec) {
   if (!sec) return '00:00';
@@ -26,6 +27,8 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
     const t = setInterval(() => setClock(new Date().toLocaleTimeString('en-GB', { hour12: false })), 1000);
     return () => clearInterval(t);
   }, []);
+
+  const [pairing, setPairing] = useState(false);
 
   const fpColor = (forceMetrics?.firepower_index ?? 100) < 50 ? 'danger' : (forceMetrics?.firepower_index ?? 100) < 70 ? 'warning' : '';
   const webUrl = bridgePaths?.web_viewer_url;
@@ -91,6 +94,10 @@ export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionEl
       {webUrl && (
         <button className="statusbar__btn" onClick={() => window.spectreAPI?.openExternal?.(webUrl)}>◎ WEB</button>
       )}
+      {mode === 'host' && (
+        <button className="statusbar__btn" onClick={() => setPairing(true)}>⌁ PAIR</button>
+      )}
+      {pairing && <PairModal onClose={() => setPairing(false)} />}
       <button className="statusbar__btn" onClick={onCommsToggle}>◈ COMMS</button>
       <div className="statusbar__value" style={{ fontSize: '11px', letterSpacing: '1px', color: 'var(--text-muted)' }}>v{window.__APP_VERSION || '?'}</div>
     </div>

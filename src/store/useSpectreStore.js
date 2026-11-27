@@ -170,13 +170,13 @@ export function useSpectreStore() {
   // ── Arma commands ─────────────────────────────────────────────────────────
   const sendArmaCommand = useCallback(async (command) => {
     if (!window.spectreAPI) return;
-    // In client mode, send through relay instead of local bridge
+    // Remote (relay) Command mode is view-only: the relay cannot authenticate orders.
     if (commandModeRef.current === 'relay') {
-      window.spectreAPI.relayCommand?.(command);
+      addCommsEntry('SPECTRE', 'ALL', `ORDER NOT SENT (${command.type}): remote Command mode is view-only.`, 'RED');
       return;
     }
     return window.spectreAPI.sendCommand(command);
-  }, []);
+  }, [addCommsEntry]);
 
   // ── Set command mode (host=local, client=relay) ───────────────────────────
   const setCommandMode = useCallback((mode) => {

@@ -127,7 +127,7 @@ export default function ModeSelect({ onSelect, savedRoomCode }) {
                   lineHeight: 1.5
                 }}>
                   Connect to a host PC<br />
-                  Command troops remotely
+                  Watch remotely (view only)
                 </div>
               </button>
             </div>
