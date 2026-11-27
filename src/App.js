@@ -399,6 +399,7 @@ export default function App() {
               units={visibleUnits()}
               contacts={state.contacts}
               selectedUnits={state.selectedUnits}
+              viewKey={state._lastMissionFolder}
               pendingAction={pendingAction}
               onUnitSelect={(id, ctrlKey) => {
                 if (ctrlKey || ctrlHeldRef.current) {

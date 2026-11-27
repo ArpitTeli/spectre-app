@@ -5,7 +5,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 
 const MAP = 8192;
 const HALF = MAP / 2;
-const RES = 256;
+const RES = 511;   // terrain cells per side: one vertex per heightmap pixel
 const EXAG = 1.5;
 const SAT_ZOOM = 3;
 const TS = 226;
@@ -34,15 +34,18 @@ function loadSatTiles() {
     const c = document.createElement('canvas');
     c.width = c.height = out;
     const ctx = c.getContext('2d');
-    let n = 0, total = tpr * tpr;
+    let n = 0, loaded = 0, total = tpr * tpr;
     for (let ty = 0; ty < tpr; ty++) {
       for (let tx = 0; tx < tpr; tx++) {
         const img = new Image();
-        // n is a shared async completion counter, so the closure is intentional.
+        // The tiles come from another site. Without this the canvas is
+        // "tainted" and WebGL refuses it, leaving the terrain black.
+        img.crossOrigin = 'anonymous';
+        // n and loaded are shared async counters, so the closures are intentional.
         // eslint-disable-next-line no-loop-func
-        img.onload = () => { ctx.drawImage(img, tx * TS, ty * TS, TS, TS); n++; if (n === total) resolve(c); };
+        img.onload = () => { ctx.drawImage(img, tx * TS, ty * TS, TS, TS); n++; loaded++; if (n === total) resolve({ canvas: c, loaded, total }); };
         // eslint-disable-next-line no-loop-func
-        img.onerror = () => { n++; if (n === total) resolve(c); };
+        img.onerror = () => { n++; if (n === total) resolve({ canvas: c, loaded, total }); };
         img.src = `https://jetelain.github.io/Arma3Map/maps/stratis/${SAT_ZOOM}/${tx}/${ty}.png`;
       }
     }
@@ -76,10 +79,12 @@ function buildMesh(heightImg) {
   ];
   function hc(t) { for (let i = 0; i < CS.length; i++) if (t <= CS[i].u) return CS[i].c; return CS[CS.length - 1].c; }
 
+  const grid = new Float32Array((RES + 1) * (RES + 1));
   for (let iy = 0; iy <= RES; iy++) {
     for (let ix = 0; ix <= RES; ix++) {
       const wx = ix * step, wy = iy * step;
       const h = gH(wx, wy);
+      grid[iy * (RES + 1) + ix] = h;
       verts.push(wx - HALF, h, -(wy - HALF));
       uvs.push(wx / CRS_SCALE, wy / CRS_SCALE);
       const c = hc(Math.min(1, h / (135 * EXAG)));
@@ -98,25 +103,73 @@ function buildMesh(heightImg) {
   geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
   geo.setIndex(idx);
   geo.computeVertexNormals();
+  _hGrid = grid;
   return geo;
 }
 
-let _hCache = null;
-function cacheHeightmap(heightImg) {
-  const can = document.createElement('canvas');
-  can.width = heightImg.width;
-  can.height = heightImg.height;
-  const c2d = can.getContext('2d');
-  c2d.drawImage(heightImg, 0, 0);
-  _hCache = c2d.getImageData(0, 0, can.width, can.height).data;
-}
+// Height of the drawn terrain surface, so units, roads and trees sit on it
+// exactly. Interpolates within the same two triangles per cell as the mesh.
+let _hGrid = null;
 function getHeightAt(armaX, armaY) {
-  if (!_hCache) return 0;
-  const w = 512;
-  const px = Math.max(0, Math.min(w - 1, Math.round((armaX / MAP) * (w - 1))));
-  const py = Math.max(0, Math.min(w - 1, Math.round((armaY / MAP) * (w - 1))));
-  const v = _hCache[(py * w + px) * 4];
-  return Math.max(0, -157.5 + (v / 255) * 392.4) * EXAG;
+  if (!_hGrid) return 0;
+  const gx = Math.max(0, Math.min(RES - 1e-6, (armaX / MAP) * RES));
+  const gy = Math.max(0, Math.min(RES - 1e-6, (armaY / MAP) * RES));
+  const ix = Math.floor(gx), iy = Math.floor(gy);
+  const fx = gx - ix, fy = gy - iy;
+  const a = iy * (RES + 1) + ix;
+  const h00 = _hGrid[a], h10 = _hGrid[a + 1], h01 = _hGrid[a + RES + 1], h11 = _hGrid[a + RES + 2];
+  return fx + fy <= 1
+    ? h00 + fx * (h10 - h00) + fy * (h01 - h00)
+    : h11 + (1 - fx) * (h01 - h11) + (1 - fy) * (h10 - h11);
+}
+const groundAt = (sceneX, sceneZ) => getHeightAt(sceneX + HALF, -sceneZ + HALF);
+
+// The 3D view is destroyed when you switch to 2D, so the camera is remembered here.
+let _savedView = null; // { key, pos, target }
+
+// Point the camera at the friendly units, looking north like the 2D map.
+// Returns false if there is no unit to look at.
+function frameUnits(cam, ctrl, unitList) {
+  const alive = unitList.filter(u => u.position && u.position.x !== undefined && u.status !== 'DESTROYED' && u.status !== 'DEAD');
+  if (alive.length === 0) return false;
+  const xs = alive.map(u => u.position.x), ys = alive.map(u => u.position.y);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const spread = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const dist = Math.min(6000, 160 + spread * 1.4);
+  const tx = cx - HALF, tz = -(cy - HALF);
+  const ty = getHeightAt(cx, cy);
+  ctrl.target.set(tx, ty, tz);
+  const camZ = tz + dist * 0.7;
+  cam.position.set(tx, Math.max(ty + dist * 0.7, groundAt(tx, camZ) + 40), camZ);
+  ctrl.update();
+  return true;
+}
+
+// A name tag that stays the same size on screen and draws over the terrain,
+// so a friendly can be found at any zoom.
+function makeUnitTag(text, color) {
+  const can = document.createElement('canvas');
+  can.width = 256; can.height = 96;
+  const c = can.getContext('2d');
+  c.font = 'bold 30px monospace';
+  c.textAlign = 'center';
+  const w = Math.min(252, c.measureText(text).width + 24);
+  c.fillStyle = 'rgba(7,9,15,0.85)';
+  c.fillRect(128 - w / 2, 2, w, 44);
+  c.strokeStyle = color; c.lineWidth = 3;
+  c.strokeRect(128 - w / 2, 2, w, 44);
+  c.fillStyle = '#ffffff';
+  c.fillText(text, 128, 35, 240);
+  c.fillStyle = color;
+  c.beginPath(); c.moveTo(114, 58); c.lineTo(142, 58); c.lineTo(128, 92); c.closePath(); c.fill();
+  const tex = new THREE.CanvasTexture(can);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, sizeAttenuation: false, depthTest: false, transparent: true, fog: false }));
+  sprite.center.set(0.5, 0); // the pointer's tip sits on the unit
+  sprite.scale.set(0.16, 0.06, 1);
+  sprite.renderOrder = 10;
+  return sprite;
 }
 
 function loadOBJ(url) {
@@ -191,7 +244,8 @@ function getUnitModelType(unit) {
   const vt = (unit.vehicle_type || '').toUpperCase();
   const t = (unit.type || '').toUpperCase();
   if (t.includes('HELICOPTER') || vt === 'HELI' || t === 'AIR') return 'helicopter';
-  if (vt === 'TANK' || t.includes('TANK') || vt.includes('TRACKED')) return 'tank';
+  if (vt === 'MBT' || vt === 'TANK' || t.includes('TANK') || vt.includes('TRACKED')) return 'tank';
+  if (vt === 'STOMPER' || vt === 'ED1') return 'vehicle'; // ground robots
   if (vt === 'IFV' || t === 'IFV' || t === 'APC') return 'vehicle';
   if (vt === 'CAR' || t === 'CAR' || vt.includes('MRAP') || vt.includes('JLTV')) return 'vehicle';
   if (vt === 'TRUCK' || t === 'TRUCK') return 'vehicle';
@@ -214,9 +268,16 @@ function makeInfantryMesh(color, emissive, opacity) {
   return group;
 }
 
-export default function MapView3D({ units, contacts, selectedUnits, pendingAction, onUnitSelect, onUnitRightClick, onContactSelect, onMapClick }) {
+export default function MapView3D({ units, contacts, selectedUnits, viewKey, pendingAction, onUnitSelect, onUnitRightClick, onContactSelect, onMapClick }) {
   const ref = useRef(null);
   const st = useRef({});
+  const unitsRef = useRef(units);
+  unitsRef.current = units;
+  const selectedRef = useRef(selectedUnits);
+  selectedRef.current = selectedUnits;
+  const viewKeyRef = useRef(viewKey || '');
+  viewKeyRef.current = viewKey || '';
+  const framedKeyRef = useRef(null); // mission the camera has been placed for
   const [status, setStatus] = useState('loading');
   const [hImg, setHImg] = useState(null);
   const [models, setModels] = useState(null);
@@ -292,7 +353,7 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
     ctrl.panSpeed = 2.0;
     ctrl.rotateSpeed = 1.0;
     ctrl.zoomSpeed = 2.0;
-    ctrl.screenSpacePanning = true;
+    ctrl.screenSpacePanning = false; // pan along the ground, so the pivot never goes under it
     ctrl.enableZoom = false;
     ctrl.keys = { LEFT: 0, RIGHT: 0, UP: 0, BOTTOM: 0 };
     ctrl.enableKeys = false;
@@ -351,24 +412,37 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
 
     renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 
-    const ZOOM_STEP = 40;
+    // Zoom toward or away from the point being looked at, which stays put.
     renderer.domElement.addEventListener('wheel', (e) => {
       e.preventDefault();
-      const dir = new THREE.Vector3();
-      cam.getWorldDirection(dir);
-      const step = e.deltaY > 0 ? ZOOM_STEP : -ZOOM_STEP;
-      const mul = e.shiftKey ? 3 : 1;
-      cam.position.addScaledVector(dir, -step * mul);
-      ctrl.target.addScaledVector(dir, -step * mul);
+      const offset = cam.position.clone().sub(ctrl.target);
+      const factor = Math.pow(e.shiftKey ? 1.35 : 1.12, Math.sign(e.deltaY || e.deltaX));
+      offset.setLength(Math.max(30, Math.min(12000, offset.length() * factor)));
+      cam.position.copy(ctrl.target).add(offset);
     }, { passive: false });
 
     scene.add(new THREE.AmbientLight(0x888888, 0.6));
     const sun = new THREE.DirectionalLight(0xffeedd, 1.0);
     sun.position.set(5000, 8000, 3000); scene.add(sun);
-    scene.add(new THREE.DirectionalLight(0x8888ff, 0.3).position.set(-3000, 2000, -4000));
+    const fill = new THREE.DirectionalLight(0x8888ff, 0.3);
+    fill.position.set(-3000, 2000, -4000); scene.add(fill);
+    scene.add(new THREE.HemisphereLight(0xdde8ff, 0x606050, 0.35));
 
     const geo = buildMesh(hImg);
-    cacheHeightmap(hImg);
+
+    // Put the camera back where it was, or, the first time, on the friendlies.
+    framedKeyRef.current = null;
+    if (_savedView && _savedView.key === viewKeyRef.current) {
+      cam.position.copy(_savedView.pos);
+      ctrl.target.copy(_savedView.target);
+      ctrl.update();
+      framedKeyRef.current = _savedView.key;
+    } else if (frameUnits(cam, ctrl, Object.values(unitsRef.current || {}))) {
+      framedKeyRef.current = viewKeyRef.current;
+    } else {
+      cam.position.set(0, 4500, 5500); // no units yet: show the whole island
+      ctrl.update();
+    }
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true, roughness: 0.9, metalness: 0, side: THREE.DoubleSide,
     });
@@ -376,8 +450,10 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
     scene.add(mesh);
 
     setStatus('loading sat');
-    loadSatTiles().then(satCanvas => {
-      const tex = new THREE.CanvasTexture(satCanvas);
+    loadSatTiles().then(({ canvas, loaded, total }) => {
+      if (loaded === 0) { setStatus('ready · no satellite (offline?)'); return; } // keep the height colours
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
       tex.wrapS = THREE.ClampToEdgeWrapping;
       tex.wrapT = THREE.ClampToEdgeWrapping;
       tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
@@ -386,7 +462,7 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
       });
       mesh.material = texMat;
       mesh.material.needsUpdate = true;
-      setStatus('ready');
+      setStatus(loaded === total ? 'ready' : `ready · ${total - loaded} tiles missing`);
     });
 
     const buildingsGroup = new THREE.Group();
@@ -516,7 +592,15 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
     // e.key returns 'W' when Shift is held and 'w' otherwise — normalize
     // single-char keys to lowercase so keydown/keyup always match the same flag.
     const keyOf = (e) => { const k = e.key; return k.length === 1 ? k.toLowerCase() : k; };
-    function kd(e) { const k = keyOf(e); keys[k] = true; if (k === 'q') qHeldRef.current = true; if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); }
+    function kd(e) {
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '');
+      if (!typing && keyOf(e) === 'f') {
+        // F: jump to the selected units, or to all friendlies.
+        const all = Object.values(unitsRef.current || {});
+        const picked = all.filter(u => (selectedRef.current || []).includes(u.id));
+        if (frameUnits(cam, ctrl, picked.length ? picked : all)) framedKeyRef.current = viewKeyRef.current;
+      }
+      const k = keyOf(e); keys[k] = true; if (k === 'q') qHeldRef.current = true; if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); }
     function ku(e) { const k = keyOf(e); keys[k] = false; if (k === 'q') qHeldRef.current = false; }
     const onBlur = () => { for (const k in keys) delete keys[k]; };
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku); window.addEventListener('blur', onBlur);
@@ -534,19 +618,27 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
         const rt = new THREE.Vector3(); rt.crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
         // Safety: clear keys if window lost focus
         if (!document.hasFocus()) { for (const k in keys) delete keys[k]; }
-        const spd = (keys['Shift'] ? 400 : 120) / 60;
+        // Fly faster the further out you are, so close-up moves stay precise.
+        const spd = Math.max(1, s.cam.position.distanceTo(s.ctrl.target) * 0.012) * (keys['Shift'] ? 3 : 1);
         let mx = 0, mz = 0;
         if (keys['w']||keys['ArrowUp'])         { mx += fwd.x * spd; mz += fwd.z * spd; }
         if (keys['s']||keys['ArrowDown'])       { mx -= fwd.x * spd; mz -= fwd.z * spd; }
         if (keys['a']||keys['ArrowLeft'])       { mx -= rt.x * spd; mz -= rt.z * spd; }
         if (keys['d']||keys['ArrowRight'])      { mx += rt.x * spd; mz += rt.z * spd; }
         if (mx || mz) {
+          const before = groundAt(s.ctrl.target.x, s.ctrl.target.z);
           s.ctrl.target.x = Math.max(-HALF, Math.min(HALF, s.ctrl.target.x + mx));
           s.ctrl.target.z = Math.max(-HALF, Math.min(HALF, s.ctrl.target.z + mz));
           s.cam.position.x += mx;
           s.cam.position.z += mz;
+          const climb = groundAt(s.ctrl.target.x, s.ctrl.target.z) - before;
+          s.ctrl.target.y += climb;
+          s.cam.position.y += climb;
         }
         s.ctrl.update();
+        // Never let the camera sink into a hill.
+        const floor = groundAt(s.cam.position.x, s.cam.position.z) + 8;
+        if (s.cam.position.y < floor) { s.cam.position.y = floor; s.cam.lookAt(s.ctrl.target); }
       }
       renderer.render(scene, cam);
     }
@@ -563,6 +655,9 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
 
     return () => {
       running = false;
+      if (framedKeyRef.current !== null) {
+        _savedView = { key: framedKeyRef.current, pos: cam.position.clone(), target: ctrl.target.clone() };
+      }
       window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); window.removeEventListener('blur', onBlur);
       window.removeEventListener('resize', rs);
       // Dispose all Three.js resources
@@ -591,8 +686,9 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
     while (g.children.length) {
       const ch = g.children[0];
       ch.traverse(child => {
-        if (child.geometry) child.geometry.dispose();
+        if (child.geometry && !child.isSprite) child.geometry.dispose(); // sprites share one geometry
         if (child.material) {
+          if (child.isSprite && child.material.map) child.material.map.dispose();
           if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
           else child.material.dispose();
         }
@@ -614,6 +710,7 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
     const selectionRingGeo = new THREE.RingGeometry(6, 8, 24);
     const selectionRingMat = new THREE.MeshBasicMaterial({ color: SELECTED, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
 
+    const tagged = []; // positions that already have a name tag
     Object.values(units || {}).forEach(u => {
       const p = u.position;
       if (!p || p.x === undefined || p.y === undefined) return;
@@ -648,6 +745,15 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
         clone.userData = { unitId: u.id };
         g.add(clone);
       }
+
+      const tag = makeUnitTag(u.callsign || u.id, dead ? '#585870' : (isSelected ? '#c75b1f' : '#3b82f6'));
+      tag.position.set(tx, h + 10, tz);
+      tag.userData = { unitId: u.id };
+      // Units close together get their tags stacked so each stays readable.
+      const stack = tagged.filter(q => Math.hypot(q.x - p.x, q.y - p.y) < 120).length;
+      tag.center.set(0.5, -0.55 * stack);
+      tagged.push(p);
+      g.add(tag);
 
       if (isSelected && !dead) {
         const ring = new THREE.Mesh(selectionRingGeo, selectionRingMat);
@@ -721,15 +827,23 @@ export default function MapView3D({ units, contacts, selectedUnits, pendingActio
     });
   }, [units, contacts, selectedUnits, models, hImg]);
 
+  // Units can arrive after the view opens, and a new mission puts them
+  // somewhere else: place the camera once for each of those cases.
+  useEffect(() => {
+    const s = st.current;
+    if (!s.cam || framedKeyRef.current === (viewKey || '')) return;
+    if (frameUnits(s.cam, s.ctrl, Object.values(units || {}))) framedKeyRef.current = viewKey || '';
+  }, [units, viewKey, hImg]);
+
   return (
     <div style={{ position:'relative', width:'100%', height:'100%', overflow:'hidden' }}>
       <div ref={ref} style={{ width:'100%', height:'100%' }} />
-      <div style={{ position:'absolute', top:12, left:12, zIndex:10, display:'flex', gap:4, alignItems:'center' }}>
+      <div style={{ position:'absolute', top:12, left:12, zIndex:10, display:'flex', gap:4, alignItems:'center', background:'rgba(7,9,15,0.8)', padding:4, borderRadius:3 }}>
         <span className="badge badge-primary">3D</span>
         <span className={`badge ${status.startsWith('ready')?'badge-success':''}`}>{status}</span>
       </div>
-      <div style={{ position:'absolute', bottom:12, left:12, zIndex:10, fontFamily:'var(--font-mono)', fontSize:11, color:'var(--text-muted)', background:'rgba(7,9,15,0.7)', padding:'5px 10px', borderRadius:3, pointerEvents:'none' }}>
-        WASD+Shift=fly · Scroll=zoom · Left-drag=pan · Right/Mid-drag=orbit · M=2D
+      <div style={{ position:'absolute', bottom:12, left:60, zIndex:10, fontFamily:'var(--font-mono)', fontSize:11, color:'#c9d1e0', background:'rgba(7,9,15,0.82)', padding:'5px 10px', borderRadius:3, pointerEvents:'none' }}>
+        F=find friendlies · WASD+Shift=fly · Scroll=zoom · Left-drag=pan · Right/Mid-drag=orbit · M=2D
       </div>
     </div>
   );
