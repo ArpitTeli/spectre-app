@@ -4,7 +4,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 export default function PairModal({ onClose }) {
   const [info, setInfo] = useState(null);
   const [show, setShow] = useState(false);
-  const [confirming, setConfirming] = useState(false);
+  const [next, setNext] = useState('');
+  const [message, setMessage] = useState('');
 
   const refresh = useCallback(() => {
     window.spectreAPI?.getPairingInfo?.().then(setInfo).catch(() => {});
@@ -16,14 +17,15 @@ export default function PairModal({ onClose }) {
     return () => clearInterval(timer);
   }, [refresh]);
 
-  const renew = async () => {
-    if (!confirming) {
-      setConfirming(true);
-      return;
+  const change = async () => {
+    const result = await window.spectreAPI?.setPairingPassword?.(next);
+    if (result?.success) {
+      setNext('');
+      setMessage('Password changed. Phones must connect again.');
+      refresh();
+    } else {
+      setMessage(result?.error || 'Could not change the password.');
     }
-    await window.spectreAPI?.resetPairing?.();
-    setConfirming(false);
-    refresh();
   };
 
   const row = { display: 'flex', justifyContent: 'space-between', gap: 12, padding: '4px 0', fontFamily: 'var(--font-mono)', fontSize: 12 };
@@ -36,7 +38,7 @@ export default function PairModal({ onClose }) {
           <button className="modal__close" onClick={onClose}>✕</button>
         </div>
         <div className="modal__body" style={{ color: 'var(--text-primary)', fontSize: 12 }}>
-          <p>In the SPECTRE Android app, open Connection and enter this PC's address and the pairing code.</p>
+          <p>In the SPECTRE Android app, open Connection and enter this PC's address and the password.</p>
           <div style={{ margin: '12px 0' }}>
             {(info?.addresses || []).map((a) => (
               <div key={a.address} style={row}>
@@ -46,21 +48,32 @@ export default function PairModal({ onClose }) {
             ))}
           </div>
           <div style={{ textAlign: 'center', padding: 12, border: '1px solid var(--border-subtle)', fontFamily: 'var(--font-mono)', fontSize: 20, letterSpacing: 2, userSelect: 'text' }}>
-            {show ? info?.code : '••••-••••-••••-••••'}
+            {show ? info?.password : '••••••••'}
           </div>
           <div style={row}>
             <span>Commanders connected</span>
             <strong>{info?.commanders ?? 0}</strong>
           </div>
           <p style={{ color: 'var(--text-muted)' }}>
-            Anyone with this code can command your units. Connections are not encrypted, so use a trusted network.
+            Anyone with this password can command your units. A short password is easy to work out, and connections are not
+            encrypted, so use a trusted network.
           </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              className="field"
+              type="password"
+              placeholder="New password (4 characters or more)"
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && change()}
+              style={{ flex: 1 }}
+            />
+            <button className="btn" onClick={change}>Set password</button>
+          </div>
+          {message && <p style={{ color: 'var(--text-muted)' }}>{message}</p>}
         </div>
         <div className="modal__footer">
-          <button className="statusbar__btn" onClick={renew}>
-            {confirming ? 'Confirm: disconnect all and make a new code' : 'New code'}
-          </button>
-          <button className="statusbar__btn" onClick={() => setShow((s) => !s)}>{show ? 'Hide code' : 'Show code'}</button>
+          <button className="btn btn-primary" onClick={() => setShow((s) => !s)}>{show ? 'Hide password' : 'Show password'}</button>
         </div>
       </div>
     </div>

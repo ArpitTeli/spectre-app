@@ -6,7 +6,7 @@ const http = require('http');
 const WebSocket = require('ws');
 const { detectArma3, detectArmaDocuments, findLatestRptLog } = require('./armaDetector');
 const { createCommandQueue } = require('./commandQueue');
-const { createCommandLink, generateCode, formatCode } = require('./commandLink');
+const { createCommandLink, generatePassword, cleanPassword } = require('./commandLink');
 
 // ─── Single instance lock ────────────────────────────────────────────────────
 const gotTheLock = app.requestSingleInstanceLock();
@@ -152,9 +152,9 @@ function startWebSocketServer() {
 
   wss = new WebSocket.Server({ server, maxPayload: 8192 }); // limits what clients may send
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
     wsClients.add(ws);
-    commandLink.handleConnection(ws);
+    commandLink.handleConnection(ws, req.socket.remoteAddress);
     dbg(`SPECTRE: WebSocket client connected (${wsClients.size} total)`);
 
     // Send current state immediately on connect
@@ -196,21 +196,24 @@ function broadcastToWebClients(data) {
 }
 
 // ─── Pairing and orders from paired commanders ───────────────────────────────
-function pairingCode(renew) {
-  const file = path.join(USER_DATA, 'pairing.json');
-  if (!renew) {
-    try {
-      const saved = JSON.parse(fs.readFileSync(file, 'utf8')).code;
-      if (saved) return saved;
-    } catch (_) {}
-  }
-  const code = generateCode();
-  fs.writeFileSync(file, JSON.stringify({ code }), 'utf8');
-  return code;
+const PAIRING_FILE = path.join(USER_DATA, 'pairing.json');
+
+function savePassword(password) {
+  fs.writeFileSync(PAIRING_FILE, JSON.stringify({ password }), 'utf8');
+  return password;
+}
+
+// Chosen by the operator and kept only on this PC.
+function pairingPassword() {
+  try {
+    const saved = cleanPassword(JSON.parse(fs.readFileSync(PAIRING_FILE, 'utf8')).password);
+    if (saved) return saved;
+  } catch (_) {}
+  return savePassword(generatePassword());
 }
 
 const commandLink = createCommandLink({
-  getCode: () => pairingCode(false),
+  getCode: () => pairingPassword(),
   log: msg => dbg(msg),
   execute: command => {
     // Tell the host operator what a paired commander ordered and what happened.
@@ -224,15 +227,18 @@ const commandLink = createCommandLink({
 });
 
 ipcMain.handle('get-pairing-info', () => ({
-  code: formatCode(pairingCode(false)),
+  password: pairingPassword(),
   addresses: getLocalIPs(),
   port: WS_PORT,
   commanders: commandLink.count(),
 }));
 
-ipcMain.handle('reset-pairing', () => {
-  pairingCode(true);
-  commandLink.disconnectAll('the host changed the pairing code');
+ipcMain.handle('set-pairing-password', (_, text) => {
+  const password = cleanPassword(text);
+  if (!password) return { success: false, error: 'Use 4 to 64 characters.' };
+  savePassword(password);
+  commandLink.disconnectAll('the host changed the password');
+  return { success: true };
 });
 
 // ─── Vercel Relay (POST state to hosted web viewer) ─────────────────────────
@@ -760,6 +766,9 @@ function isDuplicateSend(cmd) {
   return false;
 }
 
+const knownContacts = {};  // contact id -> last report
+const knownUnitTypes = {}; // unit id -> vehicle type
+
 // ─── Plain-text command queue (consumption-driven, no ack dependency) ─────────
 // The app writes ONE command per file in a pipe-delimited plain-text format:
 //   <id>|<TYPE>|<unitId>|<x1,y1;x2,y2...>|<roe>|<action>
@@ -782,14 +791,19 @@ function buildPlainCommand(cmd) {
     wpStr = `${Math.round(cmd.x || 0)},${Math.round(cmd.y || 0)}`;
   }
   const roe = (cmd.target_id || cmd.engagement_rules || '').replace(/[|;\n\r]/g, '');
-  // Contact position fallback for target commands.
-  if (!wpStr && roe && pendingState.contacts[roe] && pendingState.contacts[roe].position) {
-    wpStr = `${Math.round(pendingState.contacts[roe].position.x)},${Math.round(pendingState.contacts[roe].position.y)}`;
+  // Contact position fallback for target commands. pendingState is emptied after
+  // every update, so use the last position each contact was seen at.
+  const seen = roe && knownContacts[roe];
+  if (!wpStr && seen && seen.position) {
+    wpStr = `${Math.round(seen.position.x)},${Math.round(seen.position.y)}`;
   }
   let action = cmd.action || '';
   if (!action && cmd.speed != null) action = `speed:${Math.round(cmd.speed)}`;
   action = action.replace(/[|;\n\r]/g, '');
-  return `${id}|${type}|${uid}|${wpStr}|${roe}|${action}`;
+  // The game's splitString drops empty fields, which would slide the target into
+  // the position slot. "-" holds the place: the mod reads it as no position, and
+  // it matches no target.
+  return `${id}|${type}|${uid}|${wpStr || '-'}|${roe || '-'}|${action}`;
 }
 
 function writeCommandToFile(cmd) {
@@ -803,6 +817,7 @@ function writeCommandToFile(cmd) {
       cmd._notify?.('rejected', 'the same order was just sent');
       return;
     }
+    if (cmd.type === 'ATTACK' && knownUnitTypes[cmd.unit_id] === 'FPV') cmd.type = 'KAMIKAZE';
     if (!cmd._id) cmd._id = Date.now() + Math.floor(Math.random() * 10000);
     cmd._writtenAt = Date.now();
     // Drop phantom commands (no executable payload).
@@ -1392,6 +1407,8 @@ function parseArmaLog(chunk) {
             pendingState.units = {};
             pendingState.contacts = {};
             pendingState.events = [];
+            Object.keys(knownContacts).forEach(k => delete knownContacts[k]);
+            Object.keys(knownUnitTypes).forEach(k => delete knownUnitTypes[k]);
             commandQueue.clear('the mission changed'); // clear stale commands too
           }
           pendingState.missionFolder = meta.mf;
@@ -1411,6 +1428,7 @@ function parseArmaLog(chunk) {
         const raw = JSON.parse(jsonStr);
         const u = expandUnit(raw);
         pendingState.units[u.id] = u;
+        knownUnitTypes[u.id] = u.vehicle_type;
         gotData = true;
       } catch (e) { dbg('SPECTRE: unit parse error: ' + e.message); }
       continue;
@@ -1429,6 +1447,7 @@ function parseArmaLog(chunk) {
           source: raw.source || 'VISUAL',
           confidence: raw.confidence || 'HIGH'
         };
+        knownContacts[raw.id] = pendingState.contacts[raw.id];
         gotData = true;
       } catch (e) { dbg('SPECTRE: contact parse error: ' + e.message); }
       continue;

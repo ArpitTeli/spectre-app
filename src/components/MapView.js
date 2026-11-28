@@ -1,6 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { Button } from '@blueprintjs/core';
+import { symbolFor } from './milSymbols';
+import { gridRef } from './unitFormat';
+import { hasTerrain, loadTerrain, terrainLayer } from './terrain';
+import { trackPosition, trails, routes } from './tracks';
 
 // ─── Arma 3 Map Configs (from jetelain/Arma3Map) ─────────────────────────────
 // In this CRS: lat = Arma Y (northing), lng = Arma X (easting) — both in meters
@@ -129,48 +134,36 @@ function getUnitLatLng(position) {
 }
 
 // ─── Icon factories ───────────────────────────────────────────────────────────
-const VEHICLE_SYMBOL = { MBT: '▲', TANK: '▲', IFV: '■', APC: '◆', CAR: '●', RECON: '◇', HELI: '✦', TRUCK: '▪', BOAT: '◆', PLANE: '✦', INFANTRY: '●', FPV: '⌖', UAV: '◎', STOMPER: '◉', ED1: '○', DEFAULT: '○' };
-const CONTACT_SYMBOL = { INFANTRY: '●', VEHICLE: '■', TANK: '▲', UNKNOWN: '?' };
 
-function makeUnitIcon(unit, selected) {
-  const symbol = VEHICLE_SYMBOL[unit.vehicle_type] || VEHICLE_SYMBOL.DEFAULT;
-  const hp = unit.health ?? 100;
-  const hpColor = hp > 60 ? 'var(--accent)' : hp > 30 ? 'var(--yellow)' : 'var(--red)';
-  const borderColor = selected ? 'var(--accent)' : 'var(--border-strong)';
+const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
+// A standard symbol with the name beside it. The symbol's anchor point sits on
+// the position; a square bracket marks selection.
+function markerIcon(item, side, selected, label, tone) {
+  const symbol = symbolFor(item, side, 19);
+  const classes = [
+    'sym', `sym--${side}`,
+    selected ? 'is-selected' : '',
+    item.state === 'LAST_KNOWN' || item.state === 'DEAD' ? 'is-old' : '',
+    item.status === 'DESTROYED' || item.status === 'DEAD' ? 'is-down' : '',
+  ].join(' ');
   return L.divIcon({
     className: '',
-    iconSize: [64, 54],
-    iconAnchor: [32, 27],
-    html: `<div style="display:flex;flex-direction:column;align-items:center">
-      <div style="background:rgba(11,14,21,0.95);border:1px solid ${borderColor};border-radius:0;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:var(--text-primary);letter-spacing:0.5px;white-space:nowrap;margin-bottom:2px">${unit.callsign || unit.id}</div>
-      <div style="font-size:16px;line-height:1;color:${borderColor}">${symbol}</div>
-      <div style="width:28px;height:3px;background:var(--border-default);border-radius:0;overflow:hidden;margin-top:2px">
-        <div style="width:${hp}%;height:100%;background:${hpColor};border-radius:0"></div>
-      </div>
-    </div>`
+    iconSize: [symbol.width, symbol.height],
+    iconAnchor: [symbol.anchor.x, symbol.anchor.y],
+    html: `<div class="${classes}">${symbol.svg}<span class="sym__label${tone ? ` tone-${tone}` : ''}">${escapeHtml(label)}</span></div>`,
   });
 }
 
-function makeContactIcon(contact, selected) {
-  const symbol = CONTACT_SYMBOL[contact.type] || CONTACT_SYMBOL.UNKNOWN;
-  const colors = {
-    CONFIRMED:  { border: 'var(--red)', text: '#f2545b', opacity: 1.0 },
-    LAST_KNOWN: { border: 'var(--orange)', text: '#d96a2a', opacity: 0.7 },
-    SUSPECTED:  { border: 'var(--yellow)', text: '#f0a53a', opacity: 0.6 }
-  };
-  const c = colors[contact.state] || colors.SUSPECTED;
-  const label = contact.state === 'SUSPECTED' ? '?' : (contact.id || '?').split('-').pop();
+function makeUnitIcon(unit, selected) {
+  const hp = unit.health ?? 100;
+  const note = hp <= 60 ? ` ${Math.round(hp)}%` : '';
+  return markerIcon(unit, 'friend', selected, `${unit.callsign || unit.id}${note}`, hp <= 30 ? 'bad' : hp <= 60 ? 'warn' : '');
+}
 
-  return L.divIcon({
-    className: '',
-    iconSize: [52, 42],
-    iconAnchor: [26, 21],
-    html: `<div style="opacity:${c.opacity};display:flex;flex-direction:column;align-items:center">
-      <div style="background:rgba(11,14,21,0.95);border:1px solid ${c.border};border-radius:0;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:${c.text};letter-spacing:0.5px;margin-bottom:2px">${label}</div>
-      <div style="font-size:14px;line-height:1;color:${c.border}">${symbol}</div>
-    </div>`
-  });
+function makeContactIcon(contact, selected) {
+  const age = contact.state === 'LAST_KNOWN' ? ' (last known)' : '';
+  return markerIcon(contact, 'hostile', selected, `${contact.id || '?'}${age}`, '');
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -184,6 +177,10 @@ export default function MapView({
   onUnitSelect, onUnitRightClick, onContactSelect, onMapRightClick, onMapClick
 }) {
   const mapRef      = useRef(null);
+  const cursorRef   = useRef(null);
+  const baseRef     = useRef(null);
+  const trailLayer  = useRef(null);
+  const [routeTick, setRouteTick] = useState(0);
   const mapInst     = useRef(null);
   const unitLayer   = useRef(null);
   const contactLayer = useRef(null);
@@ -243,21 +240,56 @@ export default function MapView({
     // Dark background behind tiles
     mapRef.current.style.background = 'var(--bg-deepest)';
 
-    if (config) {
-      L.tileLayer(TILE_BASE + config.tilePattern, {
+    const chart = () => (config
+      ? L.tileLayer(TILE_BASE + config.tilePattern, {
         attribution: config.attribution,
         tileSize: config.tileSize,
         maxZoom: config.maxZoom + 4,
         maxNativeZoom: config.maxZoom,
         minZoom: 0
-      }).addTo(map);
-    } else {
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        opacity: 0.15
-      }).addTo(map);
-    }
+      })
+      : L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { opacity: 0.15 }));
 
-    L.control.zoom({ position: 'topright' }).addTo(map);
+    // "Terrain" is drawn from the game's data; "chart" is the published map,
+    // which also carries place names.
+    let base = null;
+    let wanted = null;
+    const showBase = (kind) => {
+      wanted = kind;
+      const swap = (layer) => {
+        if (base) map.removeLayer(base);
+        base = layer.addTo(map);
+        base.bringToBack?.();
+        mapRef.current.classList.toggle('base-chart', kind === 'chart');
+      };
+      if (kind === 'terrain' && hasTerrain(mapName)) {
+        loadTerrain(mapName)
+          .then((terrain) => { if (mapInst.current === map && wanted === 'terrain') swap(terrainLayer(terrain)); })
+          .catch(() => { if (mapInst.current === map) swap(chart()); });
+      } else {
+        wanted = 'chart';
+        kind = 'chart';
+        swap(chart());
+      }
+    };
+    baseRef.current = {
+      toggle: () => {
+        const next = wanted === 'terrain' ? 'chart' : 'terrain';
+        try { localStorage.setItem('spectre.basemap', next); } catch (_) {}
+        showBase(next);
+      },
+    };
+    let saved = null;
+    try { saved = localStorage.getItem('spectre.basemap'); } catch (_) {}
+    mapInst.current = map;
+    showBase(saved === 'chart' ? 'chart' : 'terrain');
+    L.control.scale({ metric: true, imperial: false, position: 'topright', maxWidth: 140 }).addTo(map);
+    trailLayer.current = L.layerGroup().addTo(map);
+
+    // Grid under the pointer, written straight to the page to avoid re-renders.
+    map.on('mousemove', (e) => {
+      if (cursorRef.current) cursorRef.current.textContent = gridRef({ x: e.latlng.lng, y: e.latlng.lat });
+    });
 
     map.on('contextmenu', (e) => {
       if (onMapRightClickRef.current) onMapRightClickRef.current(e.latlng, e.originalEvent.clientX, e.originalEvent.clientY);
@@ -273,9 +305,74 @@ export default function MapView({
     contactLayer.current = L.layerGroup().addTo(map);
     coaLayer.current     = L.layerGroup().addTo(map);
 
-    mapInst.current = map;
     prevUnitCountRef.current = 0;
   }, [mapName]);
+
+  // Floating panels cover the map's edges; their widths come from the layout.
+  const fitPadding = () => {
+    const css = getComputedStyle(mapRef.current);
+    const left = parseFloat(css.getPropertyValue('--inset-left')) || 0;
+    const right = parseFloat(css.getPropertyValue('--inset-right')) || 0;
+    return { paddingTopLeft: [left + 80, 90], paddingBottomRight: [right + 80, 150] };
+  };
+
+  // Fitting never zooms far past the sharpest tiles, or the map turns to mush.
+  const fitZoom = () => {
+    const config = getMapConfig(currentMapRef.current);
+    return config ? config.maxZoom + 0.5 : mapInst.current.getMaxZoom() - 1;
+  };
+
+  // Buttons in the floating map toolbar.
+  const unitsRef = useRef(units);
+  unitsRef.current = units;
+  const contactsRef = useRef(contacts);
+  contactsRef.current = contacts;
+  useEffect(() => {
+    const onTool = (e) => {
+      const map = mapInst.current;
+      if (!map) return;
+      if (e.detail === 'basemap') baseRef.current?.toggle();
+      if (e.detail === 'zoomIn') map.zoomIn();
+      if (e.detail === 'zoomOut') map.zoomOut();
+      if (e.detail === 'fit') {
+        const points = [...Object.values(unitsRef.current || {}), ...Object.values(contactsRef.current || {})]
+          .map(u => getUnitLatLng(u.position)).filter(Boolean);
+        if (points.length) map.fitBounds(L.latLngBounds(points), { ...fitPadding(), maxZoom: fitZoom() });
+      }
+    };
+    window.addEventListener('spectre:map', onTool);
+    return () => window.removeEventListener('spectre:map', onTool);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Where units have been, and where they were told to go ──────────────────
+  useEffect(() => {
+    const redraw = () => setRouteTick(t => t + 1);
+    window.addEventListener('spectre:routes', redraw);
+    return () => window.removeEventListener('spectre:routes', redraw);
+  }, []);
+
+  useEffect(() => {
+    const layer = trailLayer.current;
+    if (!layer) return;
+    layer.clearLayers();
+    Object.values(units || {}).forEach(unit => {
+      if (!unit.position) return;
+      trackPosition(mapName, unit);
+      const path = trails.get(unit.id) || [];
+      // Older parts of the trail fade out.
+      for (let i = 1; i < path.length; i++) {
+        L.polyline([[path[i - 1].y, path[i - 1].x], [path[i].y, path[i].x]], {
+          color: '#4fd6ff', weight: 2.5, opacity: 0.15 + 0.6 * (i / path.length), interactive: false,
+        }).addTo(layer);
+      }
+      const to = routes.get(unit.id);
+      if (to) {
+        L.polyline([[unit.position.y, unit.position.x], [to.y, to.x]], { color: '#eaf9ff', weight: 1.5, dashArray: '7 6', opacity: 0.95, interactive: false }).addTo(layer);
+        L.circleMarker([to.y, to.x], { radius: 7, color: '#eaf9ff', weight: 1.5, fill: false, interactive: false }).addTo(layer);
+        L.circleMarker([to.y, to.x], { radius: 2, color: '#eaf9ff', fillColor: '#eaf9ff', fillOpacity: 1, interactive: false }).addTo(layer);
+      }
+    });
+  }, [units, mapName, routeTick]);
 
   // ── Update unit markers ────────────────────────────────────────────────────
   useEffect(() => {
@@ -305,13 +402,12 @@ export default function MapView({
       }
 
       marker.bindTooltip(
-        `<div style="font-family:monospace;font-size:11px;background:var(--bg-primary);border:1px solid var(--border-default);padding:6px;border-radius:0">
-          <b style="color:var(--accent)">${unit.callsign}</b><br>
-          ${unit.vehicle_type} | HP:${unit.health ?? 100}% Fuel:${unit.fuel ?? 100}%<br>
-          Status: ${unit.status || 'UNKNOWN'}<br>
-          ${unit.current_order ? `<span style="color:var(--text-secondary)">${unit.current_order}</span>` : ''}
+        `<div class="map-tip">
+          <b>${escapeHtml(unit.callsign || unit.id)}</b>
+          <span>${escapeHtml(unit.vehicle_type || '')} · health ${unit.health ?? 100}% · fuel ${unit.fuel ?? 100}%</span>
+          <span>${escapeHtml(unit.current_order || unit.status || '')}</span>
         </div>`,
-        { className: 'spectre-tooltip', permanent: false, direction: 'top' }
+        { className: 'spectre-tooltip', permanent: false, direction: 'top', offset: [0, -20] }
       );
 
       unitLayer.current.addLayer(marker);
@@ -323,11 +419,11 @@ export default function MapView({
       const latlngs = unitList.map(u => getUnitLatLng(u.position)).filter(Boolean);
       if (latlngs.length > 0 && latlngs.length !== prevUnitCountRef.current) {
         prevUnitCountRef.current = latlngs.length;
-        const bounds = L.latLngBounds(latlngs);
         if (latlngs.length === 1) {
           mapInst.current.setView(latlngs[0], mapInst.current.getZoom());
         } else {
-          mapInst.current.fitBounds(bounds, { padding: [80, 80], maxZoom: mapInst.current.getMaxZoom() - 1 });
+          const everything = [...latlngs, ...Object.values(contactsRef.current || {}).map(c => getUnitLatLng(c.position)).filter(Boolean)];
+          mapInst.current.fitBounds(L.latLngBounds(everything), { ...fitPadding(), maxZoom: fitZoom() });
         }
       }
     }
@@ -351,13 +447,12 @@ export default function MapView({
 
       const ageMin = contact.last_seen ? Math.floor((Date.now() - contact.last_seen) / 60000) : 0;
       marker.bindTooltip(
-        `<div style="font-family:monospace;font-size:11px;background:var(--bg-primary);border:1px solid var(--border-default);padding:6px;border-radius:0">
-          <b style="color:var(--red)">${contact.id}</b><br>
-          Type: ${contact.type} | State: <b style="color:${contact.state === 'CONFIRMED' ? 'var(--red)' : contact.state === 'LAST_KNOWN' ? 'var(--orange)' : 'var(--yellow)'}">${contact.state}</b><br>
-          Source: ${contact.source || 'UNKNOWN'}<br>
-          ${ageMin > 0 ? `Last seen: ${ageMin}m ago` : 'Just spotted'}
+        `<div class="map-tip map-tip--hot">
+          <b>${escapeHtml(contact.id)}</b>
+          <span>${escapeHtml(contact.type || 'Unknown')} · ${escapeHtml(String(contact.state || '').replace('_', ' ').toLowerCase())}</span>
+          <span>${escapeHtml(contact.source || 'UNKNOWN')} · ${ageMin > 0 ? `seen ${ageMin} min ago` : 'just spotted'}</span>
         </div>`,
-        { className: 'spectre-tooltip', permanent: false, direction: 'top' }
+        { className: 'spectre-tooltip', permanent: false, direction: 'top', offset: [0, -20] }
       );
 
       contactLayer.current.addLayer(marker);
@@ -405,60 +500,17 @@ export default function MapView({
       <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
 
       {Object.keys(units).length === 0 && !dismissOverlay && (
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%',
-          transform: 'translate(-50%, -50%)',
-          textAlign: 'center', zIndex: 1000
-        }}>
-          <div style={{
-            fontFamily: 'var(--font-mono)', fontSize: '12px',
-            color: 'var(--text-muted)', background: 'rgba(11,14,21,0.95)',
-            padding: '20px 30px', borderRadius: '0',
-            border: '1px solid var(--border-default)',
-            position: 'relative'
-          }}>
-            <button onClick={() => setDismissOverlay(true)}
-              style={{
-                position: 'absolute', top: '4px', right: '8px',
-                background: 'none', border: 'none',
-                color: 'var(--text-muted)', cursor: 'pointer',
-                fontFamily: 'var(--font-mono)', fontSize: '14px',
-                padding: '2px 6px', lineHeight: 1
-              }}
-            >✕</button>
-            <div style={{ fontSize: '24px', marginBottom: '8px', color: 'var(--text-muted)' }}>◎</div>
-            <div style={{ fontWeight: 600, letterSpacing: '1px' }}>AWAITING ARMA CONNECTION</div>
-            <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
-              Start Arma 3 with @SPECTRE enabled and load a mission with BLUFOR units
-            </div>
-          </div>
+        <div className="map-empty">
+          <Button className="map-empty__close" minimal small icon="cross" onClick={() => setDismissOverlay(true)} aria-label="Dismiss" />
+          <h2>Waiting for Arma</h2>
+          <p>Start Arma 3 with @SPECTRE enabled and load a mission with BLUFOR units.</p>
         </div>
       )}
 
-      <div style={{
-        position: 'absolute', bottom: '10px', left: '10px',
-        background: 'rgba(11,14,21,0.95)', border: '1px solid var(--border-default)',
-        borderRadius: '0', padding: '8px 12px', zIndex: 1000,
-        fontFamily: 'var(--font-mono)', fontSize: '11px', pointerEvents: 'none'
-      }}>
-        <div style={{ color: 'var(--text-muted)', marginBottom: '5px', letterSpacing: '1px', fontWeight: 600 }}>LEGEND</div>
-        <div style={{ color: 'var(--color-friendly)',  marginBottom: '2px' }}>○ FRIENDLY</div>
-        <div style={{ color: 'var(--color-hostile)',   marginBottom: '2px' }}>● CONFIRMED HOSTILE</div>
-        <div style={{ color: 'var(--color-last-known)',marginBottom: '2px', opacity: 0.7 }}>● LAST KNOWN</div>
-        <div style={{ color: 'var(--color-suspected)', opacity: 0.6 }}>● SUSPECTED</div>
+      <div className="map-readout">
+        <span>{mapName || 'No map'}</span>
+        <span>Grid <b ref={cursorRef}>—</b></span>
       </div>
-
-      {mapName && (
-        <div style={{
-          position: 'absolute', top: '10px', left: '10px',
-          background: 'rgba(11,14,21,0.95)', border: '1px solid var(--border-default)',
-          borderRadius: '0', padding: '6px 10px', zIndex: 1000,
-          fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-primary)',
-          letterSpacing: '1px', fontWeight: 600
-        }}>
-          {mapName.toUpperCase()}
-        </div>
-      )}
     </div>
   );
 }

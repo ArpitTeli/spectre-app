@@ -1,68 +1,69 @@
 import React, { useEffect, useRef } from 'react';
+import Icon from './Icon';
 import './RadialMenu.css';
 
 const ACTIONS = {
   INFANTRY: [
-    { id: 'MOVE_TO',     label: 'Move To',     icon: '↗', color: '#56b6ff' },
-    { id: 'HOLD',        label: 'Hold',        icon: '⏸', color: '#f0a53a' },
-    { id: 'ATTACK',      label: 'Attack',      icon: '⚔', color: '#f2545b' },
-    { id: 'FORM_UP',     label: 'Form Up',     icon: '◈', color: '#3dd68c' },
-    { id: 'DISPERSE',    label: 'Disperse',    icon: '⬡', color: '#a78bfa' },
-    { id: 'SMOKE_AT',    label: 'Smoke',       icon: '☁', color: '#8a93a3' },
+    { id: 'MOVE_TO', label: 'Move To', icon: 'move' },
+    { id: 'HOLD', label: 'Hold', icon: 'hold' },
+    { id: 'ATTACK', label: 'Attack', icon: 'attack', hot: true },
+    { id: 'FORM_UP', label: 'Form Up', icon: 'formUp' },
+    { id: 'DISPERSE', label: 'Disperse', icon: 'disperse' },
+    { id: 'SMOKE_AT', label: 'Smoke', icon: 'smoke' },
   ],
   VEHICLE: [
-    { id: 'MOVE_TO',     label: 'Move To',     icon: '↗', color: '#56b6ff' },
-    { id: 'HOLD',        label: 'Hold',        icon: '⏸', color: '#f0a53a' },
-    { id: 'ATTACK',      label: 'Attack',      icon: '⚔', color: '#f2545b' },
-    { id: 'WEAPONS_FREE',label: 'Open Fire',   icon: '🔴', color: '#f2545b' },
-    { id: 'WEAPONS_SAFE',label: 'Cease Fire',  icon: '⚪', color: '#8a93a3' },
-    { id: 'SMOKE_AT',    label: 'Smoke',       icon: '☁', color: '#8a93a3' },
+    { id: 'MOVE_TO', label: 'Move To', icon: 'move' },
+    { id: 'HOLD', label: 'Hold', icon: 'hold' },
+    { id: 'ATTACK', label: 'Attack', icon: 'attack', hot: true },
+    { id: 'WEAPONS_FREE', label: 'All: free', icon: 'attack', hot: true },
+    { id: 'WEAPONS_SAFE', label: 'All: safe', icon: 'shield' },
+    { id: 'SMOKE_AT', label: 'Smoke', icon: 'smoke' },
   ],
   ARMORED: [
-    { id: 'MOVE_TO',     label: 'Move To',     icon: '↗', color: '#56b6ff' },
-    { id: 'HOLD',        label: 'Hold',        icon: '⏸', color: '#f0a53a' },
-    { id: 'ATTACK',      label: 'Attack',      icon: '⚔', color: '#f2545b' },
-    { id: 'WEAPONS_FREE',label: 'Open Fire',   icon: '🔴', color: '#f2545b' },
-    { id: 'WEAPONS_SAFE',label: 'Cease Fire',  icon: '⚪', color: '#8a93a3' },
-    { id: 'SMOKE_AT',    label: 'Smoke',       icon: '☁', color: '#8a93a3' },
+    { id: 'MOVE_TO', label: 'Move To', icon: 'move' },
+    { id: 'HOLD', label: 'Hold', icon: 'hold' },
+    { id: 'ATTACK', label: 'Attack', icon: 'attack', hot: true },
+    { id: 'WEAPONS_FREE', label: 'All: free', icon: 'attack', hot: true },
+    { id: 'WEAPONS_SAFE', label: 'All: safe', icon: 'shield' },
+    { id: 'SMOKE_AT', label: 'Smoke', icon: 'smoke' },
   ],
   ARTILLERY: [
-    { id: 'ARTILLERY_STRIKE', label: 'Fire Mission',  icon: '🎯', color: '#f2545b', complex: true },
-    { id: 'MOVE_TO',          label: 'Move To',       icon: '↗', color: '#56b6ff' },
-    { id: 'HOLD',             label: 'Hold',          icon: '⏸', color: '#f0a53a' },
-    { id: 'ADJUST_FIRE',      label: 'Adjust Fire',   icon: '◎', color: '#c75b1f' },
+    { id: 'ARTILLERY_STRIKE', label: 'Fire Mission', icon: 'alert', hot: true, complex: true },
+    { id: 'MOVE_TO', label: 'Move To', icon: 'move' },
+    { id: 'HOLD', label: 'Hold', icon: 'hold' },
+    { id: 'ADJUST_FIRE', label: 'Adjust Fire', icon: 'fit' },
   ],
   HELICOPTER: [
-    { id: 'MOVE_TO',     label: 'Move To',     icon: '↗', color: '#56b6ff' },
-    { id: 'LAND_AT',     label: 'Land',        icon: '⬇', color: '#3dd68c' },
-    { id: 'HOVER',       label: 'Flight Plan', icon: '◎', color: '#f0a53a', complex: true },
-    { id: 'ATTACK',      label: 'Attack',      icon: '⚔', color: '#f2545b' },
-    { id: 'SMOKE_AT',    label: 'Smoke',       icon: '☁', color: '#8a93a3' },
+    { id: 'MOVE_TO', label: 'Move To', icon: 'move' },
+    { id: 'LAND_AT', label: 'Land', icon: 'land' },
+    { id: 'HOVER', label: 'Flight Plan', icon: 'arrow', complex: true },
+    { id: 'ATTACK', label: 'Attack', icon: 'attack', hot: true },
+    { id: 'SMOKE_AT', label: 'Smoke', icon: 'smoke' },
   ],
   MULTI: [
-    { id: 'MOVE_TO',     label: 'Move To',     icon: '↗', color: '#56b6ff' },
-    { id: 'HOLD',        label: 'Hold',        icon: '⏸', color: '#f0a53a' },
-    { id: 'ATTACK',      label: 'Attack',      icon: '⚔', color: '#f2545b' },
+    { id: 'MOVE_TO', label: 'Move To', icon: 'move' },
+    { id: 'HOLD', label: 'Hold', icon: 'hold' },
+    { id: 'ATTACK', label: 'Attack', icon: 'attack', hot: true },
   ],
   FPV: [
-    { id: 'KAMIKAZE',    label: 'Kamikaze',    icon: '⌖', color: '#f2545b' },
-    { id: 'MOVE_TO',     label: 'Move To',     icon: '↗', color: '#56b6ff' },
-    { id: 'HOLD',        label: 'Hold',        icon: '⏸', color: '#f0a53a' },
+    { id: 'KAMIKAZE', label: 'Kamikaze', icon: 'alert', hot: true },
+    { id: 'MOVE_TO', label: 'Move To', icon: 'move' },
+    { id: 'HOLD', label: 'Hold', icon: 'hold' },
   ],
   STOMPER: [
-    { id: 'MOVE_TO',     label: 'Move To',     icon: '↗', color: '#56b6ff' },
-    { id: 'HOLD',        label: 'Hold',        icon: '⏸', color: '#f0a53a' },
-    { id: 'ATTACK',      label: 'Attack',      icon: '⚔', color: '#f2545b' },
-    { id: 'WEAPONS_FREE',label: 'Open Fire',   icon: '🔴', color: '#f2545b' },
-    { id: 'WEAPONS_SAFE',label: 'Cease Fire',  icon: '⚪', color: '#8a93a3' },
+    { id: 'MOVE_TO', label: 'Move To', icon: 'move' },
+    { id: 'HOLD', label: 'Hold', icon: 'hold' },
+    { id: 'ATTACK', label: 'Attack', icon: 'attack', hot: true },
+    { id: 'WEAPONS_FREE', label: 'All: free', icon: 'attack', hot: true },
+    { id: 'WEAPONS_SAFE', label: 'All: safe', icon: 'shield' },
   ],
   ED1: [
-    { id: 'MOVE_TO',     label: 'Move To',     icon: '↗', color: '#56b6ff' },
-    { id: 'HOLD',        label: 'Hold',        icon: '⏸', color: '#f0a53a' },
+    { id: 'MOVE_TO', label: 'Move To', icon: 'move' },
+    { id: 'HOLD', label: 'Hold', icon: 'hold' },
   ],
   UAV: [
-    { id: 'MOVE_TO',     label: 'Move To',     icon: '↗', color: '#56b6ff' },
-    { id: 'HOLD',        label: 'Hold',        icon: '⏸', color: '#f0a53a' },
+    { id: 'MOVE_TO', label: 'Move To', icon: 'move' },
+    { id: 'HOLD', label: 'Hold', icon: 'hold' },
   ],
 };
 
@@ -85,7 +86,7 @@ function getUnitActions(unit) {
 export default function RadialMenu({ x, y, unit, multiSelect, onSelect, onClose }) {
   const ref = useRef(null);
   const items = multiSelect ? ACTIONS.MULTI : getUnitActions(unit);
-  const radius = 90;
+  const radius = 96;
 
   useEffect(() => {
     function handleKey(e) {
@@ -114,7 +115,7 @@ export default function RadialMenu({ x, y, unit, multiSelect, onSelect, onClose 
           <span className="radial-center-text">MULTI</span>
         ) : unit ? (
           <>
-            <span className="radial-center-text">{(unit.callsign || unit.id || '').substring(0, 8)}</span>
+            <span className="radial-center-text">{unit.callsign || unit.id}</span>
             <span className="radial-center-type">{unit.type || 'UNIT'}</span>
           </>
         ) : null}
@@ -126,16 +127,12 @@ export default function RadialMenu({ x, y, unit, multiSelect, onSelect, onClose 
         return (
           <button
             key={action.id}
-            className="radial-item"
-            style={{
-              transform: `translate(${ix}px, ${iy}px)`,
-              borderColor: action.color,
-              color: action.color,
-            }}
+            className={`radial-item${action.hot ? ' radial-item--hot' : ''}`}
+            style={{ transform: `translate(${ix}px, ${iy}px)` }}
             onClick={() => onSelect(action)}
             title={action.label}
           >
-            <span className="radial-icon">{action.icon}</span>
+            <Icon name={action.icon} size={19} />
             <span className="radial-label">{action.label}</span>
           </button>
         );

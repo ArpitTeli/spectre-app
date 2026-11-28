@@ -1,11 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import PairModal from './PairModal';
-
-function formatElapsed(sec) {
-  if (!sec) return '00:00';
-  const m = Math.floor(sec / 60), s = sec % 60;
-  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-}
 
 let lastSpokenId = null;
 function speakCommsEntry(entry) {
@@ -21,89 +14,6 @@ function speakCommsEntry(entry) {
   window.speechSynthesis.speak(utterance);
 }
 
-export function StatusBar({ armaConnected, forceMetrics, missionPhase, missionElapsedSec, rewardData, onCommsToggle, bridgePaths, mode, roomCode, relayClients }) {
-  const [clock, setClock] = useState(new Date().toLocaleTimeString('en-GB', { hour12: false }));
-  useEffect(() => {
-    const t = setInterval(() => setClock(new Date().toLocaleTimeString('en-GB', { hour12: false })), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  const [pairing, setPairing] = useState(false);
-
-  const fpColor = (forceMetrics?.firepower_index ?? 100) < 50 ? 'danger' : (forceMetrics?.firepower_index ?? 100) < 70 ? 'warning' : '';
-  const webUrl = bridgePaths?.web_viewer_url;
-
-  return (
-    <div className="statusbar">
-      <div className="statusbar__item">
-        <span className="statusbar__dot" style={{ background: armaConnected ? 'var(--green)' : 'var(--red)' }} />
-        <span>{mode === 'client' ? 'RELAY' : 'ARMA'}</span>
-      </div>
-      <div className="statusbar__item">
-        <span className={`statusbar__value ${armaConnected ? '' : ''}`} style={{ color: armaConnected ? 'var(--green)' : 'var(--red)' }}>
-          {mode === 'client' ? (armaConnected ? 'ON' : 'OFF') : (armaConnected ? 'ON' : 'OFF')}
-        </span>
-      </div>
-      <div className="statusbar__divider" />
-      <div className="statusbar__item">
-        <span className="statusbar__value">{clock}</span>
-      </div>
-      <div className="statusbar__divider" />
-      <div className="statusbar__item">
-        <span className={`statusbar__value ${missionPhase === 'ABORTING' ? 'danger' : ''}`}>{missionPhase}</span>
-      </div>
-      {missionPhase === 'ACTIVE' && (
-        <>
-          <div className="statusbar__divider" />
-          <div className="statusbar__item">
-            <span className="statusbar__value" style={{ color: 'var(--accent)' }}>T+{formatElapsed(missionElapsedSec)}</span>
-          </div>
-        </>
-      )}
-      <div className="statusbar__divider" />
-      <div className="statusbar__item">
-        <span className={`statusbar__value ${fpColor}`}>FP {forceMetrics?.firepower_index ?? 0}%</span>
-      </div>
-      <div className="statusbar__item">
-        <span className="statusbar__value">{forceMetrics?.vehicles_active ?? 0}/{forceMetrics?.vehicles_total ?? 0} V</span>
-      </div>
-      {rewardData && (
-        <>
-          <div className="statusbar__divider" />
-          <div className="statusbar__item">
-            <span className={`statusbar__value ${rewardData.score >= 0 ? '' : 'danger'}`}>{rewardData.score.toFixed(0)}</span>
-          </div>
-          {rewardData.friendly_kia > 0 && (
-            <div className="statusbar__item">
-              <span className="statusbar__value" style={{ color: 'var(--red)' }}>KIA {rewardData.friendly_kia}</span>
-            </div>
-          )}
-        </>
-      )}
-      <div className="statusbar__spacer" />
-      {roomCode && (
-        <div className="statusbar__item">
-          <span className="badge badge-primary" style={{ fontSize: '11px', padding: '1px 6px' }}>
-            {mode === 'client' ? 'ROOM' : 'HOST'}: {roomCode}
-          </span>
-          {mode === 'host' && relayClients > 0 && (
-            <span className="statusbar__value" style={{ marginLeft: '2px' }}>{relayClients}CL</span>
-          )}
-        </div>
-      )}
-      {webUrl && (
-        <button className="statusbar__btn" onClick={() => window.spectreAPI?.openExternal?.(webUrl)}>◎ WEB</button>
-      )}
-      {mode === 'host' && (
-        <button className="statusbar__btn" onClick={() => setPairing(true)}>⌁ PAIR</button>
-      )}
-      {pairing && <PairModal onClose={() => setPairing(false)} />}
-      <button className="statusbar__btn" onClick={onCommsToggle}>◈ COMMS</button>
-      <div className="statusbar__value" style={{ fontSize: '11px', letterSpacing: '1px', color: 'var(--text-muted)' }}>v{window.__APP_VERSION || '?'}</div>
-    </div>
-  );
-}
-
 export function CommsLog({ entries, onClose }) {
   const endRef = React.useRef(null);
   React.useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [entries]);
@@ -116,7 +26,7 @@ export function CommsLog({ entries, onClose }) {
   return (
     <div className="comms-log">
       <div className="comms-log__header">
-        <span>◈ COMMS</span>
+        <span>Comms log</span>
         <div className="flex items-center gap-2">
           <span className="text-muted text-sm">{entries.length} entries</span>
           <button className="modal__close" onClick={onClose}>✕</button>
@@ -369,4 +279,3 @@ export function SettingsModal({ config, bridgePaths, onSave, onClose }) {
   );
 }
 
-export default StatusBar;

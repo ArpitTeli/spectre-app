@@ -174,7 +174,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
             </div>
           </div>
           <button className="btn" style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => patch({ missionPhase: 'BRIEFING' })}>
-            ✕ CANCEL
+            Cancel
           </button>
         </div>
 
@@ -228,7 +228,7 @@ export default function PlanningModal({ state, patch, addCommsEntry, addIntel, g
                 rows={2}
               />
               <button className="btn btn-primary" onClick={handleSend} disabled={thinking || !input.trim()}>
-                SEND
+                Send
               </button>
             </div>
 

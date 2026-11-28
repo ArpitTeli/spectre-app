@@ -49,7 +49,7 @@ When SPECTRE opens, choose a connection mode:
 - **HOST** — You're running Arma 3 on this PC. SPECTRE connects to the local Arma process and generates a room code for remote viewers.
 - **COMMAND** — Connect to a host PC remotely by entering their room code. **View only:** orders over the relay are disabled, because anyone with the room code could send them.
 
-To command from another device, pair the SPECTRE Android app: press **PAIR** in the host's bottom bar and enter the address and code in the app (same network).
+To command from another device, pair the SPECTRE Android app: press **PAIR** in the host's top bar and enter the address and password in the app (same network). Set your own password in that window.
 
 ---
 

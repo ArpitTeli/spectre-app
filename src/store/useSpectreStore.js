@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { noteOrder } from '../components/tracks';
 
 // ─── Reward scoring weights ───────────────────────────────────────────────────
 export const REWARD = {
@@ -175,6 +176,7 @@ export function useSpectreStore() {
       addCommsEntry('SPECTRE', 'ALL', `ORDER NOT SENT (${command.type}): remote Command mode is view-only.`, 'RED');
       return;
     }
+    noteOrder(command);
     return window.spectreAPI.sendCommand(command);
   }, [addCommsEntry]);
 

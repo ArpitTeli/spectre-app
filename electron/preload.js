@@ -52,7 +52,7 @@ contextBridge.exposeInMainWorld('spectreAPI', {
   onRelayStatus: (cb) => onEvent('relay-status', cb),
   startHostServices: () => ipcRenderer.send('start-host-services'),
   getPairingInfo: () => ipcRenderer.invoke('get-pairing-info'),
-  resetPairing: () => ipcRenderer.invoke('reset-pairing'),
+  setPairingPassword: (text) => ipcRenderer.invoke('set-pairing-password', text),
   onRemoteOrder: (cb) => onEvent('remote-order', cb),
   generateFpvWaypoints: (start, target) => ipcRenderer.invoke('generate-fpv-waypoints', { start, target }),
 });

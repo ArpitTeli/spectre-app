@@ -1,6 +1,6 @@
 {
   "name": "spectre-arma",
-  "version": "1.12.44",
+  "version": "1.12.45",
   "description": "SPECTRE C2 System for Arma 3",
   "main": "electron/main.js",
   "homepage": "./",
@@ -13,9 +13,12 @@
     "react": "react-scripts start"
   },
   "dependencies": {
+    "@blueprintjs/core": "^5.19.1",
+    "@blueprintjs/icons": "^5.23.0",
     "cytoscape": "^3.34.0",
     "electron-updater": "^6.1.0",
     "leaflet": "^1.9.4",
+    "milsymbol": "^3.0.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "three": "^0.185.1",

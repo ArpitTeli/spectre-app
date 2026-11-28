@@ -52,6 +52,17 @@ function loadSatTiles() {
   });
 }
 
+// The same night styling the 2D map gets from CSS.
+function darkMap(source) {
+  const out = document.createElement('canvas');
+  out.width = source.width;
+  out.height = source.height;
+  const ctx = out.getContext('2d');
+  ctx.filter = 'invert(1) hue-rotate(180deg) saturate(0.55) brightness(1.2) contrast(0.92)';
+  ctx.drawImage(source, 0, 0);
+  return out;
+}
+
 function buildMesh(heightImg) {
   const verts = [], uvs = [], cols = [], idx = [];
   const step = MAP / RES;
@@ -152,17 +163,16 @@ function makeUnitTag(text, color) {
   const can = document.createElement('canvas');
   can.width = 256; can.height = 96;
   const c = can.getContext('2d');
-  c.font = 'bold 30px monospace';
+  c.font = '600 28px Inter, system-ui, sans-serif';
   c.textAlign = 'center';
-  const w = Math.min(252, c.measureText(text).width + 24);
-  c.fillStyle = 'rgba(7,9,15,0.85)';
-  c.fillRect(128 - w / 2, 2, w, 44);
-  c.strokeStyle = color; c.lineWidth = 3;
-  c.strokeRect(128 - w / 2, 2, w, 44);
-  c.fillStyle = '#ffffff';
-  c.fillText(text, 128, 35, 240);
+  const w = Math.min(252, c.measureText(text).width + 32);
+  c.fillStyle = 'rgba(12,15,19,0.92)';
+  c.beginPath(); c.roundRect(128 - w / 2, 3, w, 44, 22); c.fill();
+  c.strokeStyle = color; c.lineWidth = 2.5; c.stroke();
+  c.fillStyle = '#f2f4f7';
+  c.fillText(text, 128, 35, 236);
   c.fillStyle = color;
-  c.beginPath(); c.moveTo(114, 58); c.lineTo(142, 58); c.lineTo(128, 92); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(116, 58); c.lineTo(140, 58); c.lineTo(128, 90); c.closePath(); c.fill();
   const tex = new THREE.CanvasTexture(can);
   tex.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, sizeAttenuation: false, depthTest: false, transparent: true, fog: false }));
@@ -335,8 +345,8 @@ export default function MapView3D({ units, contacts, selectedUnits, viewKey, pen
     if (!c || !c.clientWidth) return;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x08080c);
-    scene.fog = new THREE.Fog(0x08080c, 6000, 14000);
+    scene.background = new THREE.Color(0x0b0e12);
+    scene.fog = new THREE.Fog(0x0b0e12, 6000, 14000);
 
     const cam = new THREE.PerspectiveCamera(60, c.clientWidth / c.clientHeight, 1, 30000);
     cam.position.set(0, 300, 500);
@@ -452,7 +462,7 @@ export default function MapView3D({ units, contacts, selectedUnits, viewKey, pen
     setStatus('loading sat');
     loadSatTiles().then(({ canvas, loaded, total }) => {
       if (loaded === 0) { setStatus('ready · no satellite (offline?)'); return; } // keep the height colours
-      const tex = new THREE.CanvasTexture(canvas);
+      const tex = new THREE.CanvasTexture(darkMap(canvas));
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.wrapS = THREE.ClampToEdgeWrapping;
       tex.wrapT = THREE.ClampToEdgeWrapping;
@@ -603,6 +613,18 @@ export default function MapView3D({ units, contacts, selectedUnits, viewKey, pen
       const k = keyOf(e); keys[k] = true; if (k === 'q') qHeldRef.current = true; if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); }
     function ku(e) { const k = keyOf(e); keys[k] = false; if (k === 'q') qHeldRef.current = false; }
     const onBlur = () => { for (const k in keys) delete keys[k]; };
+    const onTool = (e) => {
+      if (e.detail === 'fit') {
+        const all = Object.values(unitsRef.current || {});
+        const picked = all.filter(u => (selectedRef.current || []).includes(u.id));
+        if (frameUnits(cam, ctrl, picked.length ? picked : all)) framedKeyRef.current = viewKeyRef.current;
+        return;
+      }
+      const offset = cam.position.clone().sub(ctrl.target);
+      offset.setLength(Math.max(30, Math.min(12000, offset.length() * (e.detail === 'zoomIn' ? 0.75 : 1.33))));
+      cam.position.copy(ctrl.target).add(offset);
+    };
+    window.addEventListener('spectre:map', onTool);
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku); window.addEventListener('blur', onBlur);
 
     let running = true;
@@ -658,7 +680,7 @@ export default function MapView3D({ units, contacts, selectedUnits, viewKey, pen
       if (framedKeyRef.current !== null) {
         _savedView = { key: framedKeyRef.current, pos: cam.position.clone(), target: ctrl.target.clone() };
       }
-      window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); window.removeEventListener('blur', onBlur);
+      window.removeEventListener('spectre:map', onTool); window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); window.removeEventListener('blur', onBlur);
       window.removeEventListener('resize', rs);
       // Dispose all Three.js resources
       const s = st.current;
@@ -702,7 +724,7 @@ export default function MapView3D({ units, contacts, selectedUnits, viewKey, pen
     }
 
     const BLUE = 0x3b82f6;
-    const SELECTED = 0xc75b1f;
+    const SELECTED = 0xe9eef5;
     const DEAD = 0x585870;
     const lineMat = new THREE.LineBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.4 });
     const groundDotGeo = new THREE.RingGeometry(2, 4, 16);
@@ -723,7 +745,7 @@ export default function MapView3D({ units, contacts, selectedUnits, viewKey, pen
       const dead = u.status === 'DESTROYED' || u.status === 'DEAD';
       const isSelected = selectedUnits && selectedUnits.includes(u.id);
       const color = dead ? DEAD : (isSelected ? SELECTED : BLUE);
-      const emissive = dead ? 0x222233 : (isSelected ? 0xc75b1f : 0x2a6db5);
+      const emissive = dead ? 0x222233 : (isSelected ? 0x9fb4c8 : 0x2a7fb5);
       const opacity = dead ? 0.4 : 1;
 
       const modelType = getUnitModelType(u);
@@ -746,7 +768,7 @@ export default function MapView3D({ units, contacts, selectedUnits, viewKey, pen
         g.add(clone);
       }
 
-      const tag = makeUnitTag(u.callsign || u.id, dead ? '#585870' : (isSelected ? '#c75b1f' : '#3b82f6'));
+      const tag = makeUnitTag(u.callsign || u.id, dead ? '#59616d' : (isSelected ? '#ffffff' : '#5cc8ff'));
       tag.position.set(tx, h + 10, tz);
       tag.userData = { unitId: u.id };
       // Units close together get their tags stacked so each stays readable.
@@ -816,6 +838,12 @@ export default function MapView3D({ units, contacts, selectedUnits, viewKey, pen
         g.add(clone);
       }
 
+      const tag = makeUnitTag(c.id || 'Hostile', state === 'SUSPECTED' ? '#ffbe55' : '#ff6369');
+      tag.material.opacity = state === 'LAST_KNOWN' || state === 'SUSPECTED' ? 0.65 : 1;
+      tag.position.set(tx, h + 9, tz);
+      tag.userData = { contactId: c.id };
+      g.add(tag);
+
       if (altAGL > 1) {
         const lineGeo = new THREE.BufferGeometry().setFromPoints([
           new THREE.Vector3(tx, h, tz),
@@ -838,12 +866,12 @@ export default function MapView3D({ units, contacts, selectedUnits, viewKey, pen
   return (
     <div style={{ position:'relative', width:'100%', height:'100%', overflow:'hidden' }}>
       <div ref={ref} style={{ width:'100%', height:'100%' }} />
-      <div style={{ position:'absolute', top:12, left:12, zIndex:10, display:'flex', gap:4, alignItems:'center', background:'rgba(7,9,15,0.8)', padding:4, borderRadius:3 }}>
-        <span className="badge badge-primary">3D</span>
-        <span className={`badge ${status.startsWith('ready')?'badge-success':''}`}>{status}</span>
+      <div className="map-badge">
+        <strong>3D</strong>
+        <span><i className={`key ${status.startsWith('ready') ? 'key--ready' : 'key--suspected'}`} />{status}</span>
       </div>
-      <div style={{ position:'absolute', bottom:12, left:60, zIndex:10, fontFamily:'var(--font-mono)', fontSize:11, color:'#c9d1e0', background:'rgba(7,9,15,0.82)', padding:'5px 10px', borderRadius:3, pointerEvents:'none' }}>
-        F=find friendlies · WASD+Shift=fly · Scroll=zoom · Left-drag=pan · Right/Mid-drag=orbit · M=2D
+      <div className="map3d-hint">
+        <b>F</b> find friendlies <b>WASD</b> fly <b>Scroll</b> zoom <b>Drag</b> pan <b>Right-drag</b> orbit <b>M</b> 2D
       </div>
     </div>
   );

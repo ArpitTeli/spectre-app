@@ -10,7 +10,9 @@
 //   client  {type:'order', body, mac}              mac = HMAC(sessionKey, body)
 //   host    {type:'ack', id, stage, reason}        received | delivered | rejected | expired | failed
 //
-// The pairing code never crosses the network. Each order is signed with a key
+// The password is chosen on the host and never crosses the network. A short one
+// can still be worked out by someone who records a pairing on the same network,
+// and wrong guesses are rate limited here. Each order is signed with a key
 // unique to the connection, numbered (no replays) and must quote a recent host
 // beat (an order held up by a bad network is refused). Traffic is NOT
 // encrypted: use a trusted network.
@@ -21,8 +23,11 @@ const PROTOCOL = 1;
 const BEAT_MS = 2000;
 const MAX_BEAT_AGE_MS = 8000; // order must quote a beat this recent
 const DELIVERY_TTL_MS = 10000; // the game must pick it up within this
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 32 symbols, no 0/O/1/I
-const CODE_LENGTH = 16; // 80 bits
+const MIN_PASSWORD = 4;
+const MAX_PASSWORD = 64;
+const TRIES = 5; // wrong passwords from one address before it must wait
+const TRIES_TOTAL = 20; // from all addresses together
+const LOCK_MS = 60000;
 
 const UNIT_ORDERS = ['MOVE_TO', 'ATTACK', 'HOLD', 'RTB'];
 const FORCE_ORDERS = ['HOLD_ALL', 'RTB_ALL', 'WEAPONS_FREE', 'WEAPONS_SAFE', 'FORM_UP', 'DISPERSE'];
@@ -30,12 +35,36 @@ const SAFETY_ORDERS = ['HOLD_ALL']; // any paired commander may send these
 const ID_PATTERN = /^[A-Za-z0-9_\-]{1,40}$/;
 const MAX_COORD = 40960;
 
-function generateCode() {
-  return Array.from(crypto.randomBytes(CODE_LENGTH), b => CODE_ALPHABET[b % 32]).join('');
+/** Used until the operator chooses a password. */
+function generatePassword() {
+  return String(crypto.randomInt(0, 100000000)).padStart(8, '0');
 }
 
-function formatCode(code) {
-  return code.match(/.{1,4}/g).join('-');
+/** The password trimmed, or null if it is too short or long. */
+function cleanPassword(text) {
+  const password = String(text ?? '').trim();
+  return password.length >= MIN_PASSWORD && password.length <= MAX_PASSWORD ? password : null;
+}
+
+// Counts wrong passwords and says when to stop listening for a while.
+function createLimiter(now) {
+  const entries = new Map();
+  const entry = key => {
+    let e = entries.get(key);
+    if (!e || (e.until && now() >= e.until)) entries.set(key, (e = { count: 0, until: 0 }));
+    return e;
+  };
+  return {
+    blocked: address => entry(address).until > 0 || entry('*').until > 0,
+    fail(address) {
+      for (const [key, limit] of [[address, TRIES], ['*', TRIES_TOTAL]]) {
+        const e = entry(key);
+        if (++e.count >= limit) e.until = now() + LOCK_MS;
+      }
+    },
+    succeed: address => entries.delete(address),
+    reset: () => entries.clear(),
+  };
 }
 
 function hmac(key, text) {
@@ -76,6 +105,7 @@ function validateOrder(order, picture) {
 
 function createCommandLink({ getCode, execute, log = () => {}, now = Date.now, onCount = () => {} }) {
   const sessions = new Set();
+  const limiter = createLimiter(now);
   let controller = null;
   let mission = '';
   const picture = { units: new Set(), contacts: new Set() };
@@ -97,6 +127,7 @@ function createCommandLink({ getCode, execute, log = () => {}, now = Date.now, o
   function onHello(session, msg) {
     if (msg.v !== PROTOCOL) return deny(session, 'this app version does not match the host');
     if (msg.role !== 'commander') return deny(session, 'role not supported');
+    if (limiter.blocked(session.address)) return deny(session, 'too many wrong passwords: wait a minute');
     session.nonce = crypto.randomBytes(16).toString('hex');
     send(session, { type: 'challenge', nonce: session.nonce });
   }
@@ -106,11 +137,14 @@ function createCommandLink({ getCode, execute, log = () => {}, now = Date.now, o
     const { nonce } = session;
     session.nonce = null; // one attempt per challenge
     const clientNonce = msg.clientNonce;
+    if (limiter.blocked(session.address)) return deny(session, 'too many wrong passwords: wait a minute');
     if (!nonce || !code || typeof clientNonce !== 'string' || !/^[0-9a-f]{32}$/.test(clientNonce)
       || !sameHex(hmac(code, `auth\n${nonce}\n${clientNonce}\ncommander`), msg.proof)) {
+      limiter.fail(session.address);
       log('SPECTRE-LINK: pairing refused');
-      return deny(session, 'pairing code is wrong');
+      return deny(session, 'password is wrong');
     }
+    limiter.succeed(session.address);
     session.key = hmac(code, `session\n${nonce}\n${clientNonce}`);
     session.lastSeq = 0;
     if (!controller) controller = session;
@@ -157,8 +191,8 @@ function createCommandLink({ getCode, execute, log = () => {}, now = Date.now, o
   timer.unref?.();
 
   return {
-    handleConnection(ws) {
-      const session = { ws, nonce: null, key: null, lastSeq: 0 };
+    handleConnection(ws, address = 'unknown') {
+      const session = { ws, address, nonce: null, key: null, lastSeq: 0 };
       sessions.add(session);
       ws.on('message', raw => {
         let msg;
@@ -193,8 +227,9 @@ function createCommandLink({ getCode, execute, log = () => {}, now = Date.now, o
       (state.contacts || []).forEach(c => c && c.id && picture.contacts.add(String(c.id)));
     },
 
-    /** Used when the pairing code changes: every commander must pair again. */
+    /** Used when the password changes: every commander must pair again. */
     disconnectAll(reason) {
+      limiter.reset();
       paired().forEach(s => deny(s, reason));
       controller = null;
     },
@@ -205,6 +240,6 @@ function createCommandLink({ getCode, execute, log = () => {}, now = Date.now, o
 }
 
 module.exports = {
-  createCommandLink, validateOrder, generateCode, formatCode,
+  createCommandLink, validateOrder, generatePassword, cleanPassword,
   PROTOCOL, MAX_BEAT_AGE_MS, DELIVERY_TTL_MS, UNIT_ORDERS, FORCE_ORDERS,
 };

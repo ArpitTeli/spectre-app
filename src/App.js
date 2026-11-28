@@ -1,12 +1,14 @@
 import React, { useEffect, useCallback, useRef, useState } from 'react';
 import { useSpectreStore } from './store/useSpectreStore';
 import { aiService } from './ai/aiService';
-import TitleBar from './components/TitleBar';
+import TopBar from './components/TopBar';
+import CommandBar from './components/CommandBar';
+import Inspector from './components/Inspector';
+import { Button } from '@blueprintjs/core';
 import MapView from './components/MapView';
 import MapView3D from './components/MapView3D';
 import SidePanel from './components/SidePanel';
-import RightPanel from './components/RightPanel';
-import { CommsLog, StatusBar, SettingsModal } from './components/StatusBar';
+import { CommsLog, SettingsModal } from './components/StatusBar';
 import PlanningModal from './components/PlanningModal';
 import COAPanel from './components/COAPanel';
 import AbortModal from './components/AbortModal';
@@ -15,7 +17,10 @@ import AARPanel from './components/AARPanel';
 import ModeSelect from './components/ModeSelect';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import RadialMenu from './components/RadialMenu';
+import '@blueprintjs/core/lib/css/blueprint.css';
+import '@blueprintjs/icons/lib/css/blueprint-icons.css';
 import './styles/global.css';
+import './styles/theme.css';
 
 export default function App() {
   const {
@@ -31,6 +36,8 @@ export default function App() {
   const [roomCode, setRoomCode] = useState('');
   const [relayStatus, setRelayStatus] = useState({ connected: false, clients: 0 });
   const [viewMode, setViewMode] = useState('2d'); // '2d' | '3d'
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [radialMenu, setRadialMenu] = useState(null); // { x, y, unitId }
   const [pendingAction, setPendingAction] = useState(null); // { id, unitId, label }
   const pendingActionRef = useRef(null);
@@ -255,42 +262,27 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-    <div className="app">
-      <TitleBar
-        missionPhase={state.missionPhase}
-        missionElapsedSec={state.missionElapsedSec}
+    <div className="app bp5-dark">
+      <TopBar
+        state={state}
+        patch={patch}
+        addCommsEntry={addCommsEntry}
+        endMission={endMission}
         armaConnected={appMode === 'client' ? relayStatus.connected : state.armaConnected}
         mode={appMode}
         roomCode={roomCode}
-        relayClients={relayStatus.clients}
-        relayError={relayStatus.error}
-        relayConnecting={relayStatus.connecting}
+        relayStatus={relayStatus}
         onSwitchMode={handleSwitchMode}
-        onMinimize={() => window.spectreAPI?.minimize()}
-        onMaximize={() => window.spectreAPI?.maximize()}
-        onClose={() => window.spectreAPI?.close()}
       />
 
       {appMode === 'client' && (
-        <div role="status" style={{
-          padding: '4px 16px', flexShrink: 0, textAlign: 'center',
-          background: 'var(--accent-dim)', borderBottom: '1px solid var(--accent)',
-          color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: '11px'
-        }}>
+        <div role="status" className="banner banner--warn">
           VIEW ONLY: orders from this window are not sent. To command remotely, pair the SPECTRE Android app with the host.
         </div>
       )}
 
       {updateDownloaded && (
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '6px 16px',
-          background: 'var(--accent-dim)',
-          borderBottom: '1px solid var(--accent)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: '11px',
-          flexShrink: 0
-        }}>
+        <div className="banner banner--action">
           <span style={{ color: 'var(--accent)' }}>
             Update v{updateInfo?.version} downloaded — restart to apply
           </span>
@@ -304,15 +296,25 @@ export default function App() {
         </div>
       )}
 
-      <div className="app-body">
+      <div className={`app-body${panelCollapsed ? '' : ' has-panel'}${inspectorOpen ? ' has-inspector' : ''}`}>
         <SidePanel
           state={state}
           patch={patch}
           addCommsEntry={addCommsEntry}
           sendArmaCommand={sendArmaCommand}
           addIntel={addIntel}
-          endMission={endMission}
           visibleUnits={visibleUnits}
+          onPickUnit={(id, additive) => {
+            if (additive || ctrlHeldRef.current) {
+              toggleUnitSelection(id);
+            } else {
+              clearSelection();
+              patch({ selectedUnit: id });
+            }
+          }}
+          mapName={state.mapName}
+          collapsed={panelCollapsed}
+          onCollapse={setPanelCollapsed}
         />
 
         <div className={`app-center ${pendingAction ? 'target-mode' : ''}`}>
@@ -323,24 +325,6 @@ export default function App() {
                 : pendingAction.id === 'ATTACK'
                 ? `Click enemy contact to attack — ${pendingAction.label} — ESC to cancel`
                 : `Click map to set target — ${pendingAction.label} — ESC to cancel`}
-            </div>
-          )}
-          {state.selectedUnits.length > 1 && !pendingAction && (
-            <div className="selection-indicator">
-              <span className="selection-count">{state.selectedUnits.length} UNITS SELECTED</span>
-              <div className="selection-actions">
-                <button className="selection-action-btn" onClick={() => {
-                  state.selectedUnits.forEach(id => sendArmaCommand({ type: 'HOLD', unit_id: id }));
-                  addCommsEntry('SPECTRE', 'SELECTED', 'HOLD', 'BLUE');
-                }}>HOLD</button>
-                <button className="selection-action-btn" onClick={() => {
-                  setPendingAction({ id: 'MOVE_TO', unitId: null, label: 'MOVE TO (ALL)' });
-                }}>MOVE TO</button>
-                <button className="selection-action-btn" onClick={() => {
-                  setPendingAction({ id: 'ATTACK', unitId: null, label: 'ATTACK (ALL)' });
-                }}>ATTACK</button>
-              </div>
-              <button className="selection-clear-btn" onClick={clearSelection}>✕</button>
             </div>
           )}
           {viewMode === '2d' ? (
@@ -474,21 +458,39 @@ export default function App() {
           )}
 
 
-          <button
-            onClick={() => setViewMode(v => v === '2d' ? '3d' : '2d')}
-            className="btn btn-sm view-toggle"
-            title="Press M to toggle 2D/3D"
-          >
-            {viewMode === '2d' ? '3D' : '2D'}
-          </button>
         </div>
 
-        <RightPanel
+        <div className="map-tools">
+          <Button className="view-toggle" onClick={() => setViewMode(v => v === '2d' ? '3d' : '2d')} title="Press M to toggle 2D/3D" text={viewMode === '2d' ? '3D' : '2D'} />
+          {viewMode === '2d' && (
+            <Button icon="layers" title="Switch between terrain and chart (place names)" aria-label="Switch basemap" onClick={() => window.dispatchEvent(new CustomEvent('spectre:map', { detail: 'basemap' }))} />
+          )}
+          <Button icon="zoom-to-fit" title="Show my units" aria-label="Show my units" onClick={() => window.dispatchEvent(new CustomEvent('spectre:map', { detail: 'fit' }))} />
+          <Button icon="plus" title="Zoom in" aria-label="Zoom in" onClick={() => window.dispatchEvent(new CustomEvent('spectre:map', { detail: 'zoomIn' }))} />
+          <Button icon="minus" title="Zoom out" aria-label="Zoom out" onClick={() => window.dispatchEvent(new CustomEvent('spectre:map', { detail: 'zoomOut' }))} />
+        </div>
+
+        <CommandBar
+          selectedUnits={state.selectedUnits}
+          onForceOrder={(type, label) => {
+            sendArmaCommand({ type });
+            addCommsEntry('SPECTRE', 'ALL', label.toUpperCase(), type === 'WEAPONS_FREE' ? 'RED' : 'BLUE');
+          }}
+          onHoldSelected={() => {
+            state.selectedUnits.forEach(id => sendArmaCommand({ type: 'HOLD', unit_id: id }));
+            addCommsEntry('SPECTRE', 'SELECTED', 'HOLD', 'BLUE');
+          }}
+          onMoveSelected={() => setPendingAction({ id: 'MOVE_TO', unitId: null, label: 'MOVE TO (ALL)' })}
+          onAttackSelected={() => setPendingAction({ id: 'ATTACK', unitId: null, label: 'ATTACK (ALL)' })}
+          onClearSelection={clearSelection}
+        />
+
+        <Inspector
+          mapName={state.mapName}
           state={state}
           patch={patch}
           sendArmaCommand={sendArmaCommand}
           addCommsEntry={addCommsEntry}
-          selectedUnit={state.selectedUnit ? state.units[state.selectedUnit] : null}
           fireMissionUnit={fireMissionUnit}
           setFireMissionUnit={setFireMissionUnit}
           flightPlanUnit={flightPlanUnit}
@@ -496,23 +498,10 @@ export default function App() {
           panelClickHandlerRef={panelClickHandlerRef}
           activeTab={rightTab}
           setActiveTab={setRightTab}
-          endMission={endMission}
+          onTarget={(id, unitId, label) => setPendingAction({ id, unitId, label })}
+          onOpenChange={setInspectorOpen}
         />
       </div>
-
-      <StatusBar
-        armaConnected={appMode === 'client' ? relayStatus.connected : state.armaConnected}
-        forceMetrics={state.forceMetrics}
-        missionPhase={state.missionPhase}
-        missionElapsedSec={state.missionElapsedSec}
-        rewardData={state.rewardData}
-        lastUpdate={state.lastArmaUpdate}
-        bridgePaths={state.bridgePaths}
-        mode={appMode}
-        roomCode={roomCode}
-        relayClients={relayStatus.clients}
-        onCommsToggle={() => patch(p => ({ ...p, showComms: !p.showComms }))}
-      />
 
       {state.showComms && (
         <CommsLog
